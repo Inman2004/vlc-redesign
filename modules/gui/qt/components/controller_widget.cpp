@@ -31,6 +31,7 @@
 #include "input_manager.hpp"         /* Get notification of Volume Change */
 #include "util/input_slider.hpp"     /* SoundSlider */
 #include "util/imagehelper.hpp"
+#include "styles/vlc_theme.hpp"       /* redesign cone metrics */
 
 #include <math.h>
 
@@ -87,13 +88,17 @@ SoundWidget::SoundWidget( QWidget *_parent, intf_thread_t * _p_intf,
         layout->addWidget( volMuteLabel );
     }
 
-    /* Slider creation: shiny or clean */
-    if( b_shiny )
+    /* Redesign: the Figma volume control is a cone, which only SoundSlider
+     * knows how to paint, so the redesign forces it regardless of the
+     * legacy "shiny" preference. */
+    if( b_shiny || Theme::isDark() )
     {
         volumeSlider = new SoundSlider( this,
             config_GetFloat( p_intf, "volume-step" ),
             var_InheritString( p_intf, "qt-slider-colours" ),
             var_InheritInteger( p_intf, "qt-max-volume") );
+        volumeSlider->setFixedHeight( Theme::VOLUME_HEIGHT );
+        volumeSlider->setMinimumWidth( Theme::VOLUME_WIDTH );
     }
     else
     {

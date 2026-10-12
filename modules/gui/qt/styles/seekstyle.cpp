@@ -30,6 +30,8 @@
 #include <QPainter>
 #include <QDebug>
 
+#include "vlc_theme.hpp"   /* redesign painters */
+
 #define RADIUS 3
 #define CHAPTERSSPOTSIZE 3
 
@@ -80,6 +82,30 @@ void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex
             /* Get the needed subcontrols to draw the slider */
             QRect groove = subControlRect(CC_Slider, slideroptions, SC_SliderGroove, widget);
             QRect handle = subControlRect(CC_Slider, slideroptions, SC_SliderHandle, widget);
+
+            /* Redesign: the Figma seek bar is 28px thick and painted by the
+             * design system. Delegate entirely rather than using the legacy
+             * blue/grey gloss below. */
+            if( Theme::isDark() )
+            {
+                Theme::SeekBarGeometry geo;
+                /* keep the 8px handle inside the track, as measured */
+                geo.groove = groove;
+                geo.groove.adjust( Theme::SEEK_HANDLE_W / 2, 0,
+                                   -Theme::SEEK_HANDLE_W / 2, 0 );
+                geo.position = slideroptions->maximum > slideroptions->minimum
+                    ? qreal( slideroptions->sliderPosition - slideroptions->minimum )
+                      / qreal( slideroptions->maximum - slideroptions->minimum )
+                    : 0.0;
+                geo.enabled = slideroptions->sliderPosition > slideroptions->minimum;
+                geo.hovered = ( option->state & QStyle::State_MouseOver )
+                           || slideroptions->animate;
+                geo.buffering = slideroptions->buffering;
+                geo.chapters = slideroptions->points;
+                geo.length = slideroptions->length;
+                Theme::paintSeekBar( *painter, geo, slideroptions->rect );
+                return;
+            }
 
             /* Adjust the size of the groove so the handle stays centered */
             groove.adjust( handle.width() / 2, 0, -handle.width() / 2, 0 );

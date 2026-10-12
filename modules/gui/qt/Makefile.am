@@ -148,7 +148,9 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/qvlcapp.hpp \
 	gui/qt/util/singleton.hpp \
 	gui/qt/util/imagehelper.cpp gui/qt/util/imagehelper.hpp \
-	gui/qt/styles/seekstyle.cpp gui/qt/styles/seekstyle.hpp
+	gui/qt/styles/seekstyle.cpp gui/qt/styles/seekstyle.hpp \
+	gui/qt/styles/vlc_theme.cpp gui/qt/styles/vlc_theme.hpp
+
 if HAVE_WIN32
 libqt_plugin_la_SOURCES += \
 	gui/qt/main_interface_win32.cpp gui/qt/main_interface_win32.hpp

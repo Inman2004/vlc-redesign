@@ -955,7 +955,8 @@ TimeLabel::TimeLabel( intf_thread_t *_p_intf, TimeLabel::Display _displayType  )
 
 
     auto updateStyle = [this]() {
-        setStyleSheet( "TimeLabel {  padding-left: 4px; padding-right: 4px; }" );
+        /* Padding is supplied by the design-system stylesheet
+         * (QLabel#TimeLabel in styles/vlc_theme.cpp). */
     };
 
     updateStyle();

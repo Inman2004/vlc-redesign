@@ -573,18 +573,16 @@ inline void MainInterface::createStatusBar()
                                       | Qt::TextSelectableByKeyboard );
     SpeedLabel *speedLabel = new SpeedLabel( p_intf, this );
 
-    /* Styling those labels */
-    timeLabel->setFrameStyle( QFrame::Sunken | QFrame::Panel );
-    speedLabel->setFrameStyle( QFrame::Sunken | QFrame::Panel );
-    nameLabel->setFrameStyle( QFrame::Sunken | QFrame::StyledPanel);
+    /* Styling those labels.
+     * The redesign drops the sunken frames and the black hover text; it is
+     * handled by the application stylesheet via object names instead. */
+    timeLabel->setObjectName( "TimeLabel" );
+    speedLabel->setObjectName( "SpeedLabel" );
+    nameLabel->setObjectName( "NameLabel" );
     auto updateStyle = [=]() {
-        timeLabel->setStyleSheet(
-            "QLabel:hover { color: black; background-color: rgba(255, 255, 255, 50%) }" );
-        speedLabel->setStyleSheet(
-            "QLabel:hover { color: black; background-color: rgba(255, 255, 255, 50%) }" );
-        /* pad both label and its tooltip */
-        nameLabel->setStyleSheet( "padding-left: 5px; padding-right: 5px;" );
-
+        /* Framing moved to the design-system stylesheet (see
+         * styles/vlc_theme.cpp). Kept as a no-op hook so the paletteChanged
+         * connection below stays meaningful for future restyling. */
     };
     updateStyle();
 //same as Qt::AA_UseStyleSheetPropagationInWidgetStyles
