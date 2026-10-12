@@ -1,0 +1,15 @@
+*.o
+*.lo
+*.la
+.deps/
+.libs/
+*.moc.cpp
+*.ui.h
+config.h
+config.log
+config.status
+Makefile
+Makefile.in
+autom4te.cache/
+resources.cpp
+*.pc
