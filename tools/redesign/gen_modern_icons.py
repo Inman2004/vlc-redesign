@@ -143,7 +143,22 @@ def tinted(svg, colour):
 
 
 def main():
-    iconoir = os.path.join(sys.argv[1], 'icons', 'regular')
+    if len(sys.argv) != 2:
+        sys.exit(__doc__.strip())
+    pkg = sys.argv[1]
+    iconoir = os.path.join(pkg, 'icons', 'regular')
+    # Validate every input before touching the output directory, so a wrong
+    # path never leaves the tree without its committed icons.
+    missing = [p for p in (os.path.join(pkg, 'LICENSE'), iconoir) if not os.path.exists(p)]
+    for src, _ in MAP.values():
+        kind, name = src.split(':')
+        f = (os.path.join(iconoir, name + '.svg') if kind == 'I'
+             else os.path.join(ROOT, 'pixmaps', 'redesign', name + '.svg'))
+        if not os.path.isfile(f):
+            missing.append(f)
+    if missing:
+        sys.exit('not an Iconoir package (npm pack iconoir@7.12.1), missing:\n  '
+                 + '\n  '.join(sorted(set(missing))[:10]))
     if os.path.isdir(OUT):
         shutil.rmtree(OUT)
     os.makedirs(OUT)
