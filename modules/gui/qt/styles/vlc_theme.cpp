@@ -370,6 +370,14 @@ static QString buildStyleSheet()
     t["accentHov"]  = accentHover().name();
     t["accentPre"]  = accentPressed().name();
     t["accentSoft"] = rgba( QColor( g_accent.red(), g_accent.green(), g_accent.blue(), 46 ) );
+    /* adjustment panel, measured on the Figma "Subtitles" frame */
+    t["adjBg"]      = g_dark ? QString( "#0E0E0E" ) : QString( "#F4F3F2" );
+    t["adjTitle"]   = g_dark ? QString( "#969696" ) : QString( "#4A4A4A" );
+    t["adjLabel"]   = g_dark ? QString( "#6B6B6B" ) : QString( "#6E6E6E" );
+    t["adjRule"]    = g_dark ? QString( "#222222" ) : QString( "#E2E0DE" );
+    t["adjBorder"]  = g_dark ? QString( "#191919" ) : QString( "#DAD7D4" );
+    t["adjBorderHi"] = g_dark ? QString( "#2C2C2C" ) : QString( "#C4C0BC" );
+    t["adjCard"]    = c.titlebar.name();
 
     QString ss = QString::fromLatin1(
     /* Fonts: bundled Google Sans, falling back to the platform UI font. */
@@ -428,6 +436,71 @@ static QString buildStyleSheet()
 
     /* Splitter between sidebar and content */
     "#VLCBody QSplitter::handle { background: @titlebar; }\n"
+
+    /* Adjustment sidebar (P3) */
+    "#VLCAdjust { background: @adjBg; border-radius: 8px; }\n"
+    "#VLCAdjust QScrollArea#AdjustScroll, #VLCAdjust QWidget#AdjustPage { background: transparent; border: none; }\n"
+    "#VLCAdjust QWidget#AdjustTabs { background: @track; border-top-left-radius: 8px;"
+    "  border-top-right-radius: 8px; }\n"
+    "#VLCAdjust QWidget#AdjustTabs QToolButton { color: @adjLabel; font-size: 14px; border: none;"
+    "  background: transparent; padding: 0 6px; }\n"
+    "#VLCAdjust QWidget#AdjustTabs QToolButton:hover, #VLCAdjust QWidget#AdjustTabs QToolButton:checked"
+    " { color: @muted; }\n"
+    "#VLCAdjust QWidget#AdjustTabLine { background: @accent; }\n"
+    "#VLCAdjust QScrollBar#AdjustOverlayBar { background: transparent; width: 6px; margin: 0; }\n"
+    "#VLCAdjust QScrollBar#AdjustOverlayBar::handle { background: rgba(255,255,255,28); border-radius: 3px;"
+    "  min-height: 32px; }\n"
+    "#VLCAdjust QScrollBar#AdjustOverlayBar::handle:hover { background: rgba(255,255,255,56); }\n"
+    "#VLCAdjust QScrollBar#AdjustOverlayBar::add-line, #VLCAdjust QScrollBar#AdjustOverlayBar::sub-line,"
+    " #VLCAdjust QScrollBar#AdjustOverlayBar::add-page, #VLCAdjust QScrollBar#AdjustOverlayBar::sub-page"
+    " { background: none; height: 0; }\n"
+    "#VLCAdjust QFrame#AdjustRule { background: @adjRule; border: none; }\n"
+    "#VLCAdjust QFrame#AdjustCardRule { background: @adjRule; border: none; margin: 2px 0; }\n"
+    "#VLCAdjust QLabel#AdjustSectionTitle { color: @adjTitle; font-size: 17px; }\n"
+    "#VLCAdjust QLabel#AdjustLabel { color: @adjLabel; font-size: 15px; }\n"
+    "#VLCAdjust QLabel#AdjustLabel:disabled, #VLCAdjust QLabel#AdjustInlineValue:disabled { color: @iconDisabled; }\n"
+    "#VLCAdjust QLabel#AdjustInlineValue { color: @muted; font-size: 15px; }\n"
+    "#VLCAdjust QLabel#AdjustScale { color: @adjLabel; font-size: 13px; padding: 0 1px; }\n"
+    /* value boxes: 140x36, #090909 well, 2px #191919 border */
+    "#VLCAdjust QComboBox, #VLCAdjust QAbstractSpinBox#AdjustSpin, #VLCAdjust QLineEdit#AdjustEdit,"
+    " #VLCAdjust QWidget#AdjustColor, #VLCAdjust QToolButton#AdjustButton, #VLCAdjust QLabel#AdjustValueSmall"
+    " { background: @track; border: 2px solid @adjBorder; border-radius: 6px; color: @muted;"
+    "  font-size: 15px; padding: 0 12px; selection-background-color: @accentSoft; selection-color: @text; }\n"
+    "#VLCAdjust QComboBox:hover, #VLCAdjust QAbstractSpinBox#AdjustSpin:hover, #VLCAdjust QLineEdit#AdjustEdit:hover,"
+    " #VLCAdjust QWidget#AdjustColor:hover, #VLCAdjust QToolButton#AdjustButton:hover { border-color: @adjBorderHi; }\n"
+    "#VLCAdjust QComboBox:focus, #VLCAdjust QAbstractSpinBox#AdjustSpin:focus, #VLCAdjust QLineEdit#AdjustEdit:focus"
+    " { border-color: @accentPre; }\n"
+    "#VLCAdjust QComboBox:disabled, #VLCAdjust QAbstractSpinBox#AdjustSpin:disabled,"
+    " #VLCAdjust QToolButton#AdjustButton:disabled { color: @iconDisabled; }\n"
+    "#VLCAdjust QToolButton#AdjustButton { text-align: left; }\n"
+    "#VLCAdjust QToolButton#AdjustButton[active=\"true\"] { color: @accent; }\n"
+    "#VLCAdjust QLabel#AdjustValueSmall { min-width: 108px; max-width: 108px; min-height: 28px;"
+    "  max-height: 28px; font-size: 14px; border: none; }\n"
+    "#VLCAdjust QComboBox::drop-down { border: none; width: 26px; }\n"
+    "#VLCAdjust QComboBox::down-arrow { image: url(:/redesign/chevron-down.svg); width: 14px; height: 14px; }\n"
+    "#VLCAdjust QComboBox#AdjustComboWide { border-radius: 8px; padding-left: 16px; }\n"
+    "#VLCAdjust QComboBox QAbstractItemView { background: @menu; border: 1px solid @menuBorder; color: @muted;"
+    "  selection-background-color: @hover; selection-color: @text; outline: 0; padding: 4px; }\n"
+    "#VLCAdjust QLineEdit#AdjustColorText { background: transparent; border: none; padding: 0; color: @muted;"
+    "  font-size: 15px; }\n"
+    "#VLCAdjust QWidget#AdjustColor { padding: 0; }\n"
+    "#VLCAdjust QWidget#AdjustCard { background: @adjCard; border-radius: 8px; }\n"
+    "#VLCAdjust QLabel#AdjustCardTitle { color: @adjLabel; font-size: 15px; }\n"
+    "#VLCAdjust QWidget#AdjustCropBox { background: @track; border-radius: 6px; }\n"
+    "#VLCAdjust QSpinBox#AdjustCropSpin { background: transparent; border: none; color: @muted;"
+    "  font-size: 15px; selection-background-color: @accentSoft; }\n"
+    "#VLCAdjust QToolButton#AdjustLink { border: none; background: transparent; border-radius: 6px; }\n"
+    "#VLCAdjust QToolButton#AdjustLink:hover { background: @hover; }\n"
+    "#VLCAdjust QWidget#AdjustFooter { background: @adjBg; border-top: 1px solid @adjRule;"
+    "  border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }\n"
+    "#VLCAdjust QPushButton#PresetButton { background: @track; border: 2px solid @track; border-radius: 8px;"
+    "  color: @muted; font-size: 15px; text-align: left; padding: 0 14px; }\n"
+    "#VLCAdjust QPushButton#PresetButton:hover { border-color: @adjBorderHi; }\n"
+    "#VLCAdjust QLabel#PresetLabel { color: @muted; font-size: 15px; background: transparent; }\n"
+    "#VLCAdjust QPushButton#PresetButton::menu-indicator { image: none; width: 0; }\n"
+    "#VLCAdjust QToolButton#AdvancedLink { color: @adjLabel; font-size: 15px; border: none;"
+    "  background: transparent; padding: 4px 6px; }\n"
+    "#VLCAdjust QToolButton#AdvancedLink:hover { color: @muted; }\n"
 
     /* Menus and tooltips, application wide */
     /* Menus, measured on the "right-click menu" frame: #232323, 45px rows,

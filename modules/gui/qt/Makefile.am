@@ -152,7 +152,9 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/styles/vlc_theme.cpp gui/qt/styles/vlc_theme.hpp \
 	gui/qt/components/header_bar.cpp gui/qt/components/header_bar.hpp \
 	gui/qt/components/nav_rail.cpp gui/qt/components/nav_rail.hpp \
-	gui/qt/components/sidebar_panel.cpp gui/qt/components/sidebar_panel.hpp
+	gui/qt/components/sidebar_panel.cpp gui/qt/components/sidebar_panel.hpp \
+	gui/qt/components/adjust_panel.cpp gui/qt/components/adjust_panel.hpp \
+	gui/qt/util/redesign_widgets.cpp gui/qt/util/redesign_widgets.hpp
 if HAVE_WIN32
 libqt_plugin_la_SOURCES += \
 	gui/qt/main_interface_win32.cpp gui/qt/main_interface_win32.hpp
@@ -183,6 +185,8 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/header_bar.moc.cpp \
 	gui/qt/components/nav_rail.moc.cpp \
 	gui/qt/components/sidebar_panel.moc.cpp \
+	gui/qt/components/adjust_panel.moc.cpp \
+	gui/qt/util/redesign_widgets.moc.cpp \
 	gui/qt/adapters/seekpoints.moc.cpp \
 	gui/qt/adapters/chromaprint.moc.cpp \
 	gui/qt/adapters/variables.moc.cpp \
@@ -429,6 +433,8 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/fonts/OFL.txt \
 	gui/qt/pixmaps/redesign/add.svg \
 	gui/qt/pixmaps/redesign/chevron.svg \
+	gui/qt/pixmaps/redesign/chevron-down.svg \
+	gui/qt/pixmaps/redesign/link.svg \
 	gui/qt/pixmaps/redesign/record.svg \
 	gui/qt/pixmaps/redesign/hide-ui.svg \
 	gui/qt/pixmaps/redesign/playback.svg \

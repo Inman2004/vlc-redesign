@@ -108,6 +108,8 @@ public:
                       QLabel *valueLabel, QLabel *nameLabel,
                       const slider_data_t *p_data );
     void setValue( float f );
+    /* re-read the live value without writing it back */
+    void reload();
 
 protected:
     FilterSliderData( QObject *parent, QSlider *slider );
@@ -133,9 +135,17 @@ class AudioFilterControlWidget : public QWidget
 
 public:
     AudioFilterControlWidget( intf_thread_t *, QWidget *, const char *name );
+    /* Redesign: the adjustment panel owns the on/off switch */
+    bool isFilterEnabled() const;
+    const QString &filterName() const { return name; }
+    virtual void reload();
+
+public slots:
+    void setFilterEnabled( bool b ) { enable( b ); }
 
 protected:
     virtual void build();
+    void buildRedesign();
     void connectConfigChanged( FilterSliderData *slider );
     QVector<FilterSliderData::slider_data_t> controls;
     QVector<FilterSliderData *> sliderDatas;
@@ -177,13 +187,16 @@ class Equalizer: public AudioFilterControlWidget
 
 public:
     Equalizer( intf_thread_t *, QWidget * );
+    void reload() override;
 
 protected:
     void build() override;
+    void buildRedesignEqualizer();
 
 private:
     FilterSliderData *preamp;
     FilterSliderData::slider_data_t preamp_values;
+    QComboBox *presetCombo;
 
 private slots:
     void setCorePreset( int );
@@ -267,5 +280,18 @@ private slots:
     void adjustSubsSpeed( double );
     void adjustSubsDuration( double );
 };
+
+/* Video filter chain access shared by the adjustment panel (the same
+ * logic ExtVideo uses, without its .ui widgets). */
+namespace VideoFilters
+{
+    bool isEnabled( intf_thread_t *, const char *module );
+    void setEnabled( intf_thread_t *, const char *module, bool );
+    /* option value: int, bool, double or QString */
+    void setOption( intf_thread_t *, const char *module, const char *option,
+                    const QVariant &value );
+    /* current value (creates the inheriting playlist variable) */
+    QVariant option( intf_thread_t *, const char *option );
+}
 
 #endif

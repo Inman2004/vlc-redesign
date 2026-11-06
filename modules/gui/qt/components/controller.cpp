@@ -355,6 +355,7 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
 
 #define NORMAL_BUTTON( name )                           \
     QToolButton * name ## Button = new QToolButton;     \
+    name ## Button->setObjectName( #name "Button" );    \
     setupButton( name ## Button );                      \
     connect( name ## Button, &QToolButton::clicked, toolbarActionsMapper, QOverload<>::of(&QSignalMapper::map) ); \
     toolbarActionsMapper->setMapping( name ## Button, name ## _ACTION ); \

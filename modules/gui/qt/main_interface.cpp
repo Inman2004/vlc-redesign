@@ -43,6 +43,7 @@
 #include "components/header_bar.hpp"            // Redesign header
 #include "components/nav_rail.hpp"              // Redesign rail
 #include "components/sidebar_panel.hpp"         // Redesign sidebar
+#include "components/adjust_panel.hpp"          // Redesign adjustments
 #include "styles/vlc_theme.hpp"                 // Redesign tokens
 #include "dialogs/firstrun.hpp"                 // First Run
 #include "dialogs/playlist.hpp"                 // PlaylistDialog
@@ -60,6 +61,7 @@
 
 #include <QWindow>
 #include <QMenu>
+#include <QToolButton>
 #include <QMenuBar>
 #include <QLabel>
 #include <QStackedWidget>
@@ -118,6 +120,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     header               = NULL;
     rail                 = NULL;
     sidebar              = NULL;
+    adjustDock           = NULL;
     bodySplitter         = NULL;
     body                 = NULL;
 
@@ -288,6 +291,8 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
             activateSection( lastSection );
         else
             setSidebarVisible( false );
+        if( settings->value( "MainWindow/adjust-visible", false ).toBool() )
+            setAdjustPanelVisible( true );
     }
     else if( settings->value( "MainWindow/playlist-visible", false ).toBool() )
         togglePlaylist();
@@ -336,6 +341,7 @@ MainInterface::~MainInterface()
         settings->setValue( "sidebar-visible", playlistVisible );
         settings->setValue( "sidebar-section", lastSection );
         settings->setValue( "sidebar-splitter", bodySplitter->saveState() );
+        settings->setValue( "adjust-visible", adjustDock && adjustDock->isOpen() );
     }
 
     /* Save the stackCentralW sizes */
@@ -1200,6 +1206,49 @@ void MainInterface::setSidebarVisible( bool b_visible )
 }
 
 /* Slide the sidebar open or closed (180ms) by animating the splitter */
+void MainInterface::setAdjustPanelVisible( bool b )
+{
+    if( !body )
+        return;
+    if( !adjustDock )
+    {
+        if( !b )
+            return;
+        /* built on first use: it creates every effect widget */
+        adjustDock = new AdjustDock( p_intf, body );
+        static_cast<QHBoxLayout *>( body->layout() )->addWidget( adjustDock );
+        connect( adjustDock->panel(), &AdjustPanel::closeRequested, this,
+                 [this]() { setAdjustPanelVisible( false ); } );
+    }
+    adjustDock->setOpen( b, !b_minimalView && !isFullScreen() );
+
+    /* the bar's settings button shows the panel state */
+    foreach( QToolButton *btn, findChildren<QToolButton *>( "EXTENDEDButton" ) )
+    {
+        if( !btn->property( "vlcIcon" ).isValid() )
+            btn->setProperty( "vlcIcon", btn->icon() );
+        btn->setIcon( b ? QIcon( Theme::pixmap( "settings", Theme::BAR_GLYPH, Theme::accent() ) )
+                        : btn->property( "vlcIcon" ).value<QIcon>() );
+    }
+    if( !b && adjustDock->panel()->isAncestorOf( QApplication::focusWidget() ) )
+        setFocus();
+}
+
+void MainInterface::toggleAdjustPanel( int tab )
+{
+    if( !body )
+        return;
+    const bool open = adjustDock && adjustDock->isOpen();
+    if( open && ( tab < 0 || adjustDock->panel()->currentTab() == tab ) )
+    {
+        setAdjustPanelVisible( false );
+        return;
+    }
+    setAdjustPanelVisible( true );
+    if( tab >= 0 )
+        adjustDock->panel()->setCurrentTab( tab, open );
+}
+
 void MainInterface::animateSidebar( bool b_visible )
 {
     const bool shown = sidebar->isVisible();
@@ -1371,6 +1420,8 @@ void MainInterface::displayNormalView()
         header->setVisible( false );
         rail->setVisible( false );
         sidebar->setVisible( false );
+        if( adjustDock )
+            adjustDock->setVisible( false );
     }
     menuBar()->setVisible( false );
     controls->setVisible( false );
@@ -1419,6 +1470,8 @@ void MainInterface::setMinimalView( bool b_minimal )
         header->setVisible( !b_minimal );
         rail->setVisible( !b_minimal );
         sidebar->setVisible( !b_minimal && playlistVisible );
+        if( adjustDock )
+            adjustDock->setVisible( !b_minimal && adjustDock->isOpen() );
     }
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( !b_minimal && b_statusbarVisible );

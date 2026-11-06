@@ -36,6 +36,8 @@
 #include "util/qt_dirs.hpp"
 #include "util/customwidgets.hpp" /* VLCKeyToString() */
 #include "main_interface.hpp"
+#include "styles/vlc_theme.hpp"
+#include "components/adjust_panel.hpp"
 
 /* The dialogs */
 #include "dialogs/playlist.hpp"
@@ -255,6 +257,11 @@ void DialogsProvider::prefsDialog()
 
 void DialogsProvider::extendedDialog()
 {
+    if( Theme::redesign() && p_intf->p_sys->p_mi )
+    {
+        p_intf->p_sys->p_mi->toggleAdjustPanel( -1 );
+        return;
+    }
     ExtendedDialog *extDialog = ExtendedDialog::getInstance(p_intf );
 
     if( !extDialog->isVisible() || /* Hidden */
@@ -266,6 +273,11 @@ void DialogsProvider::extendedDialog()
 
 void DialogsProvider::synchroDialog()
 {
+    if( Theme::redesign() && p_intf->p_sys->p_mi )
+    {
+        p_intf->p_sys->p_mi->toggleAdjustPanel( AdjustPanel::SUBTITLES_TAB );
+        return;
+    }
     ExtendedDialog *extDialog = ExtendedDialog::getInstance(p_intf );
 
     if( !extDialog->isVisible() || /* Hidden */

@@ -57,6 +57,7 @@ class StandardPLPanel;
 class HeaderBar;
 class NavRail;
 class SidebarPanel;
+class AdjustDock;
 class QSplitter;
 struct vout_window_t;
 
@@ -160,6 +161,7 @@ protected:
     HeaderBar           *header;
     NavRail             *rail;
     SidebarPanel        *sidebar;
+    AdjustDock          *adjustDock;
     QSplitter           *bodySplitter;
     QWidget             *body;
     QString              lastSection;
@@ -212,6 +214,10 @@ protected:
 public slots:
     void dockPlaylist( bool b_docked = true );
     void setSidebarVisible( bool );
+    /* Redesign adjustment sidebar: tab -1 toggles on the last tab; a tab
+     * opens it there, or closes it if it is already showing that tab */
+    void toggleAdjustPanel( int tab = -1 );
+    void setAdjustPanelVisible( bool );
     void activateSection( const QString & );
     void toggleMinimalView( bool );
     void togglePlaylist();
