@@ -35,7 +35,6 @@
 #include "input_manager.hpp"
 #include "imagehelper.hpp"
 #include "customwidgets.hpp"
-#include "styles/vlc_theme.hpp"
 #include <vlc_actions.h>
 
 #include <QPaintEvent>
@@ -534,10 +533,6 @@ QSize SeekSlider::sizeHint() const
 {
     if ( b_classic )
         return QSlider::sizeHint();
-    /* Redesign: the Figma seek bar is a deliberately thick 28px track. */
-    if( Theme::isDark() )
-        return ( orientation() == Qt::Horizontal ) ? QSize( 100, Theme::SEEK_THICKNESS )
-                                                   : QSize( Theme::SEEK_THICKNESS, 100 );
     return ( orientation() == Qt::Horizontal ) ? QSize( 100, 18 )
                                                : QSize( 18, 100 );
 }
@@ -809,18 +804,6 @@ void SoundSlider::setMuted( bool m )
 
 void SoundSlider::paintEvent( QPaintEvent *e )
 {
-    /* Redesign: the volume control is a genuine traffic cone filled with
-     * yellow-green, replacing VLC's rounded gradient bar. Painted by the
-     * design system so it matches the accent config. */
-    if( Theme::isDark() )
-    {
-        QPainter conePainter( this );
-        const qreal maxVal = maximum() > 0 ? maximum() : 1;
-        Theme::paintVolumeCone( conePainter, rect(),
-                                qreal( value() ) / maxVal, b_isMuted );
-        return;
-    }
-
     QPixmap *paintGradient;
     if (b_isMuted)
         paintGradient = &this->pixGradient2;

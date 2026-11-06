@@ -48,7 +48,6 @@
 #include "recents.hpp"          /* Recents Item destruction */
 #include "util/qvlcapp.hpp"     /* QVLCApplication definition */
 #include "components/playlist/playlist_model.hpp" /* for ~PLModel() */
-#include "styles/vlc_theme.hpp"   /* design tokens */
 
 #include <vlc_plugin.h>
 #include <vlc_vout_window.h>
@@ -210,13 +209,6 @@ static const int i_continue_list[] =
 static const char *const psz_continue_list_text[] =
     { N_("Never"), N_("Ask"), N_("Always") };
 
-/* Redesign: the three colour schemes offered by the new theme. */
-static const char *const ppsz_theme_list[] =
-    { "dark", "light", "system" };
-
-static const char *const psz_theme_list_text[] =
-    { N_("Dark"), N_("Light"), N_("System") };
-
 static const int i_raise_list[] =
     { MainInterface::RAISE_NEVER, MainInterface::RAISE_VIDEO, \
       MainInterface::RAISE_AUDIO, MainInterface::RAISE_AUDIOVIDEO,  };
@@ -270,13 +262,6 @@ vlc_module_begin ()
             change_integer_list(i_continue_list, psz_continue_list_text )
     add_bool( "qt-dark-palette", false, QT_DARK_TEXT,
                   QT_DARK_LONGTEXT, false )
-
-    /* Redesign: colour scheme and accent colour. */
-    add_string( "qt-theme", "dark", THEME_TEXT,
-                THEME_LONGTEXT, false )
-        change_string_list( ppsz_theme_list, psz_theme_list_text )
-    add_string( "qt-accent-color", THEME_ACCENT_DEFAULT, ACCENT_COLOR_TEXT,
-                ACCENT_COLOR_LONGTEXT, false )
 
 #ifdef UPDATE_CHECK
     add_bool( "qt-updates-notif", true, UPDATER_TEXT,
@@ -699,11 +684,6 @@ static void *ThreadPlatform( void *obj, char *platform_name )
     // Apply dark palette only if dark palette is enabled
     if (isDarkPaletteEnabled(p_intf))
         applyDarkPalette();
-
-    /* Redesign: install the design-system palette and stylesheet. This
-     * supersedes the legacy dark palette above for widgets that honour
-     * QSS; the legacy call is kept for the widgets it already styles. */
-    Theme::apply( p_intf );
 
     /* Launch */
     app.exec();

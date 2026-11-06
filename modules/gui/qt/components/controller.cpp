@@ -703,7 +703,9 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
     RTL_UNAFFECTED_WIDGET
     /* advanced Controls handling */
     b_advancedVisible = b_advControls;
-    setObjectName( "ControlBar" );  /* target for the redesign stylesheet */
+#ifdef DEBUG_LAYOUT
+    setStyleSheet( "background: red ");
+#endif
     controlLayout = new QVBoxLayout( this );
     controlLayout->setContentsMargins( 3, 1, 0, 1 );
     controlLayout->setSpacing( 0 );
