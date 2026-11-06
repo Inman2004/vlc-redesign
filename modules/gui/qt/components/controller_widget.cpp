@@ -37,6 +37,8 @@
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QMenu>
+#include "styles/vlc_theme.hpp"
+
 #include <QWidgetAction>
 #include <QMouseEvent>
 
@@ -53,7 +55,16 @@ SoundWidget::SoundWidget( QWidget *_parent, intf_thread_t * _p_intf,
 
     /* We need a Label for the pix */
     volMuteLabel = new QLabel;
-    volMuteLabel->setPixmap( ImageHelper::loadSvgToPixmap( ":/toolbar/volume-medium.svg", 16, 16 ) );
+    if( Theme::redesign() )
+    {
+        volMuteLabel->setFixedSize( Theme::MUTE_BUTTON_W, Theme::BAR_BUTTON );
+        volMuteLabel->setAlignment( Qt::AlignCenter );
+        volMuteLabel->setCursor( Qt::PointingHandCursor );
+        volMuteLabel->setPixmap( Theme::pixmap( "volume", Theme::BAR_GLYPH, Theme::colors().icon ) );
+        layout->setSpacing( Theme::MUTE_TO_VOLUME );
+    }
+    else
+        volMuteLabel->setPixmap( ImageHelper::loadSvgToPixmap( ":/toolbar/volume-medium.svg", 16, 16 ) );
 
     /* We might need a subLayout too */
     QVBoxLayout *subLayout;
@@ -67,7 +78,7 @@ SoundWidget::SoundWidget( QWidget *_parent, intf_thread_t * _p_intf,
         volumeControlWidget = NULL;
 
         /* And add the label */
-        layout->addWidget( volMuteLabel, 0, b_shiny? Qt::AlignBottom : Qt::AlignCenter );
+        layout->addWidget( volMuteLabel, 0, ( b_shiny && !Theme::redesign() ) ? Qt::AlignBottom : Qt::AlignCenter );
     }
     else
     {
@@ -108,7 +119,7 @@ SoundWidget::SoundWidget( QWidget *_parent, intf_thread_t * _p_intf,
     if( b_special )
         subLayout->addWidget( volumeSlider );
     else
-        layout->addWidget( volumeSlider, 0, b_shiny? Qt::AlignBottom : Qt::AlignCenter );
+        layout->addWidget( volumeSlider, 0, ( b_shiny && !Theme::redesign() ) ? Qt::AlignBottom : Qt::AlignCenter );
 
     /* Set the volume from the config */
     float volume = playlist_VolumeGet( THEPL );
@@ -129,6 +140,16 @@ void SoundWidget::refreshLabels()
 {
     int i_sliderVolume = volumeSlider->value();
     const char *psz_icon = ":/toolbar/volume-muted.svg";
+
+    if( Theme::redesign() )
+    {
+        volMuteLabel->setPixmap( Theme::pixmap( b_is_muted ? "volume-muted" : "volume",
+                                                Theme::BAR_GLYPH, Theme::colors().icon ) );
+        volMuteLabel->setToolTip( Theme::tooltipWithKey( p_intf,
+            b_is_muted ? qfu(vlc_pgettext("Tooltip|Unmute", "Unmute"))
+                       : qfu(vlc_pgettext("Tooltip|Mute", "Mute")), "key-vol-mute" ) );
+        return;
+    }
 
     if( b_is_muted )
     {
@@ -230,9 +251,24 @@ bool SoundWidget::eventFilter( QObject *obj, QEvent *e )
  **/
 void PlayButton::updateButtonIcons( bool b_playing )
 {
-    setIcon( b_playing ? QIcon( ":/toolbar/pause_b.svg" ) : QIcon( ":/toolbar/play_b.svg" ) );
-    setToolTip( b_playing ? qtr( "Pause the playback" )
-                          : qtr( I_PLAY_TOOLTIP ) );
+    if( Theme::redesign() )
+    {
+        /* dark glyph on the accent pill */
+        QIcon ic;
+        const QString name = b_playing ? "pause" : "play";
+        ic.addPixmap( Theme::pixmap( name, Theme::SMALL_GLYPH, QColor( "#1B1B1B" ) ) );
+        ic.addPixmap( Theme::pixmap( name, Theme::SMALL_GLYPH, QColor( "#1B1B1B" ) ),
+                      QIcon::Disabled );
+        setIcon( ic );
+    }
+    else
+        setIcon( b_playing ? QIcon( ":/toolbar/pause_b.svg" ) : QIcon( ":/toolbar/play_b.svg" ) );
+    if( Theme::redesign() )
+        setToolTip( Theme::tooltipWithKey( NULL, b_playing ? qtr( "Pause" ) : qtr( "Play" ),
+                                           "key-play-pause" ) );
+    else
+        setToolTip( b_playing ? qtr( "Pause the playback" )
+                              : qtr( I_PLAY_TOOLTIP ) );
 }
 
 void AtoB_Button::updateButtonIcons( bool timeA, bool timeB )

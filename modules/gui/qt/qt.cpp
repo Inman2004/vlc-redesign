@@ -46,6 +46,7 @@
 #include "managers/addons_manager.hpp" /* Addons manager */
 #include "dialogs/help.hpp"     /* Launch Update */
 #include "recents.hpp"          /* Recents Item destruction */
+#include "styles/vlc_theme.hpp" /* Redesign tokens */
 #include "util/qvlcapp.hpp"     /* QVLCApplication definition */
 #include "components/playlist/playlist_model.hpp" /* for ~PLModel() */
 
@@ -123,6 +124,28 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define ERROR_TEXT N_( "Show unimportant error and warnings dialogs" )
 
 #define QT_DARK_TEXT N_( "Enable Dark Mode" )
+
+#define QT_REDESIGN_TEXT N_( "Use the redesigned interface" )
+#define QT_REDESIGN_LONGTEXT N_( "Single control bar, header, navigation rail " \
+                                 "and library sidebar." )
+#define QT_REDESIGN_FRAMELESS_TEXT N_( "Draw our own window title bar" )
+#define QT_REDESIGN_FRAMELESS_LONGTEXT N_( "Hide the system window decoration and " \
+                                           "use the built-in header instead." )
+#define QT_THEME_TEXT N_( "Theme" )
+#define QT_THEME_LONGTEXT N_( "Colour scheme of the redesigned interface." )
+#define QT_ACCENT_TEXT N_( "Accent color" )
+#define QT_ACCENT_LONGTEXT N_( "Colour used for the play button, seek handle " \
+                               "and selections." )
+
+static const char *const psz_theme_values[] = { "dark", "light", "system" };
+static const char *const psz_theme_texts[] = { N_("Dark"), N_("Light"), N_("System") };
+/* Keep in sync with Theme::ACCENT_VALUES */
+static const char *const psz_accent_values[] = {
+    "#D37918", "#A03B26", "#8C721B", "#147528", "#147A97",
+    "#144497", "#6631B5", "#AB3C80", "#7E9E13" };
+static const char *const psz_accent_texts[] = {
+    N_("Amber"), N_("Rust"), N_("Olive"), N_("Green"), N_("Teal"),
+    N_("Blue"), N_("Violet"), N_("Magenta"), N_("Lime") };
 #define QT_DARK_LONGTEXT N_( "Applies a dark theme to the style." )
 
 #define UPDATER_TEXT N_( "Activate the updates availability notification" )
@@ -262,6 +285,14 @@ vlc_module_begin ()
             change_integer_list(i_continue_list, psz_continue_list_text )
     add_bool( "qt-dark-palette", false, QT_DARK_TEXT,
                   QT_DARK_LONGTEXT, false )
+
+    add_bool( "qt-redesign", true, QT_REDESIGN_TEXT, QT_REDESIGN_LONGTEXT, false )
+    add_bool( "qt-redesign-frameless", true, QT_REDESIGN_FRAMELESS_TEXT,
+              QT_REDESIGN_FRAMELESS_LONGTEXT, false )
+    add_string( "qt-theme", "dark", QT_THEME_TEXT, QT_THEME_LONGTEXT, false )
+        change_string_list( psz_theme_values, psz_theme_texts )
+    add_string( "qt-accent-color", "#D37918", QT_ACCENT_TEXT, QT_ACCENT_LONGTEXT, false )
+        change_string_list( psz_accent_values, psz_accent_texts )
 
 #ifdef UPDATE_CHECK
     add_bool( "qt-updates-notif", true, UPDATER_TEXT,
@@ -623,6 +654,9 @@ static void *ThreadPlatform( void *obj, char *platform_name )
     }
 #endif
 
+    /* Resolve the redesign theme before any widget queries it */
+    Theme::init( p_intf );
+
     /* Create the normal interface in non-DP mode */
     MainInterface *p_mi = NULL;
 
@@ -684,6 +718,10 @@ static void *ThreadPlatform( void *obj, char *platform_name )
     // Apply dark palette only if dark palette is enabled
     if (isDarkPaletteEnabled(p_intf))
         applyDarkPalette();
+
+    /* The redesign palette and stylesheet go on top (palette above is the
+     * fallback for anything the stylesheet does not reach) */
+    Theme::apply();
 
     /* Launch */
     app.exec();

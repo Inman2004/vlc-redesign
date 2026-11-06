@@ -43,6 +43,8 @@
 #include "util/customwidgets.hpp"                       /* qEventToKey */
 
 #include "adapters/seekpoints.hpp"
+#include "styles/vlc_theme.hpp"                      /* Redesign */
+#include "menus.hpp"                         /* Track popups */
 
 #include <QToolButton>
 #include <QHBoxLayout>
@@ -52,6 +54,7 @@
 #include <QApplication>
 #include <QWindow>
 #include <QScreen>
+#include <QMenu>
 #if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
 #include <QDesktopWidget>
 #endif
@@ -99,17 +102,143 @@ void AbstractController::setStatus( int status )
                             var_GetBool( THEMIM->getInput(), "can-rewind" ) );
 }
 
+/* Toolbar settings: the redesign keeps its own keys and defaults */
+const char *toolbarKey( int which )
+{
+    const bool r = Theme::redesign();
+    switch( which )
+    {
+    case TOOLBAR_MAIN1: return r ? "MainWindow/RedesignToolbar1" : "MainWindow/MainToolbar1";
+    case TOOLBAR_MAIN2: return r ? "MainWindow/RedesignToolbar2" : "MainWindow/MainToolbar2";
+    case TOOLBAR_INPUT: return r ? "MainWindow/RedesignInputToolbar" : "MainWindow/InputToolbar";
+    default:            return r ? "MainWindow/RedesignFSCtoolbar" : "MainWindow/FSCtoolbar";
+    }
+}
+
+QString toolbarDefault( int which )
+{
+    const bool r = Theme::redesign();
+    switch( which )
+    {
+    case TOOLBAR_MAIN1: return r ? REDESIGN_TB1_DEFAULT : MAIN_TB1_DEFAULT;
+    case TOOLBAR_MAIN2: return r ? REDESIGN_TB2_DEFAULT : MAIN_TB2_DEFAULT;
+    case TOOLBAR_INPUT: return r ? REDESIGN_INPT_TB_DEFAULT : INPT_TB_DEFAULT;
+    default:            return r ? REDESIGN_FSC_TB_DEFAULT : FSC_TB_DEFAULT;
+    }
+}
+
+/* Redesign glyph for a toolbar button, empty if it keeps its legacy icon */
+static QString redesignIconName( int button )
+{
+    switch( button )
+    {
+    case PLAY_BUTTON:           return "play";
+    case STOP_BUTTON:           return "stop";
+    case OPEN_BUTTON:           return "open";
+    case PREV_SLOW_BUTTON:
+    case PREVIOUS_BUTTON:       return "prev";
+    case NEXT_FAST_BUTTON:
+    case NEXT_BUTTON:           return "next";
+    case FULLSCREEN_BUTTON:
+    case DEFULLSCREEN_BUTTON:   return "fullscreen";
+    case EXTENDED_BUTTON:       return "settings";
+    case PLAYLIST_BUTTON:       return "queue";
+    case OPEN_SUB_BUTTON:
+    case SUBTITLE_TRACKS_BUTTON:return "subtitles";
+    case AUDIO_TRACKS_BUTTON:   return "audio";
+    default:                    return QString();
+    }
+}
+
+/* Tooltip with the hotkey, for the redesigned bar */
+static QString buttonTooltip( int button )
+{
+    const QString base = qtr( tooltipL[button] );
+    if( !Theme::redesign() )
+        return base;
+    switch( button )
+    {
+    case PLAY_BUTTON:        return Theme::tooltipWithKey( NULL, qtr( "Play / Pause" ), "key-play-pause" );
+    case STOP_BUTTON:        return Theme::tooltipWithKey( NULL, qtr( "Stop" ), "key-stop" );
+    case PREVIOUS_BUTTON:
+    case PREV_SLOW_BUTTON:   return Theme::tooltipWithKey( NULL, qtr( "Previous" ), "key-prev" );
+    case NEXT_BUTTON:
+    case NEXT_FAST_BUTTON:   return Theme::tooltipWithKey( NULL, qtr( "Next" ), "key-next" );
+    case FULLSCREEN_BUTTON:
+    case DEFULLSCREEN_BUTTON:return Theme::tooltipWithKey( NULL, qtr( "Fullscreen" ), "key-toggle-fullscreen" );
+    case AUDIO_TRACKS_BUTTON:return Theme::tooltipWithKey( NULL, qtr( "Audio tracks and device" ), "key-audio-track" );
+    case SUBTITLE_TRACKS_BUTTON:return Theme::tooltipWithKey( NULL, qtr( "Subtitles" ), "key-subtitle-track" );
+    case SNAPSHOT_BUTTON:    return Theme::tooltipWithKey( NULL, qtr( "Take a snapshot" ), "key-snapshot" );
+    case RECORD_BUTTON:      return Theme::tooltipWithKey( NULL, qtr( "Record" ), "key-record" );
+    case EXTENDED_BUTTON:
+        return QString( "%1  <span style='color:%2'>Ctrl+E</span>" )
+                   .arg( qtr( "Adjustments and effects" ), Theme::colors().textMuted.name() );
+    case PLAYLIST_BUTTON:
+        return QString( "%1  <span style='color:%2'>Ctrl+L</span>" )
+                   .arg( qtr( "Queue" ), Theme::colors().textMuted.name() );
+    default:                 return base;
+    }
+}
+
+static QIcon buttonIcon( int button )
+{
+    if( Theme::redesign() )
+    {
+        QString name = redesignIconName( button );
+        if( !name.isEmpty() )
+            return Theme::icon( name );
+    }
+    return QIcon( iconL[button] );
+}
+
 /* Generic button setup */
-void AbstractController::setupButton( QAbstractButton *aButton )
+void AbstractController::setupButton( QAbstractButton *aButton, buttonType_e )
 {
     static QSizePolicy sizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
     sizePolicy.setHorizontalStretch( 0 );
     sizePolicy.setVerticalStretch( 0 );
 
     aButton->setSizePolicy( sizePolicy );
-    aButton->setFixedSize( QSize( 26, 26 ) );
-    aButton->setIconSize( QSize( 20, 20 ) );
+    if( Theme::redesign() )
+    {
+        aButton->setFixedSize( QSize( Theme::BAR_BUTTON, Theme::BAR_BUTTON ) );
+        aButton->setIconSize( QSize( Theme::BAR_GLYPH, Theme::BAR_GLYPH ) );
+        aButton->setCursor( Qt::PointingHandCursor );
+        QToolButton *tb = qobject_cast<QToolButton *>( aButton );
+        if( tb ) tb->setAutoRaise( true );
+        Theme::installHoverFade( aButton );
+    }
+    else
+    {
+        aButton->setFixedSize( QSize( 26, 26 ) );
+        aButton->setIconSize( QSize( 20, 20 ) );
+    }
     aButton->setFocusPolicy( Qt::NoFocus );
+}
+
+/* Audio / subtitle track popups (redesign). The menu content comes from
+ * the same builders as the Audio and Subtitle menus of the menu bar. */
+QWidget *AbstractController::trackMenuButton( buttonType_e button )
+{
+    QToolButton *b = new QToolButton;
+    setupButton( b, button );
+    b->setToolTip( buttonTooltip( button ) );
+    b->setIcon( buttonIcon( button ) );
+    intf_thread_t *intf = p_intf;
+    connect( b, &QToolButton::clicked, b, [b, button, intf]() {
+        QMenu menu( b );
+        if( button == AUDIO_TRACKS_BUTTON )
+            VLCMenuBar::AudioMenu( intf, &menu );
+        else
+            VLCMenuBar::SubtitleMenu( intf, &menu, true );
+        menu.ensurePolished();
+        const QSize hint = menu.sizeHint();
+        QPoint pos = b->mapToGlobal( QPoint( b->width() - hint.width(), -hint.height() - 6 ) );
+        if( pos.y() < 0 ) /* no room above (fullscreen top edge): open below */
+            pos = b->mapToGlobal( QPoint( b->width() - hint.width(), b->height() + 6 ) );
+        menu.exec( pos );
+    } );
+    return b;
 }
 
 /* Open the generic config line for the toolbar, parse it
@@ -179,7 +308,7 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
     /* Special case for SPACERS, who aren't QWidgets */
     if( i_type == WIDGET_SPACER )
     {
-        controlLayout_->addSpacing( 12 );
+        controlLayout_->addSpacing( Theme::redesign() ? Theme::BAR_SPACER : 12 );
     }
     else if(  i_type == WIDGET_SPACER_EXTEND )
     {
@@ -197,7 +326,8 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
             if( !buttonGroupLayout )
             {
                 buttonGroupLayout = new QHBoxLayout;
-
+                if( Theme::redesign() )
+                    buttonGroupLayout->setSpacing( Theme::BAR_GROUP_SPACING );
             }
             buttonGroupLayout->addWidget( widg );
         }
@@ -209,8 +339,8 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
 }
 
 #define BUTTON_SET_BAR( a_button ) \
-    a_button->setToolTip( qtr( tooltipL[button] ) ); \
-    a_button->setIcon( QIcon( iconL[button] ) );
+    a_button->setToolTip( buttonTooltip( button ) ); \
+    a_button->setIcon( buttonIcon( button ) );
 #define BUTTON_SET_BAR2( button, image, tooltip ) \
     button->setToolTip( tooltip );          \
     button->setIcon( QIcon( ":/"#image ".svg" ) );
@@ -245,6 +375,13 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         PlayButton *playButton = new PlayButton;
         setupButton( playButton );
         BUTTON_SET_BAR(  playButton );
+        if( Theme::redesign() )
+        {
+            /* accent pill, 54x28 as measured */
+            playButton->setObjectName( "PlayButton" );
+            playButton->setFixedSize( QSize( Theme::PLAY_BUTTON_W, Theme::PLAY_BUTTON_H ) );
+            playButton->setIconSize( QSize( Theme::SMALL_GLYPH, Theme::SMALL_GLYPH ) );
+        }
         connect( playButton, &PlayButton::clicked, toolbarActionsMapper, QOverload<>::of(&QSignalMapper::map) );
         toolbarActionsMapper->setMapping( playButton, PLAY_ACTION );
         connect( this, &AbstractController::inputPlaying, playButton, &PlayButton::updateButtonIcons );
@@ -266,10 +403,20 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         break;
     case PREVIOUS_BUTTON:{
         NORMAL_BUTTON( PREVIOUS );
+        if( Theme::redesign() ) /* narrow targets hug the play pill */
+        {
+            PREVIOUSButton->setFixedWidth( Theme::TRANSPORT_BUTTON_W );
+            PREVIOUSButton->setIconSize( QSize( Theme::TRANSPORT_GLYPH, Theme::TRANSPORT_GLYPH ) );
+        }
         }
         break;
     case NEXT_BUTTON: {
         NORMAL_BUTTON( NEXT );
+        if( Theme::redesign() )
+        {
+            NEXTButton->setFixedWidth( Theme::TRANSPORT_BUTTON_W );
+            NEXTButton->setIconSize( QSize( Theme::TRANSPORT_GLYPH, Theme::TRANSPORT_GLYPH ) );
+        }
         }
         break;
     case SLOWER_BUTTON:{
@@ -316,6 +463,10 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
             NORMAL_BUTTON( FULLWIDTH );
         }
         break;
+    case AUDIO_TRACKS_BUTTON:
+    case SUBTITLE_TRACKS_BUTTON:
+        widget = trackMenuButton( button );
+        break;
     case EXTENDED_BUTTON:{
         NORMAL_BUTTON( EXTENDED );
         }
@@ -354,7 +505,8 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         }
         break;
     case INPUT_SLIDER: {
-        SeekSlider *slider = new SeekSlider( p_intf, Qt::Horizontal, NULL, !b_shiny );
+        SeekSlider *slider = new SeekSlider( p_intf, Qt::Horizontal, NULL,
+                                             !b_shiny && !Theme::redesign() );
         SeekPoints *chapters = new SeekPoints( this, p_intf );
         connect( THEMIM->getIM(), &InputManager::chapterChanged, chapters, &SeekPoints::update );
         slider->setChapters( chapters );
@@ -384,7 +536,8 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         b_special = true;
     case VOLUME:
         {
-            SoundWidget *snd = new SoundWidget( this, p_intf, b_shiny, b_special );
+            SoundWidget *snd = new SoundWidget( this, p_intf,
+                                                b_shiny || Theme::redesign(), b_special );
             widget = snd;
         }
         break;
@@ -492,9 +645,24 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         break;
     case TIME_LABEL_ELAPSED:
         widget = new TimeLabel( p_intf, TimeLabel::Elapsed );
+        if( Theme::redesign() )
+        {
+            /* fixed box, text pinned next to the seek bar */
+            TimeLabel *l = static_cast<TimeLabel *>( widget );
+            l->setFixedWidth( Theme::TIME_LABEL_W );
+            l->setAlignment( Qt::AlignRight | Qt::AlignVCenter );
+            l->setContentsMargins( 0, 0, Theme::TIME_LABEL_GAP_L, 0 );
+        }
         break;
     case TIME_LABEL_REMAINING:
         widget = new TimeLabel( p_intf, TimeLabel::Remaining );
+        if( Theme::redesign() )
+        {
+            TimeLabel *l = static_cast<TimeLabel *>( widget );
+            l->setFixedWidth( Theme::TIME_LABEL_W );
+            l->setAlignment( Qt::AlignLeft | Qt::AlignVCenter );
+            l->setContentsMargins( Theme::TIME_LABEL_GAP_R, 0, 0, 0 );
+        }
         break;
     default:
         msg_Warn( p_intf, "This should not happen %i", button );
@@ -706,6 +874,24 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
 #ifdef DEBUG_LAYOUT
     setStyleSheet( "background: red ");
 #endif
+    grip = NULL;
+    if( Theme::redesign() )
+    {
+        /* One row: both configurable lines are laid out side by side */
+        setObjectName( "VLCControlBar" );
+        setAttribute( Qt::WA_StyledBackground, true );
+        setFixedHeight( Theme::CONTROLBAR_HEIGHT );
+        controlLayout = new QHBoxLayout( this );
+        controlLayout->setContentsMargins( Theme::BAR_MARGIN_LEFT, 0, Theme::BAR_MARGIN_RIGHT, 0 );
+        controlLayout->setSpacing( 0 );
+        parseAndCreate( getSettings()->value( toolbarKey( TOOLBAR_MAIN1 ),
+                            toolbarDefault( TOOLBAR_MAIN1 ) ).toString(), controlLayout );
+        parseAndCreate( getSettings()->value( toolbarKey( TOOLBAR_MAIN2 ),
+                            toolbarDefault( TOOLBAR_MAIN2 ) ).toString(), controlLayout );
+        if( !b_advancedVisible && advControls ) advControls->hide();
+        return;
+    }
+
     controlLayout = new QVBoxLayout( this );
     controlLayout->setContentsMargins( 3, 1, 0, 1 );
     controlLayout->setSpacing( 0 );
@@ -773,8 +959,12 @@ InputControlsWidget::InputControlsWidget( intf_thread_t *_p_i, QWidget *_parent 
     setStyleSheet( "background: green ");
 #endif
 
-    QString line = getSettings()->value( "MainWindow/InputToolbar", INPT_TB_DEFAULT ).toString();
+    QString line = getSettings()->value( toolbarKey( TOOLBAR_INPUT ),
+                                         toolbarDefault( TOOLBAR_INPUT ) ).toString();
     parseAndCreate( line, controlLayout );
+    /* The redesign folds the seek row into the main bar */
+    if( Theme::redesign() && line.isEmpty() )
+        setFixedHeight( 0 );
 }
 /**********************************************************************
  * Fullscrenn control widget
@@ -810,12 +1000,32 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     QVBoxLayout *controlLayout2 = new QVBoxLayout( this );
     controlLayout2->setContentsMargins( 4, 6, 4, 2 );
 
-    /* First line */
-    InputControlsWidget *inputC = new InputControlsWidget( p_intf, this );
-    controlLayout2->addWidget( inputC );
+    if( Theme::redesign() )
+    {
+        /* Same single row as the docked bar, on a floating panel */
+        setObjectName( "VLCFullscreenBar" );
+        setFrameShape( QFrame::NoFrame );
+        setStyleSheet( QString( "#VLCFullscreenBar { background: %1; border-radius: 8px; }"
+                                "#VLCFullscreenBar QToolButton { background: transparent;"
+                                " border: none; border-radius: 6px; }"
+                                "#VLCFullscreenBar QToolButton:hover { background: %2; }"
+                                "#VLCFullscreenBar QToolButton#PlayButton { background: %3; }" )
+                       .arg( Theme::colors().controlbar.name(),
+                             Theme::colors().elevated.name(),
+                             Theme::accent().name() ) );
+        controlLayout2->setContentsMargins( 16, 0, 16, 0 );
+        setFixedHeight( Theme::CONTROLBAR_HEIGHT + 6 );
+    }
+    else
+    {
+        /* First line */
+        InputControlsWidget *inputC = new InputControlsWidget( p_intf, this );
+        controlLayout2->addWidget( inputC );
+    }
 
     controlLayout = new QHBoxLayout;
-    QString line = getSettings()->value( "MainWindow/FSCtoolbar", FSC_TB_DEFAULT ).toString();
+    QString line = getSettings()->value( toolbarKey( TOOLBAR_FSC ),
+                                         toolbarDefault( TOOLBAR_FSC ) ).toString();
     parseAndCreate( line, controlLayout );
     controlLayout2->addLayout( controlLayout );
 

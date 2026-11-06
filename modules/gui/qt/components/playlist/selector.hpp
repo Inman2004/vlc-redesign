@@ -124,6 +124,10 @@ public:
     virtual ~PLSelector();
 
     void getCurrentItemInfos( int *type, bool *delayedSearch, QString *name );
+    /* Redesign rail: select a source by SD name prefix ("video_dir",
+     * "upnp"...) or "playlist" / "library". Returns its display name,
+     * empty if not available. */
+    QString selectSource( const QString &key );
     int getCurrentItemCategory();
 
 protected:

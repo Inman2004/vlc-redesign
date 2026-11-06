@@ -40,6 +40,10 @@
 #include "components/interface_widgets.hpp"     // bgWidget, videoWidget
 #include "components/controller.hpp"            // controllers
 #include "components/playlist/playlist.hpp"     // plWidget
+#include "components/header_bar.hpp"            // Redesign header
+#include "components/nav_rail.hpp"              // Redesign rail
+#include "components/sidebar_panel.hpp"         // Redesign sidebar
+#include "styles/vlc_theme.hpp"                 // Redesign tokens
 #include "dialogs/firstrun.hpp"                 // First Run
 #include "dialogs/playlist.hpp"                 // PlaylistDialog
 
@@ -59,6 +63,10 @@
 #include <QMenuBar>
 #include <QLabel>
 #include <QStackedWidget>
+#include <QSplitter>
+#include <QShortcut>
+#include <QVariantAnimation>
+#include <QHBoxLayout>
 #include <QScreen>
 #ifdef _WIN32
 #include <QFileInfo>
@@ -107,6 +115,11 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     cryptedLabel         = NULL;
     controls             = NULL;
     inputC               = NULL;
+    header               = NULL;
+    rail                 = NULL;
+    sidebar              = NULL;
+    bodySplitter         = NULL;
+    body                 = NULL;
 
     b_hideAfterCreation  = false; // --qt-start-minimized
     playlistVisible      = false;
@@ -128,6 +141,12 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     setFocusPolicy( Qt::StrongFocus );
     setAcceptDrops( true );
     setWindowRole( "vlc-main" );
+    setObjectName( "VLCMainWindow" );
+    if( Theme::frameless() )
+    {
+        setWindowFlags( windowFlags() | Qt::FramelessWindowHint );
+        new FramelessResizer( this );
+    }
     setWindowIcon( QApplication::windowIcon() );
     setWindowOpacity( var_InheritFloat( p_intf, "qt-opacity" ) );
 
@@ -148,6 +167,8 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
 
     /* */
     b_plDocked = getSettings()->value( "MainWindow/pl-dock-status", true ).toBool();
+    if( Theme::redesign() )
+        b_plDocked = true; /* the playlist lives in the sidebar */
 
     /* Should the UI stays on top of other windows */
     b_interfaceOnTop = var_InheritBool( p_intf, "video-on-top" );
@@ -161,6 +182,14 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
      * Menu Bar *
      ************/
     VLCMenuBar::createMenuBar( this, p_intf );
+    /* Redesign: the same menus are reached from the header's menu button */
+    if( Theme::redesign() )
+    {
+        menuBar()->setFixedHeight( 0 ); /* stays "visible" so its shortcuts keep working */
+        /* Hide UI, as in the design's context menu */
+        QShortcut *hideUi = new QShortcut( QKeySequence( "Ctrl+\\" ), this );
+        connect( hideUi, &QShortcut::activated, this, [this]() { toggleMinimalView( !b_minimalView ); } );
+    }
     connect( THEMIM->getIM(), &InputManager::voutListChanged,
              THEDP, &DialogsProvider::destroyPopupMenu );
 
@@ -252,7 +281,15 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
 
 
     /* Final Sizing, restoration and placement of the interface */
-    if( settings->value( "MainWindow/playlist-visible", false ).toBool() )
+    if( Theme::redesign() )
+    {
+        lastSection = settings->value( "MainWindow/sidebar-section", "playlists" ).toString();
+        if( settings->value( "MainWindow/sidebar-visible", true ).toBool() )
+            activateSection( lastSection );
+        else
+            setSidebarVisible( false );
+    }
+    else if( settings->value( "MainWindow/playlist-visible", false ).toBool() )
         togglePlaylist();
 
     QVLCTools::restoreWidgetPosition( settings, this, QSize(600, 420) );
@@ -294,6 +331,12 @@ MainInterface::~MainInterface()
     settings->setValue( "adv-controls",
                         getControlsVisibilityStatus() & CONTROLS_ADVANCED );
     settings->setValue( "status-bar-visible", b_statusbarVisible );
+    if( sidebar )
+    {
+        settings->setValue( "sidebar-visible", playlistVisible );
+        settings->setValue( "sidebar-section", lastSection );
+        settings->setValue( "sidebar-splitter", bodySplitter->saveState() );
+    }
 
     /* Save the stackCentralW sizes */
     settings->setValue( "bgSize", stackWidgetsSizes[bgWidget] );
@@ -314,6 +357,11 @@ MainInterface::~MainInterface()
 
 void MainInterface::computeMinimumSize()
 {
+    if( Theme::redesign() )
+    {
+        setMinimumWidth( 640 );
+        return;
+    }
     int minWidth = 80;
     if( menuBar()->isVisible() )
         minWidth += controls->sizeHint().width();
@@ -333,9 +381,17 @@ void MainInterface::recreateToolbars()
 
     controls = new ControlsWidget( p_intf, b_adv, this );
     inputC = new InputControlsWidget( p_intf, this );
-    mainLayout->insertWidget( 2, inputC );
-    mainLayout->insertWidget( settings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: 3,
-                              controls );
+    if( Theme::redesign() )
+    {
+        mainLayout->addWidget( inputC );
+        mainLayout->addWidget( controls );
+    }
+    else
+    {
+        mainLayout->insertWidget( 2, inputC );
+        mainLayout->insertWidget( settings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: 3,
+                                  controls );
+    }
 
     if( fullscreenControls )
     {
@@ -468,9 +524,59 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     main->setContentsMargins( 0, 0, 0, 0 );
     mainLayout->setSpacing( 0 ); mainLayout->setContentsMargins( 0, 0, 0, 0 );
 
+    /* Redesign: header on top, then rail | sidebar | content */
+    QWidget *contentPanel = NULL;
+    if( Theme::redesign() )
+    {
+        main->setObjectName( "VLCCentral" );
+        main->setAttribute( Qt::WA_StyledBackground, true );
+
+        header = new HeaderBar( p_intf, this );
+        mainLayout->addWidget( header );
+        connect( header, &HeaderBar::sidebarToggled, this, &MainInterface::setSidebarVisible );
+    }
+
     createResumePanel( main );
+
+    if( Theme::redesign() )
+    {
+        body = new QWidget( main );
+        body->setObjectName( "VLCBody" );
+        QHBoxLayout *bodyLayout = new QHBoxLayout( body );
+        bodyLayout->setContentsMargins( 0, 0, Theme::CONTENT_MARGIN, 0 );
+        bodyLayout->setSpacing( 0 );
+
+        rail = new NavRail( body );
+        bodyLayout->addWidget( rail );
+        connect( rail, &NavRail::sectionActivated, this, &MainInterface::activateSection );
+        connect( rail, &NavRail::collapseRequested, this, [this]() { setSidebarVisible( false ); } );
+        connect( rail, &NavRail::addRequested, THEDP, &DialogsProvider::simpleOpenDialog );
+
+        bodySplitter = new QSplitter( Qt::Horizontal, body );
+        bodySplitter->setHandleWidth( 1 );
+        bodySplitter->setChildrenCollapsible( false );
+        bodyLayout->addWidget( bodySplitter, 1 );
+
+        sidebar = new SidebarPanel( p_intf, bodySplitter );
+        bodySplitter->addWidget( sidebar );
+
+        contentPanel = new QWidget( bodySplitter );
+        contentPanel->setObjectName( "VLCContent" );
+        contentPanel->setAttribute( Qt::WA_StyledBackground, true );
+        QVBoxLayout *contentLayout = new QVBoxLayout( contentPanel );
+        contentLayout->setContentsMargins( 0, 0, 0, 0 );
+        bodySplitter->addWidget( contentPanel );
+        bodySplitter->setStretchFactor( 0, 0 );
+        bodySplitter->setStretchFactor( 1, 1 );
+        if( !bodySplitter->restoreState(
+                creationSettings->value( "MainWindow/sidebar-splitter" ).toByteArray() ) )
+            bodySplitter->setSizes( QList<int>() << Theme::SIDEBAR_WIDTH << 800 );
+
+        mainLayout->addWidget( body, 1 );
+    }
+
     /* */
-    stackCentralW = new QVLCStackedWidget( main );
+    stackCentralW = new QVLCStackedWidget( contentPanel ? contentPanel : main );
 
     /* Bg Cone */
     if ( QDate::currentDate().dayOfYear() >= QT_XMAS_JOKE_DAY
@@ -483,6 +589,11 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
         bgWidget = new BackgroundWidget( p_intf );
 
     stackCentralW->addWidget( bgWidget );
+    if( Theme::redesign() )
+    {
+        /* let the rounded content panel show through */
+        bgWidget->setAutoFillBackground( false );
+    }
     if ( !var_InheritBool( p_intf, "qt-bgcone" ) )
         bgWidget->setWithArt( false );
     else
@@ -495,7 +606,10 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
         videoWidget = new VideoWidget( p_intf, stackCentralW );
         stackCentralW->addWidget( videoWidget );
     }
-    mainLayout->insertWidget( 1, stackCentralW );
+    if( contentPanel )
+        contentPanel->layout()->addWidget( stackCentralW );
+    else
+        mainLayout->insertWidget( 1, stackCentralW );
 
     stackWidgetsSizes[bgWidget] =
         creationSettings->value( "MainWindow/bgSize", QSize( 600, 0 ) ).toSize();
@@ -507,10 +621,18 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
         creationSettings->value( "MainWindow/adv-controls", false ).toBool(), this );
     inputC = new InputControlsWidget( p_intf, this );
 
-    mainLayout->insertWidget( 2, inputC );
-    mainLayout->insertWidget(
-        creationSettings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: 3,
-        controls );
+    if( Theme::redesign() )
+    {
+        mainLayout->addWidget( inputC );
+        mainLayout->addWidget( controls );
+    }
+    else
+    {
+        mainLayout->insertWidget( 2, inputC );
+        mainLayout->insertWidget(
+            creationSettings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: 3,
+            controls );
+    }
 
     /* Visualisation, disabled for now, they SUCK */
     #if 0
@@ -1028,6 +1150,26 @@ void MainInterface::createPlaylist()
 {
     PlaylistDialog *dialog = PlaylistDialog::getInstance( p_intf );
 
+    if( sidebar )
+    {
+        playlistWidget = dialog->exportPlaylistWidget();
+        sidebar->setPlaylistWidget( playlistWidget );
+        /* pop-out window closed: take the playlist back into the sidebar */
+        connect( dialog, &PlaylistDialog::visibilityChanged, this, [this, dialog]( bool visible ) {
+            if( visible || !dialog->hasPlaylistWidget() )
+                return;
+            playlistWidget = dialog->exportPlaylistWidget();
+            sidebar->setPlaylistWidget( playlistWidget );
+        } );
+        connect( sidebar, &SidebarPanel::popOutRequested, this, [this, dialog]() {
+            setSidebarVisible( false );
+            playlistWidget->setSidebarMode( false );
+            dialog->importPlaylistWidget( playlistWidget );
+            dialog->show();
+        } );
+        return;
+    }
+
     if( b_plDocked )
     {
         playlistWidget = dialog->exportPlaylistWidget();
@@ -1037,8 +1179,103 @@ void MainInterface::createPlaylist()
     connect( dialog, &PlaylistDialog::visibilityChanged, this, &MainInterface::setPlaylistVisibility );
 }
 
+void MainInterface::setSidebarVisible( bool b_visible )
+{
+    if( !sidebar )
+        return;
+    if( b_visible && !playlistWidget )
+        createPlaylist();
+    if( b_visible && rail->current().isEmpty() )
+    {
+        activateSection( lastSection.isEmpty() ? QString( "playlists" ) : lastSection );
+        return;
+    }
+    animateSidebar( b_visible );
+    if( !b_visible )
+        rail->setCurrent( QString() );
+    header->sidebarButton()->blockSignals( true );
+    header->sidebarButton()->setChecked( b_visible );
+    header->sidebarButton()->blockSignals( false );
+    playlistVisible = b_visible;
+}
+
+/* Slide the sidebar open or closed (180ms) by animating the splitter */
+void MainInterface::animateSidebar( bool b_visible )
+{
+    const bool shown = sidebar->isVisible();
+    if( shown == b_visible && !sidebar->property( "vlcAnimating" ).toBool() )
+        return;
+
+    int target = sidebar->property( "vlcWidth" ).toInt();
+    if( target <= 0 )
+        target = Theme::SIDEBAR_WIDTH;
+    if( shown && !sidebar->property( "vlcAnimating" ).toBool() )
+        target = sidebar->width(); /* remember the user's width */
+    sidebar->setProperty( "vlcWidth", target );
+
+    /* No animation before the window is on screen or in minimal view */
+    if( !isVisible() || b_minimalView || isFullScreen() )
+    {
+        sidebar->setVisible( b_visible );
+        if( b_visible )
+            bodySplitter->setSizes( QList<int>() << target << qMax( 1, bodySplitter->width() - target ) );
+        return;
+    }
+
+    QVariantAnimation *anim = sidebar->findChild<QVariantAnimation *>( "vlcSlide" );
+    if( !anim )
+    {
+        anim = new QVariantAnimation( sidebar );
+        anim->setObjectName( "vlcSlide" );
+        anim->setDuration( 180 );
+        anim->setEasingCurve( QEasingCurve::OutCubic );
+        connect( anim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+            const int w = v.toInt();
+            bodySplitter->setSizes( QList<int>() << w << qMax( 1, bodySplitter->width() - w ) );
+        } );
+        connect( anim, &QVariantAnimation::finished, this, [this, anim]() {
+            sidebar->setProperty( "vlcAnimating", false );
+            sidebar->setMinimumWidth( Theme::SIDEBAR_MIN_WIDTH );
+            if( anim->endValue().toInt() == 0 )
+                sidebar->hide();
+        } );
+    }
+    const int from = shown ? sidebar->width() : 0;
+    anim->stop();
+    sidebar->setProperty( "vlcAnimating", true );
+    sidebar->setMinimumWidth( 0 );
+    sidebar->show();
+    bodySplitter->setSizes( QList<int>() << from << qMax( 1, bodySplitter->width() - from ) );
+    anim->setStartValue( from );
+    anim->setEndValue( b_visible ? target : 0 );
+    anim->start();
+}
+
+void MainInterface::activateSection( const QString &key )
+{
+    if( !sidebar )
+        return;
+    if( !playlistWidget )
+        createPlaylist();
+    lastSection = key;
+    rail->setCurrent( key );
+    sidebar->showSection( key );
+    setSidebarVisible( true );
+}
+
 void MainInterface::togglePlaylist()
 {
+    if( sidebar )
+    {
+        /* Queue button: show the current playlist, or hide the sidebar
+         * when it is already showing it */
+        if( sidebar->isVisible() && rail->current() == "playlists" )
+            setSidebarVisible( false );
+        else
+            activateSection( "playlists" );
+        return;
+    }
+
     if( !playlistWidget ) createPlaylist();
 
     PlaylistDialog *dialog = PlaylistDialog::getInstance( p_intf );
@@ -1082,6 +1319,7 @@ const Qt::Key MainInterface::kc[10] =
 
 void MainInterface::dockPlaylist( bool p_docked )
 {
+    if( sidebar ) return; /* always docked in the sidebar */
     if( b_plDocked == p_docked ) return;
     /* some extra check */
     if ( b_plDocked && !playlistWidget ) createPlaylist();
@@ -1128,6 +1366,12 @@ void MainInterface::dockPlaylist( bool p_docked )
  */
 void MainInterface::displayNormalView()
 {
+    if( header )
+    {
+        header->setVisible( false );
+        rail->setVisible( false );
+        sidebar->setVisible( false );
+    }
     menuBar()->setVisible( false );
     controls->setVisible( false );
 #ifndef QT_NO_STATUSBAR
@@ -1170,6 +1414,12 @@ void MainInterface::setMinimalView( bool b_minimal )
 
     menuBar()->setVisible( !b_minimal );
     controls->setVisible( !b_minimal );
+    if( header )
+    {
+        header->setVisible( !b_minimal );
+        rail->setVisible( !b_minimal );
+        sidebar->setVisible( !b_minimal && playlistVisible );
+    }
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( !b_minimal && b_statusbarVisible );
 #endif

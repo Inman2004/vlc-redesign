@@ -45,6 +45,7 @@ class QHideEvent;
 class QTimer;
 class SeekPoints;
 class QPropertyAnimation;
+class QVariantAnimation;
 class QCommonStyle;
 class TimeTooltip;
 class QSequentialAnimationGroup;
@@ -118,6 +119,10 @@ private:
     qreal mHandleOpacity;
     qreal mLoading;
     QPropertyAnimation *animHandle;
+    /* Redesign hover state (0..1, animated) and cursor x, -1 when outside */
+    QVariantAnimation *hoverAnim;
+    qreal hoverAmount;
+    int hoverX;
     QSequentialAnimationGroup *animLoading;
     QTimer *hideHandleTimer;
     QTimer *startAnimLoadingTimer;

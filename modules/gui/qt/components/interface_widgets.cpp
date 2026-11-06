@@ -30,6 +30,7 @@
 
 #include "qt.hpp"
 #include "components/interface_widgets.hpp"
+#include "styles/vlc_theme.hpp"
 #include "dialogs_provider.hpp"
 #include "util/customwidgets.hpp"               // qtEventToVLCKey, QVLCStackedWidget
 
@@ -921,11 +922,11 @@ TimeLabel::TimeLabel( intf_thread_t *_p_intf, TimeLabel::Display _displayType  )
         b_remainingTime = getSettings()->value( "MainWindow/ShowRemainingTime", false ).toBool();
     switch( _displayType ) {
         case TimeLabel::Elapsed:
-            setText( " --:-- " );
+            setText( Theme::redesign() ? "00:00:00" : " --:-- " );
             setToolTip( qtr("Elapsed time") );
             break;
         case TimeLabel::Remaining:
-            setText( " --:-- " );
+            setText( Theme::redesign() ? "00:00:00" : " --:-- " );
             setToolTip( qtr("Total/Remaining time")
                         + QString("\n-")
                         + qtr("Click to toggle between total and remaining time")
@@ -987,11 +988,11 @@ void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
     cachedPos = pos;
     if( pos == -1.f )
     {
-        setMinimumSize( QSize( 0, 0 ) );
+        if( !Theme::redesign() ) setMinimumSize( QSize( 0, 0 ) );
         if( displayType == TimeLabel::Both )
             setText( "--:--/--:--" );
         else
-            setText( "--:--" );
+            setText( Theme::redesign() ? "00:00:00" : "--:--" );
         return;
     }
 
@@ -1000,6 +1001,15 @@ void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
     secstotimestr( psz_length, length );
     secstotimestr( psz_time, ( b_remainingTime && length ) ? length - time
                                                            : time );
+    if( Theme::redesign() )
+    {
+        /* the redesign always shows hours: 00:02:10 */
+        const int t = ( b_remainingTime && length ) ? length - time : time;
+        snprintf( psz_length, MSTRTIME_MAX_SIZE, "%02d:%02d:%02d",
+                  length / 3600, ( length / 60 ) % 60, length % 60 );
+        snprintf( psz_time, MSTRTIME_MAX_SIZE, "%02d:%02d:%02d",
+                  t / 3600, ( t / 60 ) % 60, t % 60 );
+    }
 
     // compute the minimum size that will be required for the psz_length
     // and use it to enforce a minimal size to avoid "dancing" widgets
@@ -1020,18 +1030,18 @@ void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
     switch( displayType )
     {
         case TimeLabel::Elapsed:
-            setMinimumSize( minsize );
+            if( !Theme::redesign() ) setMinimumSize( minsize );
             setText( QString( psz_time ) );
             break;
         case TimeLabel::Remaining:
             if( b_remainingTime )
             {
-                setMinimumSize( minsize );
+                if( !Theme::redesign() ) setMinimumSize( minsize );
                 setText( QString("-") + QString( psz_time ) );
             }
             else
             {
-                setMinimumSize( QSize( 0, 0 ) );
+                if( !Theme::redesign() ) setMinimumSize( QSize( 0, 0 ) );
                 setText( QString( psz_length ) );
             }
             break;

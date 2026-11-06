@@ -108,7 +108,7 @@ PlaylistWidget::PlaylistWidget( intf_thread_t *_p_i, QWidget *_par )
              mainView, QOverload<const QModelIndex &>::of(&StandardPLPanel::browseInto) );
 
     /* Button to switch views */
-    QToolButton *viewButton = new QToolButton( this );
+    viewButton = new QToolButton( this );
     viewButton->setIcon( style()->standardIcon( QStyle::SP_FileDialogDetailedView ) );
     viewButton->setToolTip( qtr("Change playlistview") );
     topbarLayout->addWidget( viewButton );
@@ -222,6 +222,15 @@ void PlaylistWidget::forceShow()
 void PlaylistWidget::changeView( const QModelIndex& index )
 {
     locationBar->setIndex( index );
+}
+
+void PlaylistWidget::setSidebarMode( bool b_sidebar )
+{
+    leftSplitter->setVisible( !b_sidebar );
+    locationBar->setVisible( !b_sidebar );
+    viewButton->setVisible( !b_sidebar );
+    setContentsMargins( 0, b_sidebar ? 0 : 3, 0, b_sidebar ? 0 : 3 );
+    setMinimumWidth( b_sidebar ? 0 : 400 );
 }
 
 void PlaylistWidget::setSearchFieldFocus()

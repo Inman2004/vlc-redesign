@@ -100,19 +100,19 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
     mainTboxLayout->addRow( new QLabel( qtr( "Toolbar position:" ) ),
                             positionCheckbox );
 
-    QString line1 = getSettings()->value( "MainWindow/MainToolbar1",
-                                          MAIN_TB1_DEFAULT ).toString();
+    QString line1 = getSettings()->value( toolbarKey( TOOLBAR_MAIN1 ),
+                                          toolbarDefault( TOOLBAR_MAIN1 ) ).toString();
     controller1 = new DroppingController( p_intf, line1, this );
     mainTboxLayout->addRow( new QLabel( qtr("Line 1:") ), controller1 );
 
-    QString line2 = getSettings()->value( "MainWindow/MainToolbar2",
-                                          MAIN_TB2_DEFAULT ).toString();
+    QString line2 = getSettings()->value( toolbarKey( TOOLBAR_MAIN2 ),
+                                          toolbarDefault( TOOLBAR_MAIN2 ) ).toString();
     controller2 = new DroppingController( p_intf, line2, this );
     mainTboxLayout->addRow( new QLabel( qtr("Line 2:") ), controller2 );
 
     /* TimeToolBar */
-    QString line = getSettings()->value( "MainWindow/InputToolbar",
-                                         INPT_TB_DEFAULT ).toString();
+    QString line = getSettings()->value( toolbarKey( TOOLBAR_INPUT ),
+                                         toolbarDefault( TOOLBAR_INPUT ) ).toString();
     controller = new DroppingController( p_intf, line, this );
     QWidget *timeToolbarBox = new QWidget();
     timeToolbarBox->setLayout( new QVBoxLayout() );
@@ -129,8 +129,8 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
     tabWidget->addTab( advToolbarBox, qtr( "Advanced Widget" ) );
 
     /* FSCToolBar */
-    QString lineFSC = getSettings()->value( "MainWindow/FSCtoolbar",
-                                            FSC_TB_DEFAULT ).toString();
+    QString lineFSC = getSettings()->value( toolbarKey( TOOLBAR_FSC ),
+                                            toolbarDefault( TOOLBAR_FSC ) ).toString();
     controllerFSC = new DroppingController( p_intf, lineFSC, this );
     QWidget *FSCToolbarBox = new QWidget();
     FSCToolbarBox->setLayout( new QVBoxLayout() );
@@ -260,11 +260,11 @@ void ToolbarEditDialog::changeProfile( int i )
 void ToolbarEditDialog::close()
 {
     bool isChecked = getSettings()->value( "MainWindow/ToolbarPos" ).toBool();
-    QString c1 = getSettings()->value( "MainWindow/MainToolbar1" ).toString();
-    QString c2 = getSettings()->value( "MainWindow/MainToolbar2" ).toString();
+    QString c1 = getSettings()->value( toolbarKey( TOOLBAR_MAIN1 ) ).toString();
+    QString c2 = getSettings()->value( toolbarKey( TOOLBAR_MAIN2 ) ).toString();
     QString cA = getSettings()->value( "MainWindow/AdvToolbar" ).toString();
-    QString c = getSettings()->value( "MainWindow/InputToolbar" ).toString();
-    QString cFSC = getSettings()->value( "MainWindow/FSCToolbar" ).toString();
+    QString c = getSettings()->value( toolbarKey( TOOLBAR_INPUT ) ).toString();
+    QString cFSC = getSettings()->value( toolbarKey( TOOLBAR_FSC ) ).toString();
 
     if ( isChecked == positionCheckbox->isChecked()
          && c1 == controller1->getValue()
@@ -278,11 +278,11 @@ void ToolbarEditDialog::close()
     }
 
     getSettings()->setValue( "MainWindow/ToolbarPos", !!positionCheckbox->isChecked() );
-    getSettings()->setValue( "MainWindow/MainToolbar1", controller1->getValue() );
-    getSettings()->setValue( "MainWindow/MainToolbar2", controller2->getValue() );
+    getSettings()->setValue( toolbarKey( TOOLBAR_MAIN1 ), controller1->getValue() );
+    getSettings()->setValue( toolbarKey( TOOLBAR_MAIN2 ), controller2->getValue() );
     getSettings()->setValue( "MainWindow/AdvToolbar", controllerA->getValue() );
-    getSettings()->setValue( "MainWindow/InputToolbar", controller->getValue() );
-    getSettings()->setValue( "MainWindow/FSCtoolbar", controllerFSC->getValue() );
+    getSettings()->setValue( toolbarKey( TOOLBAR_INPUT ), controller->getValue() );
+    getSettings()->setValue( toolbarKey( TOOLBAR_FSC ), controllerFSC->getValue() );
     getSettings()->sync();
     accept();
 }

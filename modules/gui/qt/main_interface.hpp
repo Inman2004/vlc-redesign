@@ -54,6 +54,10 @@ class QSize;
 class QScreen;
 class QTimer;
 class StandardPLPanel;
+class HeaderBar;
+class NavRail;
+class SidebarPanel;
+class QSplitter;
 struct vout_window_t;
 
 class MainInterface : public QVLCMW
@@ -136,6 +140,7 @@ protected:
     void setMinimalView( bool );
     void setInterfaceFullScreen( bool );
     void computeMinimumSize();
+    void animateSidebar( bool );
 
     /* */
     QSettings           *settings;
@@ -150,6 +155,14 @@ protected:
 
     /* Widgets */
     QStackedWidget      *stackCentralW;
+
+    /* Redesign chrome (NULL in the classic interface) */
+    HeaderBar           *header;
+    NavRail             *rail;
+    SidebarPanel        *sidebar;
+    QSplitter           *bodySplitter;
+    QWidget             *body;
+    QString              lastSection;
 
     VideoWidget         *videoWidget;
     BackgroundWidget    *bgWidget;
@@ -198,6 +211,8 @@ protected:
 
 public slots:
     void dockPlaylist( bool b_docked = true );
+    void setSidebarVisible( bool );
+    void activateSection( const QString & );
     void toggleMinimalView( bool );
     void togglePlaylist();
     void toggleUpdateSystrayMenu(bool requestActivate = false);

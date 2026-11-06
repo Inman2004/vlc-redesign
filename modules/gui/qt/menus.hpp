@@ -67,6 +67,8 @@ class VLCMenuBar : public QObject
 {
     Q_OBJECT
     friend class MenuFunc;
+    friend class AbstractController; /* redesign track popups */
+    friend class HeaderBar;          /* redesign main menu */
 
 public:
     /* Main bar creation */
@@ -96,6 +98,10 @@ public:
 
     static QMenu *rendererMenu;
     static QActionGroup *rendererGroup;
+
+private:
+    /* Redesign right-click menu (Figma "right-click menu" frame) */
+    static QMenu* RedesignPopupMenu( intf_thread_t *, bool );
 
 private:
     /* All main Menus */

@@ -35,6 +35,7 @@
 #include "input_manager.hpp"
 #include "imagehelper.hpp"
 #include "customwidgets.hpp"
+#include "styles/vlc_theme.hpp"
 #include <vlc_actions.h>
 
 #include <QPaintEvent>
@@ -54,6 +55,7 @@
 #include <QDebug>
 #include <QScreen>
 #include <QSequentialAnimationGroup>
+#include <QVariantAnimation>
 
 namespace {
     int const MIN_SLIDER_VALUE = 0;
@@ -77,6 +79,9 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     mHandleLength = -1;
     b_seekable = true;
     alternativeStyle = NULL;
+    hoverAnim = NULL;
+    hoverAmount = 0.0;
+    hoverX = -1;
 
     // prepare some static colors
     QPalette p = palette();
@@ -126,7 +131,22 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
 
     /* Use the new/classic style */
     setMinimumHeight( 18 );
-    if( !b_classic )
+    if( Theme::redesign() )
+    {
+        /* Painted by Theme::paintSeekBar: 28px track, 8px handle */
+        b_classic = false;
+        mHandleLength = Theme::SEEK_HANDLE_W;
+        hoverAnim = new QVariantAnimation( this );
+        hoverAnim->setDuration( 140 );
+        hoverAnim->setEasingCurve( QEasingCurve::OutCubic );
+        connect( hoverAnim, &QVariantAnimation::valueChanged, this,
+                 [this]( const QVariant &v ) { hoverAmount = v.toReal(); update(); } );
+        setFixedHeight( Theme::SEEK_THICKNESS );
+        setAttribute( Qt::WA_Hover );
+        setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
+        setCursor( Qt::PointingHandCursor );
+    }
+    else if( !b_classic )
     {
         alternativeStyle = new SeekStyle;
         setStyle( alternativeStyle );
@@ -375,6 +395,11 @@ void SeekSlider::mousePressEvent( QMouseEvent* event )
 
 void SeekSlider::mouseMoveEvent( QMouseEvent *event )
 {
+    if( hoverAnim )
+    {
+        hoverX = event->x();
+        update();
+    }
     if ( ! ( event->buttons() & ( Qt::LeftButton | Qt::MiddleButton ) ) )
     {
         /* Handle button release when mouserelease has been hijacked by popup */
@@ -442,6 +467,13 @@ void SeekSlider::enterEvent( QEnterEvent * )
 void SeekSlider::enterEvent( QEvent * )
 #endif
 {
+    if( hoverAnim )
+    {
+        hoverAnim->stop();
+        hoverAnim->setStartValue( hoverAmount );
+        hoverAnim->setEndValue( 1.0 );
+        hoverAnim->start();
+    }
     /* Cancel the fade-out timer */
     hideHandleTimer->stop();
     /* Only start the fade-in if needed */
@@ -460,6 +492,14 @@ void SeekSlider::enterEvent( QEvent * )
 
 void SeekSlider::leaveEvent( QEvent * )
 {
+    if( hoverAnim )
+    {
+        hoverX = -1;
+        hoverAnim->stop();
+        hoverAnim->setStartValue( hoverAmount );
+        hoverAnim->setEndValue( 0.0 );
+        hoverAnim->start();
+    }
     hideHandleTimer->start();
     /* Hide the tooltip
        - if the mouse leave the slider rect (Note: it can still be
@@ -474,6 +514,23 @@ void SeekSlider::leaveEvent( QEvent * )
 
 void SeekSlider::paintEvent( QPaintEvent *ev )
 {
+    if( Theme::redesign() )
+    {
+        const int span = maximum() - minimum();
+        const qreal pos = ( isEnabled() && span > 0 )
+                        ? qreal( sliderPosition() - minimum() ) / span : -1.0;
+        QList<qreal> marks;
+        if( chapters && inputLength > 0 )
+            foreach( const SeekPoint &point, chapters->getPoints() )
+                if( point.time > 0 )
+                    marks << qBound( 0.0, point.time / 1000000.0 / inputLength, 1.0 );
+        const qreal buffering =
+            ( QTime::currentTime() > bufferingStart.addSecs( 1 ) ) ? f_buffering : 0.0;
+        QPainter painter( this );
+        Theme::paintSeekBar( &painter, QRectF( rect() ), pos, buffering, marks,
+                             isEnabled(), isEnabled() ? hoverAmount : 0.0, hoverX );
+        return;
+    }
     if ( alternativeStyle )
     {
         SeekStyle::SeekStyleOption option;
@@ -531,6 +588,8 @@ bool SeekSlider::eventFilter( QObject *obj, QEvent *event )
 
 QSize SeekSlider::sizeHint() const
 {
+    if( Theme::redesign() )
+        return QSize( 200, Theme::SEEK_THICKNESS );
     if ( b_classic )
         return QSlider::sizeHint();
     return ( orientation() == Qt::Horizontal ) ? QSize( 100, 18 )
@@ -625,7 +684,14 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
     b_mouseOutside = true;
     b_isMuted = false;
 
-    setFixedSize( WLENGTH, WHEIGHT );
+    if( Theme::redesign() )
+    {
+        setFixedSize( Theme::VOLUME_WIDTH, Theme::VOLUME_HEIGHT );
+        setAttribute( Qt::WA_Hover );
+        setCursor( Qt::PointingHandCursor );
+    }
+    else
+        setFixedSize( WLENGTH, WHEIGHT );
 
     pixOutside = ImageHelper::loadSvgToPixmap(":/toolbar/volslide-outside.svg", width(), height() );
 
@@ -793,6 +859,13 @@ void SoundSlider::mouseMoveEvent( QMouseEvent *event )
 
 void SoundSlider::changeValue( int x )
 {
+    if( Theme::redesign() )
+    {
+        /* the fill spans the wedge minus its 2.5px inset */
+        const qreal inner = width() - 5.0;
+        setValue( qBound( 0, int( ( x - 2.5 ) * maximum() / inner + 0.5 ), maximum() ) );
+        return;
+    }
     setValue( ( ( x - PADDINGL ) * maximum() ) / ( width() - ( PADDINGR + PADDINGL ) ) );
 }
 
@@ -804,6 +877,15 @@ void SoundSlider::setMuted( bool m )
 
 void SoundSlider::paintEvent( QPaintEvent *e )
 {
+    if( Theme::redesign() )
+    {
+        QPainter p( this );
+        Theme::paintVolumeWedge( &p, QRectF( rect() ).adjusted( 0.5, 0.5, -0.5, -0.5 ),
+                                 maximum() > 0 ? qreal( value() ) / maximum() : 0.0,
+                                 b_isMuted, underMouse() );
+        e->accept();
+        return;
+    }
     QPixmap *paintGradient;
     if (b_isMuted)
         paintGradient = &this->pixGradient2;

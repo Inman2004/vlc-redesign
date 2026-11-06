@@ -40,6 +40,20 @@
 #define INPT_TB_DEFAULT "43;33-4;44"
 #define FSC_TB_DEFAULT "0-2;64;3;1;4;64;37;64;38;64;8;65;25;35-4;34"
 
+/* Redesign: one 54px row. prev, play, next | elapsed, seek, total |
+ * volume | audio tracks, subtitle tracks, adjustments, queue.
+ * Stored under separate keys so a layout customised for the classic
+ * two-row bar does not leak into the redesign (and vice versa). */
+#define REDESIGN_TB1_DEFAULT ""
+#define REDESIGN_TB2_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;26;27;9;64;10"
+#define REDESIGN_INPT_TB_DEFAULT ""
+#define REDESIGN_FSC_TB_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;26;27;8"
+
+/* Settings key / default for each toolbar, depending on the active UI */
+const char *toolbarKey( int which );
+QString toolbarDefault( int which );
+enum { TOOLBAR_MAIN1, TOOLBAR_MAIN2, TOOLBAR_INPUT, TOOLBAR_FSC };
+
 #define I_PLAY_TOOLTIP N_("Play\nIf the playlist is empty, open a medium")
 
 class QBoxLayout;
@@ -81,6 +95,8 @@ typedef enum buttonType_e
     NEXT_BUTTON,
     OPEN_SUB_BUTTON,
     FULLWIDTH_BUTTON,
+    AUDIO_TRACKS_BUTTON,
+    SUBTITLE_TRACKS_BUTTON,
     BUTTON_MAX,
 
     SPLITTER = 0x20,
@@ -110,7 +126,8 @@ static const char* const nameL[BUTTON_MAX] = { N_("Play"), N_("Stop"), N_("Open"
     N_("Record"), N_("A→B Loop"), N_("Frame By Frame"), N_("Trickplay Reverse"),
     N_("Step backward" ), N_("Step forward"), N_("Quit"), N_("Random"),
     N_("Loop / Repeat"), N_("Information"), N_("Previous"), N_("Next"),
-    N_("Open subtitles"), N_("Dock fullscreen controller")
+    N_("Open subtitles"), N_("Dock fullscreen controller"),
+    N_("Audio tracks"), N_("Subtitle tracks")
 };
 static const char* const tooltipL[BUTTON_MAX] = { I_PLAY_TOOLTIP,
     N_("Stop playback"), N_("Open a medium"),
@@ -125,6 +142,7 @@ static const char* const tooltipL[BUTTON_MAX] = { I_PLAY_TOOLTIP,
     N_("Previous media in the playlist"), N_("Next media in the playlist"),
     N_("Open subtitle file"),
     N_("Dock/undock fullscreen controller to/from bottom of screen"),
+    N_("Audio tracks and output device"), N_("Subtitle tracks"),
 };
 static const QString iconL[BUTTON_MAX] ={ ":/toolbar/play_b.svg", ":/toolbar/stop_b.svg",
     ":/toolbar/eject.svg", ":/toolbar/previous_b.svg", ":/toolbar/next_b.svg",
@@ -134,7 +152,8 @@ static const QString iconL[BUTTON_MAX] ={ ":/toolbar/play_b.svg", ":/toolbar/sto
     ":/toolbar/frame.svg", ":/toolbar/reverse.svg", ":/toolbar/skip_back.svg",
     ":/toolbar/skip_fw.svg", ":/toolbar/clear.svg", ":/buttons/playlist/shuffle_on.svg",
     ":/buttons/playlist/repeat_all.svg", ":/menu/info.svg",
-    ":/toolbar/previous_b.svg", ":/toolbar/next_b.svg", ":/toolbar/eject.svg", ":/toolbar/space.svg"
+    ":/toolbar/previous_b.svg", ":/toolbar/next_b.svg", ":/toolbar/eject.svg", ":/toolbar/space.svg",
+    ":/redesign/audio.svg", ":/redesign/subtitles.svg"
 };
 
 enum
@@ -170,7 +189,8 @@ protected:
 
     QWidget *createWidget( buttonType_e, int options = WIDGET_NORMAL );
 private:
-    static void setupButton( QAbstractButton * );
+    static void setupButton( QAbstractButton *, buttonType_e type = BUTTON_MAX );
+    QWidget *trackMenuButton( buttonType_e );
     QFrame *discFrame();
     QFrame *telexFrame();
     void applyAttributes( QToolButton *, bool b_flat, bool b_big );
@@ -212,7 +232,7 @@ public:
                     QWidget *_parent = 0 );
 
     void setGripVisible( bool b_visible )
-    { grip->setVisible( b_visible ); }
+    { if( grip ) grip->setVisible( b_visible ); }
 
 protected:
     friend class MainInterface;

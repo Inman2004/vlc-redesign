@@ -47,6 +47,7 @@ class SearchLineEdit;
 class QModelIndex;
 class QStackedWidget;
 class PLSelector;
+class QToolButton;
 
 class PlaylistWidget : public QWidget
 {
@@ -60,6 +61,12 @@ public:
     QStackedWidget *artContainer;
     StandardPLPanel      *mainView;
 
+    /* Redesign: the sidebar provides navigation, search and view
+     * switching, so hide our own selector tree and top bar. */
+    void setSidebarMode( bool );
+    PLSelector *sourceSelector() const { return selector; }
+    SearchLineEdit *searchField() const { return searchEdit; }
+
 private:
     QSplitter            *leftSplitter;
     QSplitter            *split;
@@ -68,6 +75,7 @@ private:
 
     LocationBar          *locationBar;
     SearchLineEdit       *searchEdit;
+    QToolButton          *viewButton;
 
     intf_thread_t *p_intf;
 

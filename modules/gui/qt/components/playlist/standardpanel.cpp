@@ -27,6 +27,7 @@
 #endif
 
 #include "components/playlist/standardpanel.hpp"
+#include "styles/vlc_theme.hpp"
 
 #include "components/playlist/vlc_model.hpp"      /* VLCModel */
 #include "components/playlist/playlist_model.hpp" /* PLModel */
@@ -131,7 +132,7 @@ StandardPLPanel::StandardPLPanel( PlaylistWidget *_parent,
 StandardPLPanel::~StandardPLPanel()
 {
     getSettings()->beginGroup("Playlist");
-    if( treeView )
+    if( treeView && !Theme::redesign() )
         getSettings()->setValue( "headerStateV2", treeView->header()->saveState() );
     getSettings()->setValue( "view-mode", currentViewIndex() );
     getSettings()->setValue( "zoom",

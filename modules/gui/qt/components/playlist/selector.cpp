@@ -28,6 +28,7 @@
 
 #include "qt.hpp"
 #include "components/playlist/selector.hpp"
+#include <QTreeWidgetItemIterator>
 #include "playlist_model.hpp"                /* plMimeData */
 #include "input_manager.hpp"                 /* MainInputManager, for podcast */
 
@@ -219,6 +220,32 @@ void PLSelector::updateTotalDuration( PLSelItem* item, const char* prefix )
         qs_timeLabel += QString( " [%1:%2]").arg( i_minutes, 2, 10, QChar('0') ).arg( i_seconds, 2, 10, QChar('0') );
 
     item->setText( qs_timeLabel );
+}
+
+QString PLSelector::selectSource( const QString &key )
+{
+    QTreeWidgetItemIterator it( this );
+    for( ; *it; ++it )
+    {
+        QTreeWidgetItem *item = *it;
+        bool match = false;
+        const int special = item->data( 0, SPECIAL_ROLE ).toInt();
+        if( key == "playlist" )
+            match = item->data( 0, TYPE_ROLE ).toInt() == PL_ITEM_TYPE && special == IS_PL;
+        else if( key == "library" )
+            match = item->data( 0, TYPE_ROLE ).toInt() == PL_ITEM_TYPE && special == IS_ML;
+        else
+            match = item->data( 0, TYPE_ROLE ).toInt() == SD_TYPE
+                 && item->data( 0, NAME_ROLE ).toString().startsWith( key );
+        if( match )
+        {
+            setCurrentItem( item );
+            setSource( item );
+            const QString longname = item->data( 0, LONGNAME_ROLE ).toString();
+            return longname.isEmpty() ? key : longname;
+        }
+    }
+    return QString();
 }
 
 void PLSelector::createItems()

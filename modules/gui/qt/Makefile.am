@@ -148,7 +148,11 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/qvlcapp.hpp \
 	gui/qt/util/singleton.hpp \
 	gui/qt/util/imagehelper.cpp gui/qt/util/imagehelper.hpp \
-	gui/qt/styles/seekstyle.cpp gui/qt/styles/seekstyle.hpp
+	gui/qt/styles/seekstyle.cpp gui/qt/styles/seekstyle.hpp \
+	gui/qt/styles/vlc_theme.cpp gui/qt/styles/vlc_theme.hpp \
+	gui/qt/components/header_bar.cpp gui/qt/components/header_bar.hpp \
+	gui/qt/components/nav_rail.cpp gui/qt/components/nav_rail.hpp \
+	gui/qt/components/sidebar_panel.cpp gui/qt/components/sidebar_panel.hpp
 if HAVE_WIN32
 libqt_plugin_la_SOURCES += \
 	gui/qt/main_interface_win32.cpp gui/qt/main_interface_win32.hpp
@@ -176,6 +180,9 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/extensions_manager.moc.cpp \
 	gui/qt/managers/addons_manager.moc.cpp \
 	gui/qt/recents.moc.cpp \
+	gui/qt/components/header_bar.moc.cpp \
+	gui/qt/components/nav_rail.moc.cpp \
+	gui/qt/components/sidebar_panel.moc.cpp \
 	gui/qt/adapters/seekpoints.moc.cpp \
 	gui/qt/adapters/chromaprint.moc.cpp \
 	gui/qt/adapters/variables.moc.cpp \
@@ -417,6 +424,50 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/toolbar/volume-low.svg \
 	gui/qt/pixmaps/toolbar/volume-medium.svg \
 	gui/qt/pixmaps/toolbar/volume-muted.svg \
+	gui/qt/pixmaps/redesign/fonts/GoogleSans-Regular.ttf \
+	gui/qt/pixmaps/redesign/fonts/GoogleSans-Medium.ttf \
+	gui/qt/pixmaps/redesign/fonts/OFL.txt \
+	gui/qt/pixmaps/redesign/add.svg \
+	gui/qt/pixmaps/redesign/chevron.svg \
+	gui/qt/pixmaps/redesign/record.svg \
+	gui/qt/pixmaps/redesign/hide-ui.svg \
+	gui/qt/pixmaps/redesign/playback.svg \
+	gui/qt/pixmaps/redesign/quit.svg \
+	gui/qt/pixmaps/redesign/play-outline.svg \
+	gui/qt/pixmaps/redesign/audio.svg \
+	gui/qt/pixmaps/redesign/back.svg \
+	gui/qt/pixmaps/redesign/dots.svg \
+	gui/qt/pixmaps/redesign/folder.svg \
+	gui/qt/pixmaps/redesign/forward.svg \
+	gui/qt/pixmaps/redesign/fullscreen.svg \
+	gui/qt/pixmaps/redesign/grid.svg \
+	gui/qt/pixmaps/redesign/home.svg \
+	gui/qt/pixmaps/redesign/music.svg \
+	gui/qt/pixmaps/redesign/network.svg \
+	gui/qt/pixmaps/redesign/next.svg \
+	gui/qt/pixmaps/redesign/open.svg \
+	gui/qt/pixmaps/redesign/pause.svg \
+	gui/qt/pixmaps/redesign/play.svg \
+	gui/qt/pixmaps/redesign/playlist.svg \
+	gui/qt/pixmaps/redesign/popout.svg \
+	gui/qt/pixmaps/redesign/prev.svg \
+	gui/qt/pixmaps/redesign/queue.svg \
+	gui/qt/pixmaps/redesign/recent.svg \
+	gui/qt/pixmaps/redesign/search.svg \
+	gui/qt/pixmaps/redesign/settings.svg \
+	gui/qt/pixmaps/redesign/sidebar.svg \
+	gui/qt/pixmaps/redesign/sort.svg \
+	gui/qt/pixmaps/redesign/stop.svg \
+	gui/qt/pixmaps/redesign/subtitles.svg \
+	gui/qt/pixmaps/redesign/video.svg \
+	gui/qt/pixmaps/redesign/view.svg \
+	gui/qt/pixmaps/redesign/volume-muted.svg \
+	gui/qt/pixmaps/redesign/volume.svg \
+	gui/qt/pixmaps/redesign/win-close.svg \
+	gui/qt/pixmaps/redesign/win-fullscreen.svg \
+	gui/qt/pixmaps/redesign/win-max.svg \
+	gui/qt/pixmaps/redesign/win-min.svg \
+	gui/qt/pixmaps/redesign/win-restore.svg \
 	gui/qt/pixmaps/toolbar/volume-slider-inside.svg \
 	gui/qt/pixmaps/toolbar/volume-slider-outside.svg \
 	gui/qt/pixmaps/types/capture-card_16px.svg \

@@ -37,6 +37,7 @@
 #include <vlc_aout.h>                             /* audio_output_t */
 
 #include "menus.hpp"
+#include "styles/vlc_theme.hpp"
 
 #include "main_interface.hpp"                     /* View modifications */
 #include "dialogs_provider.hpp"                   /* Dialogs display */
@@ -1010,8 +1011,135 @@ QMenu* VLCMenuBar::MiscPopupMenu( intf_thread_t *p_intf, bool show )
 }
 
 /* Main Menu that sticks everything together  */
+/* "Label<TAB>Key": Qt shows the part after the tab as the shortcut
+ * column without registering a second shortcut. */
+static QString withKey( intf_thread_t *p_intf, const QString &label, const char *option )
+{
+    char *psz = var_InheritString( p_intf, option );
+    QString key = psz ? qfu( psz ).section( '\t', 0, 0 ) : QString();
+    free( psz );
+    /* "Shift+r" -> "Shift + R", as drawn in the design */
+    QStringList parts = key.split( '+' );
+    for( int i = 0; i < parts.size(); i++ )
+        if( parts[i].size() == 1 )
+            parts[i] = parts[i].toUpper();
+    key = parts.join( " + " );
+    return key.isEmpty() ? label : label + "\t" + key;
+}
+
+QMenu* VLCMenuBar::RedesignPopupMenu( intf_thread_t *p_intf, bool show )
+{
+    input_thread_t *p_input = THEMIM->getInput();
+    MainInterface *mi = p_intf->p_sys->p_mi;
+    const QColor accent = Theme::accent();
+    const QColor grey = Theme::colors().icon;
+    const int G = 20;
+    QMenu *menu = new QMenu();
+    menu->setObjectName( "VLCContextMenu" );
+    QAction *action;
+
+    /* Leave fullscreen first when in fullscreen: the most likely wish */
+    vout_thread_t *p_vout = THEMIM->getVout();
+    if( p_vout )
+    {
+        if( var_GetBool( p_vout, "fullscreen" ) )
+        {
+            action = menu->addAction( QIcon( Theme::pixmap( "fullscreen", G, grey ) ),
+                                      withKey( p_intf, qtr( "Leave Fullscreen" ), "key-leave-fullscreen" ),
+                                      ActionsManager::getInstance( p_intf ), [p_intf]() {
+                                          ActionsManager::getInstance( p_intf )->doAction( FULLSCREEN_ACTION ); } );
+        }
+        vlc_object_release( p_vout );
+    }
+
+    /* Transport, accent glyphs */
+    const bool playing = p_input && var_GetInteger( p_input, "state" ) == PLAYING_S;
+    menu->addAction( QIcon( Theme::pixmap( playing ? "pause" : "play-outline", G, accent ) ),
+                     withKey( p_intf, playing ? qtr( "Pause" ) : qtr( "Play" ), "key-play-pause" ),
+                     THEMIM, &MainInputManager::togglePlayPause );
+    action = menu->addAction( QIcon( Theme::pixmap( "stop", G, accent ) ),
+                              withKey( p_intf, qtr( "Stop" ), "key-stop" ),
+                              THEMIM, &MainInputManager::stop );
+    action->setEnabled( p_input != NULL );
+    const bool empty = THEMIM->hasEmptyPlaylist();
+    action = menu->addAction( QIcon( Theme::pixmap( "prev", G, accent ) ),
+                              withKey( p_intf, qtr( "Previous Item" ), "key-prev" ),
+                              THEMIM, &MainInputManager::prev );
+    action->setEnabled( !empty );
+    action = menu->addAction( QIcon( Theme::pixmap( "next", G, accent ) ),
+                              withKey( p_intf, qtr( "Next Item" ), "key-next" ),
+                              THEMIM, &MainInputManager::next );
+    action->setEnabled( !empty );
+    action = menu->addAction( QIcon( Theme::pixmap( "record", G, accent ) ),
+                              withKey( p_intf, qtr( "Record" ), "key-record" ),
+                              THEAM, &ActionsManager::record );
+    action->setEnabled( p_input != NULL );
+
+    /* Hide UI: the redesign's name for the minimal view */
+    if( mi )
+    {
+        action = menu->addAction( QIcon( Theme::pixmap( "hide-ui", G, grey ) ),
+                                  qtr( "Hide UI" ) + "\tCtrl + \\", mi, [mi]() {
+                                      mi->toggleMinimalView( true ); } );
+    }
+
+    /* Sub menus, built by the same builders as the classic menus */
+    QMenu *sub;
+    sub = NavigMenu( p_intf, new QMenu( menu ) );
+    action = menu->addMenu( sub );
+    action->setText( qtr( "Playback" ) );
+    action->setIcon( QIcon( Theme::pixmap( "playback", G, grey ) ) );
+
+    sub = VideoMenu( p_intf, new QMenu( menu ) );
+    action = menu->addMenu( sub );
+    action->setText( qtr( "Video" ) );
+    action->setIcon( QIcon( Theme::pixmap( "video", G, grey ) ) );
+    action->setEnabled( p_input && !sub->isEmpty() );
+
+    sub = AudioMenu( p_intf, new QMenu( menu ) );
+    action = menu->addMenu( sub );
+    action->setText( qtr( "Audio" ) );
+    action->setIcon( QIcon( Theme::pixmap( "audio", G, grey ) ) );
+
+    sub = SubtitleMenu( p_intf, new QMenu( menu ), true );
+    action = menu->addMenu( sub );
+    action->setText( qtr( "Subtitle" ) );
+    action->setIcon( QIcon( Theme::pixmap( "subtitles", G, grey ) ) );
+    if( p_input )
+        UpdateItem( p_intf, sub, "spu-es", VLC_OBJECT( p_input ), true );
+
+    sub = ToolsMenu( p_intf, new QMenu( menu ) );
+    action = menu->addMenu( sub );
+    action->setText( qtr( "More Settings" ) );
+    action->setIcon( QIcon( Theme::pixmap( "settings", G, grey ) ) );
+
+    QMenuView *plMenu = new QMenuView( menu, 25 );
+    PLModel *model = PLModel::getPLModel( p_intf );
+    plMenu->setModel( model );
+    connect( plMenu, &QMenuView::activated,
+             model, QOverload<const QModelIndex &>::of(&PLModel::activateItem) );
+    action = menu->addMenu( plMenu );
+    action->setText( qtr( "Playlist" ) );
+    action->setIcon( QIcon( Theme::pixmap( "playlist", G, grey ) ) );
+
+    sub = FileMenu( p_intf, menu, mi );
+    action = menu->addMenu( sub );
+    action->setText( qtr( "Open Media" ) );
+    action->setIcon( QIcon( Theme::pixmap( "open", G, grey ) ) );
+
+    menu->addAction( QIcon( Theme::pixmap( "quit", G, grey ) ),
+                     qtr( "Quit VLC" ) + "\tCtrl + Q", THEDP, &DialogsProvider::quit );
+
+    if( show )
+        menu->popup( QCursor::pos() );
+    return menu;
+}
+
 QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
 {
+    if( Theme::redesign() && !p_intf->p_sys->b_isDialogProvider )
+        return RedesignPopupMenu( p_intf, show );
+
     POPUP_BOILERPLATE
 
     /* */
