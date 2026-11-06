@@ -501,6 +501,14 @@ EXTRA_DIST += gui/qt/vlc.qrc $(libqt_plugin_la_RES)
 
 nodist_libqt_plugin_la_SOURCES += gui/qt/resources.cpp
 
+# Redesign: modern icon overlay (tools/redesign/gen_modern_icons.py)
+include $(top_srcdir)/modules/gui/qt/pixmaps/modern/files.am
+EXTRA_DIST += gui/qt/modern.qrc $(libqt_plugin_la_MODERN_RES) \
+	gui/qt/pixmaps/modern/ICONOIR-LICENSE
+nodist_libqt_plugin_la_SOURCES += gui/qt/resources_modern.cpp
+gui/qt/resources_modern.cpp: gui/qt/modern.qrc $(libqt_plugin_la_MODERN_RES)
+	$(AM_V_GEN)$(RCC) -name modern -o $@ $<
+
 if ENABLE_VLM
 nodist_libqt_plugin_la_SOURCES += gui/qt/dialogs/vlm.moc.cpp
 endif

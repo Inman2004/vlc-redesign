@@ -13,3 +13,4 @@ Makefile.in
 autom4te.cache/
 resources.cpp
 *.pc
+resources_modern.cpp

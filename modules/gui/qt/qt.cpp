@@ -590,6 +590,14 @@ static void *ThreadPlatform( void *obj, char *platform_name )
     }
     argv[argc] = NULL;
 
+    /* Redesign: the modern icon overlay reuses the legacy resource paths
+     * and the first registered resource wins. rcc already registered both
+     * from static initialisers at load time (vlc first), so re-register
+     * them in the order we want. */
+    Q_CLEANUP_RESOURCE( modern );
+    Q_CLEANUP_RESOURCE( vlc );
+    if( var_InheritBool( p_intf, "qt-redesign" ) )
+        Q_INIT_RESOURCE( modern );
     Q_INIT_RESOURCE( vlc );
 
 #if HAS_QT56
