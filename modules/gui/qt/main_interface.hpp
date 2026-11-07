@@ -59,6 +59,7 @@ class NavRail;
 class SidebarPanel;
 class AdjustDock;
 class ChromeAutoHider;
+class LibraryView;
 class QSplitter;
 struct vout_window_t;
 
@@ -165,6 +166,9 @@ protected:
     AdjustDock          *adjustDock;
     /* redesign: windowed auto-hide ("Always") and the I-key peek in Hide UI */
     ChromeAutoHider     *autoHider = NULL;
+    /* redesign: the library window state (P5a) */
+    LibraryView         *libraryView = NULL;
+    bool                 b_libraryMode = false;
     friend class ChromeAutoHider;
     void setChromeVisible( bool );
     QSplitter           *bodySplitter;
@@ -227,6 +231,9 @@ public slots:
     void showAdjustPanel( int tab );
     void activateSection( const QString & );
     void toggleMinimalView( bool );
+    /* library window state: nav + browse view instead of rail, sidebar,
+     * content and bar; section "" keeps the last one */
+    void setLibraryMode( bool, const QString &section = QString() );
     void togglePlaylist();
     void toggleUpdateSystrayMenu(bool requestActivate = false);
     void showUpdateSystrayMenu();

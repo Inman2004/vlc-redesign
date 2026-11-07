@@ -46,6 +46,8 @@ public:
 
 public slots:
     void setTitle( const QString & );
+    /* library window state: cone and menu only on the left (Figma #3-6) */
+    void setLibraryMode( bool );
     void updateCrumb();
 
 signals:
@@ -68,6 +70,8 @@ private:
     QToolButton *menuBtn, *sidebarBtn;
     QToolButton *minBtn, *maxBtn, *fsBtn, *closeBtn;
     QLabel *folderIcon, *crumb, *title;
+    QWidget *divider;
+    bool libraryMode = false;
     QWidget *leftGroup, *rightGroup;
 };
 

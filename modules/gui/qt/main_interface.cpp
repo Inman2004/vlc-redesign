@@ -43,7 +43,8 @@
 #include "components/header_bar.hpp"            // Redesign header
 #include "components/nav_rail.hpp"              // Redesign rail
 #include "components/sidebar_panel.hpp"
-#include "library/media_library.hpp"         // Redesign sidebar
+#include "library/media_library.hpp"
+#include "library/library_view.hpp"         // Redesign sidebar
 #include "components/adjust_panel.hpp"          // Redesign adjustments
 #include "dialogs/redesign_dialogs.hpp"          // Remembered subtitles
 #include "styles/vlc_theme.hpp"                 // Redesign tokens
@@ -299,7 +300,7 @@ private:
 
 void MainInterface::setChromeVisible( bool b )
 {
-    if( !header )
+    if( !header || b_libraryMode )
         return;
     header->setVisible( b );
     rail->setVisible( b );
@@ -813,6 +814,17 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
             bodySplitter->setSizes( QList<int>() << Theme::SIDEBAR_WIDTH << 800 );
 
         mainLayout->addWidget( body, 1 );
+
+        /* the library window state replaces the body (P5a) */
+        libraryView = new LibraryView( p_intf, main );
+        libraryView->hide();
+        mainLayout->addWidget( libraryView, 1 );
+        connect( libraryView, &LibraryView::closeRequested, this, [this]() { setLibraryMode( false ); } );
+        connect( libraryView, &LibraryView::played, this, [this]() { setLibraryMode( false ); } );
+        connect( libraryView, &LibraryView::playerSectionRequested, this, [this]( const QString &key ) {
+            setLibraryMode( false );
+            activateSection( key );
+        } );
     }
 
     /* */
@@ -1407,12 +1419,15 @@ void MainInterface::createPlaylist()
             playlistWidget = dialog->exportPlaylistWidget();
             sidebar->setPlaylistWidget( playlistWidget );
         } );
-        connect( sidebar, &SidebarPanel::popOutRequested, this, [this, dialog]() {
-            setSidebarVisible( false );
-            playlistWidget->setSidebarMode( false );
-            dialog->importPlaylistWidget( playlistWidget );
-            dialog->show();
+        /* the sidebar expands into the library window (Figma row 2 #3-6);
+         * the classic playlist window stays in right-click > Interface */
+        connect( sidebar, &SidebarPanel::popOutRequested, this, [this]() {
+            const QString sec = lastSection == "music" ? "music"
+                              : lastSection == "recents" ? "recent"
+                              : lastSection == "home" ? "home" : "videos";
+            setLibraryMode( true, sec );
         } );
+        Q_UNUSED( dialog );
         return;
     }
 
@@ -1757,6 +1772,33 @@ void MainInterface::setMinimalView( bool b_minimal )
  *
  * If b_minimal is false, then we are normalView
  */
+void MainInterface::setLibraryMode( bool on, const QString &section )
+{
+    if( !libraryView || b_videoFullScreen )
+        return;
+    if( on && !section.isEmpty() )
+        libraryView->openSection( section );
+    if( on == b_libraryMode )
+        return;
+    b_libraryMode = on;
+    if( autoHider )
+        autoHider->reset();
+    header->setLibraryMode( on );
+    if( on )
+    {
+        body->hide();
+        controls->hide();
+        libraryView->show();
+        libraryView->setFocus();
+    }
+    else
+    {
+        libraryView->hide();
+        body->show();
+        controls->setVisible( !b_minimalView );
+    }
+}
+
 void MainInterface::toggleMinimalView( bool b_minimal )
 {
     if( !b_minimalView && b_autoresize ) /* Normal mode */

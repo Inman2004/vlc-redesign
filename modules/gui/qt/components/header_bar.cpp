@@ -100,7 +100,7 @@ HeaderBar::HeaderBar( intf_thread_t *_p_intf, MainInterface *_mi )
     connect( sidebarBtn, &QToolButton::toggled, this, &HeaderBar::sidebarToggled );
     left->addWidget( sidebarBtn );
 
-    QFrame *divider = new QFrame( leftGroup );
+    divider = new QFrame( leftGroup );
     divider->setObjectName( "HeaderDivider" );
     divider->setFixedSize( 1, 18 );
     left->addSpacing( 4 );
@@ -197,9 +197,17 @@ void HeaderBar::updateCrumb()
         }
     }
     crumb->setText( folder );
-    crumb->setVisible( !folder.isEmpty() );
-    folderIcon->setVisible( !folder.isEmpty() );
+    crumb->setVisible( !folder.isEmpty() && !libraryMode );
+    folderIcon->setVisible( !folder.isEmpty() && !libraryMode );
     placeTitle();
+}
+
+void HeaderBar::setLibraryMode( bool on )
+{
+    libraryMode = on;
+    sidebarBtn->setVisible( !on );
+    divider->setVisible( !on );
+    updateCrumb();
 }
 
 void HeaderBar::showMainMenu()

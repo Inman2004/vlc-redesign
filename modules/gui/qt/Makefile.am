@@ -158,6 +158,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/seek_preview.cpp gui/qt/util/seek_preview.hpp \
 	gui/qt/util/frame_grabber.cpp gui/qt/util/frame_grabber.hpp \
 	gui/qt/library/media_library.cpp gui/qt/library/media_library.hpp \
+	gui/qt/library/library_view.cpp gui/qt/library/library_view.hpp \
 	gui/qt/dialogs/redesign_dialogs.cpp gui/qt/dialogs/redesign_dialogs.hpp \
 	gui/qt/components/redesign_menus.cpp gui/qt/components/redesign_menus.hpp
 if HAVE_WIN32
@@ -195,6 +196,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/seek_preview.moc.cpp \
 	gui/qt/util/frame_grabber.moc.cpp \
 	gui/qt/library/media_library.moc.cpp \
+	gui/qt/library/library_view.moc.cpp \
 	gui/qt/dialogs/redesign_dialogs.moc.cpp \
 	gui/qt/components/redesign_menus.moc.cpp \
 	gui/qt/adapters/seekpoints.moc.cpp \
