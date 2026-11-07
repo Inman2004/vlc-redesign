@@ -1356,7 +1356,10 @@ void FullscreenControllerWidget::hideFSC()
     }
     p_hideTimer->stop();
     if( isVisible() )
+    {
+        msg_Dbg( p_intf, "fullscreen chrome: hide" );
         fadeTo( 0.0 );
+    }
     else if( topStrip )
         topStrip->hide();
 }
@@ -1394,6 +1397,8 @@ void FullscreenControllerWidget::showFSC()
             topStrip->show();
             topStrip->raise();
         }
+        if( !isVisible() )
+            msg_Dbg( p_intf, "fullscreen chrome: show" );
         show();
         raise();
         fadeTo( 1.0 );

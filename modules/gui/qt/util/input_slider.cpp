@@ -148,10 +148,15 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
         setCursor( Qt::PointingHandCursor );
 
         /* thumbnail over the hover time (qt-seek-preview) */
-        preview = new SeekPreview( p_intf, this );
-        connect( preview, &SeekPreview::ready, this, [this]( float, const QImage &img ) {
+        preview = SeekPreview::shared( p_intf );
+        connect( preview, &SeekPreview::ready, this, [this]( float, const QImage & ) {
+            /* whatever finished, show the frame closest to the hover now */
             if( mTimeTooltip->isVisible() && mTimeTooltip->previewEnabled() )
-                mTimeTooltip->setThumbnail( img );
+            {
+                const QImage img = preview->cached( previewTime, inputLength );
+                if( !img.isNull() )
+                    mTimeTooltip->setThumbnail( img );
+            }
         } );
     }
     else if( !b_classic )
@@ -455,13 +460,22 @@ void SeekSlider::mouseMoveEvent( QMouseEvent *event )
                 QWidget::mapToGlobal( QPoint( 0, 0 ) ).y() );
         if( likely( size().width() > handleLength() ) ) {
             const float hoverTime = getValuePercentageFromXPos( event->x() ) * inputLength;
-            secstotimestr( psz_length, hoverTime );
+            if( Theme::redesign() )
+            {
+                /* same hh:mm:ss as the bar's time labels (Figma: 00:02:10) */
+                const int t = int( hoverTime );
+                snprintf( psz_length, sizeof( psz_length ), "%02d:%02d:%02d",
+                          t / 3600, ( t / 60 ) % 60, t % 60 );
+            }
+            else
+                secstotimestr( psz_length, hoverTime );
             if( preview )
             {
                 const bool on = SeekPreview::available( p_intf );
                 mTimeTooltip->setPreviewEnabled( on );
                 if( on )
                 {
+                    previewTime = hoverTime;
                     const QImage img = preview->cached( hoverTime, inputLength );
                     if( !img.isNull() )
                         mTimeTooltip->setThumbnail( img );

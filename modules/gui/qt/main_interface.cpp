@@ -159,9 +159,13 @@ public:
         if( mi->b_minimalView )
         {
             peeking = !peeking;
+            msg_Dbg( p_intf, "window chrome: peek %s", peeking ? "on" : "off" );
             mi->setChromeVisible( peeking );
             if( peeking )
+            {
+                peekCursor = QCursor::pos();
                 timer.start( delay() );
+            }
         }
         else if( autoHidden )
             activity();
@@ -229,6 +233,7 @@ private:
         if( autoHidden )
         {
             autoHidden = false;
+            msg_Dbg( p_intf, "window chrome: shown again" );
             mi->setChromeVisible( true );
         }
         if( peeking )
@@ -243,6 +248,10 @@ private:
         if( qApp->activePopupWidget() || qApp->activeModalWidget() )
             return true;
         if( !mi->isActiveWindow() )
+            return false;
+        /* a peek appears under a cursor that did not move: that is not
+         * the user resting on the controls */
+        if( peeking && QCursor::pos() == peekCursor )
             return false;
         QWidget *w = QApplication::widgetAt( QCursor::pos() );
         for( ; w; w = w->parentWidget() )
@@ -264,6 +273,7 @@ private:
         if( peeking )
         {
             peeking = false;
+            msg_Dbg( p_intf, "window chrome: peek ended" );
             if( mi->b_minimalView )
                 mi->setChromeVisible( false );
             return;
@@ -272,6 +282,7 @@ private:
             && THEMIM->getIM()->playingStatus() == PLAYING_S )
         {
             autoHidden = true;
+            msg_Dbg( p_intf, "window chrome: auto-hide" );
             mi->setChromeVisible( false );
         }
     }
@@ -281,6 +292,7 @@ private:
     QTimer timer;
     int mode() const { return var_InheritInteger( p_intf, "qt-autohide-controls" ); }
     bool autoHidden = false, peeking = false;
+    QPoint peekCursor;
     QList<vout_thread_t *> vouts;
 };
 

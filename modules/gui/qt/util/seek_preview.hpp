@@ -30,12 +30,15 @@
 #include <QTimer>
 #include <QMap>
 #include <QList>
+#include <QSet>
+#include <atomic>
 
 /* VLC 3 has no thumbnailer API. A preview is decoded by a second, hidden
  * input whose video goes to the "vmem" display: it starts at the hovered
- * time (fast seek, no audio, no subtitles) and is closed as soon as the
- * first picture arrives. One job runs at a time; the latest hover wins,
- * and pictures are cached per time bucket for the current file. */
+ * time (fast seek, no audio, no subtitles, no window) and is closed as
+ * soon as the first picture after the seek arrives. One job runs at a
+ * time; the latest hover wins, and from the first hover the rest of the
+ * file is filled in the background, nearest first, about 250 pictures. */
 class SeekPreview : public QObject
 {
     Q_OBJECT
@@ -45,6 +48,7 @@ public:
     SeekPreview( intf_thread_t *, QObject *parent = NULL );
     virtual ~SeekPreview();
 
+    static SeekPreview *shared( intf_thread_t * );
     /* qt-seek-preview, and only for local files with video */
     static bool available( intf_thread_t * );
 
@@ -54,11 +58,12 @@ public:
     /* a cached picture near this time, if any */
     QImage cached( float time, float length ) const;
 
+    struct Job;     /* public for the input event callback */
+
 signals:
     void ready( float time, const QImage & );
 
 private:
-    struct Job;
     static unsigned setupCb( void **, char *, unsigned *, unsigned *,
                              unsigned *, unsigned * );
     static void *lockCb( void *, void ** );
@@ -66,6 +71,7 @@ private:
 
     int bucketOf( float time, float length ) const;
     void startNext();
+    int nextFillBucket() const;
     void finish( Job *, const QImage & );
     void dropCache();
 
@@ -79,6 +85,10 @@ private:
     float pendingLength;
     QMap<int, QImage> cache;
     QList<int> cacheOrder;
+    QSet<int> failed;
+    int fillCenter = 0;
+    float fillLength = 0;
+    std::atomic<int> closing { 0 };
 };
 
 #endif

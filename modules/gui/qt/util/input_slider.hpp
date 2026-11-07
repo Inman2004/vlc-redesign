@@ -93,6 +93,7 @@ protected:
 
 private:
     SeekPreview *preview = NULL;
+    float previewTime = -1;
     intf_thread_t *p_intf;
     bool isSliding;        /* Whether we are currently sliding by user action */
     bool isJumping;              /* if we requested a jump to another chapter */
