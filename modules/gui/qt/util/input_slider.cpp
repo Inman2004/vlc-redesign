@@ -30,6 +30,7 @@
 #include "qt.hpp"
 
 #include "util/input_slider.hpp"
+#include "util/seek_preview.hpp"
 #include "util/timetooltip.hpp"
 #include "adapters/seekpoints.hpp"
 #include "input_manager.hpp"
@@ -145,6 +146,13 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
         setAttribute( Qt::WA_Hover );
         setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
         setCursor( Qt::PointingHandCursor );
+
+        /* thumbnail over the hover time (qt-seek-preview) */
+        preview = new SeekPreview( p_intf, this );
+        connect( preview, &SeekPreview::ready, this, [this]( float, const QImage &img ) {
+            if( mTimeTooltip->isVisible() && mTimeTooltip->previewEnabled() )
+                mTimeTooltip->setThumbnail( img );
+        } );
     }
     else if( !b_classic )
     {
@@ -446,7 +454,20 @@ void SeekSlider::mouseMoveEvent( QMouseEvent *event )
         QPoint target( pos.x() - ( event->x() - posX ),
                 QWidget::mapToGlobal( QPoint( 0, 0 ) ).y() );
         if( likely( size().width() > handleLength() ) ) {
-            secstotimestr( psz_length, getValuePercentageFromXPos( event->x() ) * inputLength );
+            const float hoverTime = getValuePercentageFromXPos( event->x() ) * inputLength;
+            secstotimestr( psz_length, hoverTime );
+            if( preview )
+            {
+                const bool on = SeekPreview::available( p_intf );
+                mTimeTooltip->setPreviewEnabled( on );
+                if( on )
+                {
+                    const QImage img = preview->cached( hoverTime, inputLength );
+                    if( !img.isNull() )
+                        mTimeTooltip->setThumbnail( img );
+                    preview->request( hoverTime, inputLength );
+                }
+            }
             mTimeTooltip->setTip( target, psz_length, chapterLabel );
         }
     }
@@ -559,6 +580,8 @@ void SeekSlider::paintEvent( QPaintEvent *ev )
 
 void SeekSlider::hideEvent( QHideEvent * )
 {
+    if( preview )
+        preview->cancel();
     mTimeTooltip->hide();
 }
 

@@ -105,6 +105,197 @@ static int IntfRaiseMainCB( vlc_object_t *p_this, const char *psz_variable,
 const QEvent::Type MainInterface::ToolbarsNeedRebuild =
         (QEvent::Type)QEvent::registerEventType();
 
+/*****************************************************************************
+ * ChromeAutoHider (redesign, P2b)
+ * Windowed counterpart of the fullscreen controller's hiding: with
+ * qt-autohide-controls = Always the header, rail, sidebar and bar go away
+ * while a video plays and the mouse rests on it ("Player - hidden" frame),
+ * and come back on the next move. In Hide UI the I key peeks at them.
+ * Nothing is resized: the video simply takes the freed space.
+ *****************************************************************************/
+static const QEvent::Type VoutMouseMovedEvent = QEvent::Type( QEvent::registerEventType() );
+
+class ChromeAutoHider : public QObject
+{
+public:
+    ChromeAutoHider( intf_thread_t *_p_intf, MainInterface *_mi )
+        : QObject( _mi ), p_intf( _p_intf ), mi( _mi )
+    {
+        timer.setSingleShot( true );
+        connect( &timer, &QTimer::timeout, this, [this]() { tick(); } );
+        connect( THEMIM->getIM(), &InputManager::voutListChanged, this,
+                 [this]( vout_thread_t **pp, int n ) { setVouts( pp, n ); },
+                 Qt::DirectConnection );
+        connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this,
+                 [this]( int ) { activity(); } );
+        qApp->installEventFilter( this );
+    }
+
+    ~ChromeAutoHider()
+    {
+        qApp->removeEventFilter( this );
+        setVouts( NULL, 0 );
+    }
+
+    bool isHidden() const { return autoHidden; }
+
+    /* back to the state the view mode expects, before the mode changes */
+    void reset()
+    {
+        timer.stop();
+        if( autoHidden )
+            mi->setChromeVisible( true );
+        if( peeking )
+            mi->setChromeVisible( false );
+        autoHidden = peeking = false;
+        arm();
+    }
+
+    /* the I key outside fullscreen */
+    void peek()
+    {
+        if( mi->b_videoFullScreen )
+            return;
+        if( mi->b_minimalView )
+        {
+            peeking = !peeking;
+            mi->setChromeVisible( peeking );
+            if( peeking )
+                timer.start( delay() );
+        }
+        else if( autoHidden )
+            activity();
+    }
+
+protected:
+    bool eventFilter( QObject *obj, QEvent *e ) Q_DECL_OVERRIDE
+    {
+        if( e->type() == QEvent::MouseMove && obj->isWidgetType()
+            && static_cast<QWidget *>( obj )->window() == mi )
+            activity();
+        return QObject::eventFilter( obj, e );
+    }
+
+    void customEvent( QEvent *e ) Q_DECL_OVERRIDE
+    {
+        if( e->type() == VoutMouseMovedEvent )
+            activity();
+    }
+
+private:
+    static int MouseMoved( vlc_object_t *, const char *, vlc_value_t,
+                           vlc_value_t, void *data )
+    {
+        QApplication::postEvent( static_cast<ChromeAutoHider *>( data ),
+                                 new QEvent( VoutMouseMovedEvent ) );
+        return VLC_SUCCESS;
+    }
+
+    void setVouts( vout_thread_t **pp, int n )
+    {
+        QList<vout_thread_t *> next;
+        for( int i = 0; i < n; i++ )
+            next << pp[i];
+        foreach( vout_thread_t *v, vouts )
+            if( !next.contains( v ) )
+            {
+                var_DelCallback( v, "mouse-moved", MouseMoved, this );
+                vlc_object_release( v );
+            }
+        foreach( vout_thread_t *v, next )
+            if( !vouts.contains( v ) )
+            {
+                vlc_object_hold( v );
+                var_AddCallback( v, "mouse-moved", MouseMoved, this );
+            }
+        vouts = next;
+    }
+
+    int delay() const
+    {
+        return qMax( 300, (int)var_InheritInteger( p_intf, "mouse-hide-timeout" ) );
+    }
+
+    void arm()
+    {
+        if( mode() == 2 && !mi->b_minimalView && !mi->b_videoFullScreen )
+            timer.start( delay() );
+    }
+
+    void activity()
+    {
+        if( mi->b_videoFullScreen )
+            return;
+        if( autoHidden )
+        {
+            autoHidden = false;
+            mi->setChromeVisible( true );
+        }
+        if( peeking )
+            timer.start( delay() );
+        else
+            arm();
+    }
+
+    /* the mouse rests on a chrome widget, or a menu or dialog is up */
+    bool busy() const
+    {
+        if( qApp->activePopupWidget() || qApp->activeModalWidget() )
+            return true;
+        if( !mi->isActiveWindow() )
+            return false;
+        QWidget *w = QApplication::widgetAt( QCursor::pos() );
+        for( ; w; w = w->parentWidget() )
+            if( w == mi->header || w == mi->controls || w == mi->rail
+                || w == mi->sidebar || w == (QWidget *)mi->adjustDock )
+                return true;
+        return false;
+    }
+
+    void tick()
+    {
+        if( mi->b_videoFullScreen )
+            return;
+        if( busy() )
+        {
+            timer.start( delay() );
+            return;
+        }
+        if( peeking )
+        {
+            peeking = false;
+            if( mi->b_minimalView )
+                mi->setChromeVisible( false );
+            return;
+        }
+        if( mode() == 2 && !mi->b_minimalView && THEMIM->getIM()->hasVideo()
+            && THEMIM->getIM()->playingStatus() == PLAYING_S )
+        {
+            autoHidden = true;
+            mi->setChromeVisible( false );
+        }
+    }
+
+    intf_thread_t *p_intf;
+    MainInterface *mi;
+    QTimer timer;
+    int mode() const { return var_InheritInteger( p_intf, "qt-autohide-controls" ); }
+    bool autoHidden = false, peeking = false;
+    QList<vout_thread_t *> vouts;
+};
+
+void MainInterface::setChromeVisible( bool b )
+{
+    if( !header )
+        return;
+    header->setVisible( b );
+    rail->setVisible( b );
+    sidebar->setVisible( b && playlistVisible );
+    if( adjustDock )
+        adjustDock->setVisible( b && adjustDock->isOpen() );
+    controls->setVisible( b );
+}
+
 MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
 {
     /* Variables initialisation */
@@ -192,12 +383,21 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
         menuBar()->setFixedHeight( 0 ); /* stays "visible" so its shortcuts keep working */
         /* Hide UI, as in the design's context menu */
         QShortcut *hideUi = new QShortcut( QKeySequence( "Ctrl+\\" ), this );
-        connect( hideUi, &QShortcut::activated, this, [this]() { toggleMinimalView( !b_minimalView ); } );
+        connect( hideUi, &QShortcut::activated, this, [this]() {
+            /* in fullscreen there is no window chrome: keep the
+             * controller from coming up until the next Ctrl+\ or I */
+            if( b_videoFullScreen && fullscreenControls )
+                fullscreenControls->setSuppressed( !fullscreenControls->isSuppressed() );
+            else
+                toggleMinimalView( !b_minimalView );
+        } );
     }
     connect( THEMIM->getIM(), &InputManager::voutListChanged,
              THEDP, &DialogsProvider::destroyPopupMenu );
 
     createMainWidget( settings );
+    if( Theme::redesign() )
+        autoHider = new ChromeAutoHider( p_intf, this );
 
 #ifndef QT_NO_STATUSBAR
     /**************
@@ -870,6 +1070,12 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
 
 void MainInterface::toggleFSC()
 {
+   /* called from the hotkeys thread: I peeks at the chrome when windowed */
+   if( Theme::redesign() )
+       QMetaObject::invokeMethod( this, [this]() {
+           if( autoHider && !b_videoFullScreen )
+               autoHider->peek();
+       }, Qt::QueuedConnection );
    if( !fullscreenControls ) return;
 
    IMEvent *eShow = new IMEvent( IMEvent::FullscreenControlToggle );
@@ -1442,6 +1648,8 @@ void MainInterface::dockPlaylist( bool p_docked )
  */
 void MainInterface::displayNormalView()
 {
+    if( autoHider )
+        autoHider->reset();
     if( header )
     {
         header->setVisible( false );
@@ -1464,6 +1672,8 @@ void MainInterface::displayNormalView()
  */
 void MainInterface::setMinimalView( bool b_minimal )
 {
+    if( autoHider )
+        autoHider->reset();
     bool b_menuBarVisible = menuBar()->isVisible();
     bool b_controlsVisible = controls->isVisible();
 #ifndef QT_NO_STATUSBAR

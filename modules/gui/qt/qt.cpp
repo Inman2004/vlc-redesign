@@ -128,6 +128,16 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define QT_REDESIGN_TEXT N_( "Use the redesigned interface" )
 #define QT_REDESIGN_LONGTEXT N_( "Single control bar, header, navigation rail " \
                                  "and library sidebar." )
+#define QT_AUTOHIDE_TEXT N_( "Auto-hide the controls" )
+#define QT_AUTOHIDE_LONGTEXT N_( "When the header and control bar hide while " \
+    "the mouse rests on the video. The delay is the mouse hide timeout." )
+#define QT_SEEK_PREVIEW_TEXT N_( "Show a thumbnail when hovering the seek bar" )
+#define QT_SEEK_PREVIEW_LONGTEXT N_( "Decode a small preview of the hovered " \
+    "position of local video files with a second, hidden input." )
+static const int i_autohide_list[] = { 0, 1, 2 };
+static const char *const psz_autohide_list_text[] = {
+    N_( "Never" ), N_( "In fullscreen only" ), N_( "Always" ) };
+
 #define QT_REDESIGN_FRAMELESS_TEXT N_( "Draw our own window title bar" )
 #define QT_REDESIGN_FRAMELESS_LONGTEXT N_( "Hide the system window decoration and " \
                                            "use the built-in header instead." )
@@ -289,6 +299,9 @@ vlc_module_begin ()
     add_bool( "qt-redesign", true, QT_REDESIGN_TEXT, QT_REDESIGN_LONGTEXT, false )
     add_bool( "qt-redesign-frameless", true, QT_REDESIGN_FRAMELESS_TEXT,
               QT_REDESIGN_FRAMELESS_LONGTEXT, false )
+    add_integer( "qt-autohide-controls", 1, QT_AUTOHIDE_TEXT, QT_AUTOHIDE_LONGTEXT, false )
+        change_integer_list( i_autohide_list, psz_autohide_list_text )
+    add_bool( "qt-seek-preview", true, QT_SEEK_PREVIEW_TEXT, QT_SEEK_PREVIEW_LONGTEXT, false )
     add_string( "qt-theme", "dark", QT_THEME_TEXT, QT_THEME_LONGTEXT, false )
         change_string_list( psz_theme_values, psz_theme_texts )
     add_string( "qt-accent-color", "#D37918", QT_ACCENT_TEXT, QT_ACCENT_LONGTEXT, false )

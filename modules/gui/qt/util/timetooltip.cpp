@@ -20,6 +20,8 @@
  *****************************************************************************/
 
 #include "timetooltip.hpp"
+#include "styles/vlc_theme.hpp"
+#include "util/seek_preview.hpp"
 
 #include <QApplication>
 #include <QPainter>
@@ -49,6 +51,13 @@ TimeTooltip::TimeTooltip( QWidget *parent ) :
     // Inherit from the system default font size -5
     mFont = QFont( "Verdana", qMax( qApp->font().pointSize() - 5, 7 ) );
     mTipX = -1;
+    mPreview = false;
+    mThumbSize = QSize( SeekPreview::MAX_W, SeekPreview::MAX_H );
+    if( Theme::redesign() )
+    {
+        mFont = qApp->font();
+        mFont.setPixelSize( 14 );
+    }
 
     // By default the widget is unintialized and should not be displayed
     resize( 0, 0 );
@@ -59,6 +68,35 @@ void TimeTooltip::adjustPosition()
     if( mDisplayedText.isEmpty() )
     {
         resize( 0, 0 );
+        return;
+    }
+
+    if( Theme::redesign() )
+    {
+        /* Components column: a 36px #0F0F0F pill with the time, or a
+         * #191919 card with the thumbnail over the time; 8px of shadow */
+        QFontMetrics metrics( mFont );
+        const int textW = metrics.horizontalAdvance( mDisplayedText );
+        QSize card;
+        if( mPreview )
+            card = QSize( qMax( mThumbSize.width() + 12, textW + 32 ),
+                          mThumbSize.height() + 6 + 36 );
+        else
+            card = QSize( qMax( 96, textW + 32 ), 36 );
+        const int pad = 8;
+        QSize size( card.width() + 2 * pad, card.height() + 2 * pad );
+        QPoint position( mTarget.x() - size.width() / 2,
+                         mTarget.y() - size.height() + pad - 10 );
+        QRect screen{};
+        if( QScreen *sc = QGuiApplication::screenAt( mTarget ) )
+            screen = sc->geometry();
+        if( screen.isValid() )
+            position.setX( qMax( screen.left(), qMin( position.x(),
+                           screen.left() + screen.width() - size.width() ) ) );
+        move( position );
+        mBox = QRect( QPoint( pad, pad ), card );
+        if( this->size() != size )
+            resize( size );
         return;
     }
 
@@ -150,8 +188,84 @@ void TimeTooltip::show()
     raise();
 }
 
+void TimeTooltip::setPreviewEnabled( bool b )
+{
+    if( mPreview == b )
+        return;
+    mPreview = b;
+    if( !b )
+        mThumb = QImage();
+    adjustPosition();
+    update();
+}
+
+void TimeTooltip::setThumbnail( const QImage &img )
+{
+    mThumb = img;
+    if( !img.isNull() )
+    {
+        /* keep the card height steady: fit the picture in the 16:9 area */
+        QSize s = img.size().scaled( SeekPreview::MAX_W, SeekPreview::MAX_H,
+                                     Qt::KeepAspectRatio );
+        if( s.width() != mThumbSize.width() )
+        {
+            mThumbSize = QSize( s.width(), SeekPreview::MAX_H );
+            adjustPosition();
+        }
+    }
+    update();
+}
+
 void TimeTooltip::paintEvent( QPaintEvent * )
 {
+    if( Theme::redesign() )
+    {
+        QPainter p( this );
+        p.setRenderHint( QPainter::Antialiasing );
+        p.setCompositionMode( QPainter::CompositionMode_Source );
+        p.fillRect( rect(), Qt::transparent );
+        p.setCompositionMode( QPainter::CompositionMode_SourceOver );
+        const int radius = mPreview ? 10 : 7;
+        /* soft shadow */
+        for( int i = 8; i > 0; --i )
+        {
+            QColor c( 0, 0, 0, 10 + ( 8 - i ) * 3 );
+            p.setPen( Qt::NoPen );
+            p.setBrush( c );
+            p.drawRoundedRect( QRectF( mBox ).adjusted( -i, -i + 2, i, i + 2 ),
+                               radius + i, radius + i );
+        }
+        p.setBrush( mPreview ? QColor( 0x19, 0x19, 0x19 ) : QColor( 0x0F, 0x0F, 0x0F ) );
+        p.drawRoundedRect( QRectF( mBox ), radius, radius );
+
+        QRect textRect = mBox;
+        if( mPreview )
+        {
+            const QRect area( mBox.left() + ( mBox.width() - mThumbSize.width() ) / 2,
+                              mBox.top() + 6, mThumbSize.width(), mThumbSize.height() );
+            QPainterPath clip;
+            clip.addRoundedRect( QRectF( area ), 5, 5 );
+            p.save();
+            p.setClipPath( clip );
+            p.fillRect( area, QColor( 0x25, 0x24, 0x23 ) );
+            if( !mThumb.isNull() )
+            {
+                QSize s = mThumb.size().scaled( area.size(), Qt::KeepAspectRatio );
+                QRect r( QPoint( 0, 0 ), s );
+                r.moveCenter( area.center() );
+                p.setRenderHint( QPainter::SmoothPixmapTransform );
+                p.drawImage( r, mThumb );
+            }
+            p.restore();
+            textRect = QRect( mBox.left(), area.bottom() + 1, mBox.width(),
+                              mBox.bottom() - area.bottom() );
+        }
+        p.setFont( mFont );
+        p.setPen( QColor( 0x8F, 0x8F, 0x8F ) );
+        p.drawText( textRect, Qt::AlignCenter, mDisplayedText );
+        return;
+    }
+
     QPainter p( this );
     p.setRenderHints( QPainter::TextAntialiasing );
 

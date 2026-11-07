@@ -58,6 +58,7 @@ class HeaderBar;
 class NavRail;
 class SidebarPanel;
 class AdjustDock;
+class ChromeAutoHider;
 class QSplitter;
 struct vout_window_t;
 
@@ -162,6 +163,10 @@ protected:
     NavRail             *rail;
     SidebarPanel        *sidebar;
     AdjustDock          *adjustDock;
+    /* redesign: windowed auto-hide ("Always") and the I-key peek in Hide UI */
+    ChromeAutoHider     *autoHider = NULL;
+    friend class ChromeAutoHider;
+    void setChromeVisible( bool );
     QSplitter           *bodySplitter;
     QWidget             *body;
     QString              lastSection;

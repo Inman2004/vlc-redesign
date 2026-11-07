@@ -839,6 +839,28 @@ QWidget *AdjustPanel::buildPlaybackTab()
     } );
     addRow( sec, qtr( "Sleep Timer" ), sleepCombo );
 
+    /* Seek bar and controls (Settings > Interface until P6 has its page) */
+    sec = addSection( page, qtr( "Controls" ) );
+    ToggleSwitch *thumbs = new ToggleSwitch;
+    thumbs->setChecked( var_InheritBool( p_intf, "qt-seek-preview" ) );
+    thumbs->setToolTip( qtr( "Preview the hovered position of local video files" ) );
+    connect( thumbs, &ToggleSwitch::clicked, this, [this]( bool on ) {
+        config_PutInt( p_intf, "qt-seek-preview", on );
+        saveTimer.start();
+    } );
+    addRow( sec, qtr( "Show Thumbnail on Seekbar" ), thumbs );
+
+    QComboBox *autohide = makeCombo();
+    autohide->addItems( QStringList() << qtr( "Never" ) << qtr( "In fullscreen only" )
+                                      << qtr( "Always" ) );
+    autohide->setCurrentIndex( qBound( 0, (int) var_InheritInteger( p_intf, "qt-autohide-controls" ), 2 ) );
+    autohide->setToolTip( qtr( "Hide the header and control bar while the mouse rests on the video" ) );
+    connect( autohide, QOverload<int>::of( &QComboBox::activated ), this, [this]( int i ) {
+        config_PutInt( p_intf, "qt-autohide-controls", i );
+        saveTimer.start();
+    } );
+    addRow( sec, qtr( "Auto-hide the Controls" ), autohide );
+
     /* Resume */
     sec = addSection( page, qtr( "Resume" ) );
     QComboBox *cont = makeCombo();

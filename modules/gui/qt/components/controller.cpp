@@ -57,6 +57,9 @@
 #include <QWindow>
 #include <QScreen>
 #include <QMenu>
+#include <QLabel>
+#include <QVariantAnimation>
+#include "main_interface.hpp"
 #if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
 #include <QDesktopWidget>
 #endif
@@ -1117,8 +1120,29 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
                        .arg( Theme::colors().controlbar.name(),
                              Theme::colors().elevated.name(),
                              Theme::accent().name() ) );
-        controlLayout2->setContentsMargins( 16, 0, 16, 0 );
-        setFixedHeight( Theme::CONTROLBAR_HEIGHT + 6 );
+        /* the docked bar's own box model, full width at the bottom */
+        controlLayout2->setContentsMargins( Theme::BAR_MARGIN_LEFT, 0,
+                                            Theme::BAR_MARGIN_RIGHT, 0 );
+        setFixedHeight( Theme::CONTROLBAR_HEIGHT );
+        setStyleSheet( styleSheet().replace( "border-radius: 8px;", "border-radius: 0px;" ) );
+        isWideFSC = true;
+        buildTopStrip();
+        fadeAnim = new QVariantAnimation( this );
+        fadeAnim->setDuration( 150 );
+        fadeAnim->setEasingCurve( QEasingCurve::OutCubic );
+        connect( fadeAnim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+            setWindowOpacity( v.toReal() );
+            if( topStrip )
+                topStrip->setWindowOpacity( v.toReal() );
+        } );
+        connect( fadeAnim, &QVariantAnimation::finished, this, [this]() {
+            if( fadeAnim->endValue().toReal() <= 0.0 )
+            {
+                hide();
+                if( topStrip )
+                    topStrip->hide();
+            }
+        } );
     }
     else
     {
@@ -1154,7 +1178,8 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     /* First Move */
     previousPosition = getSettings()->value( "FullScreen/pos" ).toPoint();
     screenRes = getSettings()->value( "FullScreen/screen" ).toRect();
-    isWideFSC = getSettings()->value( "FullScreen/wide" ).toBool();
+    if( !Theme::redesign() )
+        isWideFSC = getSettings()->value( "FullScreen/wide" ).toBool();
 
     connect( this, QOverload<bool>::of(&FullscreenControllerWidget::fullscreenChanged), THEMIM, &MainInputManager::changeFullscreen );
 
@@ -1170,7 +1195,9 @@ FullscreenControllerWidget::~FullscreenControllerWidget()
 
     getSettings()->setValue( "FullScreen/pos", previousPosition );
     getSettings()->setValue( "FullScreen/screen", screenRes );
-    getSettings()->setValue( "FullScreen/wide", isWideFSC );
+    if( !Theme::redesign() )
+        getSettings()->setValue( "FullScreen/wide", isWideFSC );
+    delete topStrip;
 
     setVoutList( NULL, 0 );
     vlc_mutex_destroy( &lock );
@@ -1209,11 +1236,136 @@ void FullscreenControllerWidget::restoreFSC()
             previousPosition = pos();
         }
     }
+    else if( Theme::redesign() )
+    {
+        const QRect sg = fsScreenGeometry();
+        if( windowHandle() && QGuiApplication::screenAt( sg.center() ) )
+            windowHandle()->setScreen( QGuiApplication::screenAt( sg.center() ) );
+        setMinimumWidth( sg.width() );
+        setGeometry( sg.x(), sg.y() + sg.height() - height(), sg.width(), height() );
+        placeTopStrip();
+    }
     else
     {
         /* Dock at the bottom of the screen */
         updateFullwidthGeometry( targetScreen() );
     }
+}
+
+/* The screen the video is fullscreen on (targetScreen() can be -1) */
+QRect FullscreenControllerWidget::fsScreenGeometry()
+{
+    const int n = targetScreen();
+    if( n >= 0 && n < QGuiApplication::screens().length() )
+        return QGuiApplication::screens()[n]->geometry();
+    QWidget *mi = parentWidget();
+    if( mi && mi->windowHandle() && mi->windowHandle()->screen() )
+        return mi->windowHandle()->screen()->geometry();
+    return QGuiApplication::primaryScreen()->geometry();
+}
+
+/* Title strip: the windowed header's look (cone, centred title, leave
+ * fullscreen, close), as its own frameless tool window like this bar */
+void FullscreenControllerWidget::buildTopStrip()
+{
+    topStrip = new QWidget( NULL, Qt::Tool | Qt::FramelessWindowHint
+                                  | Qt::X11BypassWindowManagerHint );
+    topStrip->setObjectName( "VLCHeader" );
+    topStrip->setAttribute( Qt::WA_ShowWithoutActivating );
+    topStrip->setAttribute( Qt::WA_StyledBackground, true );
+    topStrip->setFixedHeight( Theme::TITLEBAR_HEIGHT );
+    topStrip->installEventFilter( this );
+
+    QHBoxLayout *l = new QHBoxLayout( topStrip );
+    l->setContentsMargins( 12, 0, 6, 0 );
+    l->setSpacing( 0 );
+    QLabel *cone = new QLabel( topStrip );
+    cone->setPixmap( QIcon( ":/logo/vlc128.png" ).pixmap( 20, 20 ) );
+    cone->setFixedSize( 26, 32 );
+    cone->setAlignment( Qt::AlignCenter );
+    l->addWidget( cone );
+
+    topTitle = new QLabel( topStrip );
+    topTitle->setObjectName( "HeaderTitle" );
+    topTitle->setAlignment( Qt::AlignCenter );
+    l->addWidget( topTitle, 1 );
+
+    QToolButton *leave = new QToolButton( topStrip );
+    Theme::setupIconButton( leave, "win-restore", 32, 24 );
+    leave->setFixedSize( Theme::WINDOW_BUTTON_W, 32 );
+    leave->setToolTip( Theme::tooltipWithKey( p_intf, qtr( "Leave fullscreen" ),
+                                              "key-leave-fullscreen" ) );
+    connect( leave, &QToolButton::clicked, this, [this]() {
+        /* the same path as the Esc hotkey */
+        var_SetBool( THEPL, "fullscreen", false );
+        vout_thread_t *p_vout = THEMIM->getVout();
+        if( p_vout )
+        {
+            var_SetBool( p_vout, "fullscreen", false );
+            vlc_object_release( p_vout );
+        }
+    } );
+    QToolButton *close = new QToolButton( topStrip );
+    Theme::setupIconButton( close, "win-close", 32, 24 );
+    close->setFixedSize( Theme::WINDOW_BUTTON_W, 32 );
+    close->setObjectName( "WinClose" );
+    close->setToolTip( qtr( "Close" ) );
+    connect( close, &QToolButton::clicked, this, [this]() {
+        if( parentWidget() )
+            parentWidget()->close();
+    } );
+    /* balance the cone so the title stays centred on the screen */
+    l->insertSpacing( 1, 2 * Theme::WINDOW_BUTTON_W - 26 );
+    l->addWidget( leave );
+    l->addWidget( close );
+
+    auto setTitle = [this]( const QString &name ) {
+        topTitle->setText( name.isEmpty() ? qtr( "VLC Media Player" ) : name );
+    };
+    connect( THEMIM->getIM(), &InputManager::nameChanged, topStrip, setTitle );
+    setTitle( QString() );
+}
+
+void FullscreenControllerWidget::placeTopStrip()
+{
+    if( !topStrip )
+        return;
+    const QRect sg = fsScreenGeometry();
+    if( topStrip->windowHandle() && QGuiApplication::screenAt( sg.center() ) )
+        topStrip->windowHandle()->setScreen( QGuiApplication::screenAt( sg.center() ) );
+    topStrip->setGeometry( sg.x(), sg.y(), sg.width(), Theme::TITLEBAR_HEIGHT );
+}
+
+void FullscreenControllerWidget::fadeTo( qreal target )
+{
+    if( fadeAnim->state() == QAbstractAnimation::Running
+        && qFuzzyCompare( fadeAnim->endValue().toReal(), target ) )
+        return;
+    fadeAnim->stop();
+    fadeAnim->setStartValue( windowOpacity() );
+    fadeAnim->setEndValue( target );
+    fadeAnim->start();
+}
+
+void FullscreenControllerWidget::hideFSC()
+{
+    if( !Theme::redesign() )
+    {
+        hide();
+        return;
+    }
+    p_hideTimer->stop();
+    if( isVisible() )
+        fadeTo( 0.0 );
+    else if( topStrip )
+        topStrip->hide();
+}
+
+void FullscreenControllerWidget::setSuppressed( bool b )
+{
+    b_suppressed = b;
+    if( b )
+        hideFSC();
 }
 
 void FullscreenControllerWidget::centerFSC( int number )
@@ -1231,6 +1383,22 @@ void FullscreenControllerWidget::centerFSC( int number )
  */
 void FullscreenControllerWidget::showFSC()
 {
+    if( Theme::redesign() )
+    {
+        restoreFSC();
+        if( !isVisible() )
+            setWindowOpacity( 0.0 );
+        if( topStrip && !topStrip->isVisible() )
+        {
+            topStrip->setWindowOpacity( windowOpacity() );
+            topStrip->show();
+            topStrip->raise();
+        }
+        show();
+        raise();
+        fadeTo( 1.0 );
+        return;
+    }
     restoreFSC();
 
 #if HAVE_TRANSPARENCY
@@ -1248,6 +1416,14 @@ void FullscreenControllerWidget::planHideFSC()
     vlc_mutex_lock( &lock );
     int i_timeout = i_hide_timeout;
     vlc_mutex_unlock( &lock );
+
+    if( Theme::redesign() )
+    {
+        /* "Never" keeps the chrome up for as long as the video is fullscreen */
+        if( var_InheritInteger( p_intf, "qt-autohide-controls" ) != 0 )
+            p_hideTimer->start( qMax( i_timeout, 0 ) );
+        return;
+    }
 
     p_hideTimer->start( i_timeout );
 
@@ -1353,10 +1529,15 @@ void FullscreenControllerWidget::customEvent( QEvent *event )
 
             if( b_fs )
             {
-                if( isHidden() )
+                if( isHidden() || ( fadeAnim && fadeAnim->endValue().toReal() <= 0.0
+                                    && fadeAnim->state() == QAbstractAnimation::Running ) )
                 {
+                    b_suppressed = false;
                     p_hideTimer->stop();
                     showFSC();
+                    /* a peek: it goes away again like after a mouse move */
+                    if( Theme::redesign() && !b_mouse_over )
+                        planHideFSC();
                 }
                 else
                     hideFSC();
@@ -1368,6 +1549,12 @@ void FullscreenControllerWidget::customEvent( QEvent *event )
             b_fs = b_fullscreen;
             vlc_mutex_unlock( &lock );
 
+            if( Theme::redesign() )
+            {
+                if( b_fs && !b_suppressed )
+                    showFSC();
+                break;
+            }
             if( b_fs && ( isHidden()
 #if HAVE_TRANSPARENCY
                  || p_slowHideTimer->isActive()
@@ -1400,6 +1587,26 @@ bool FullscreenControllerWidget::eventFilter( QObject *watched, QEvent *event )
         /* Hide if not active */
         if ( !wParent->isActiveWindow() && !isActiveWindow() )
             hideFSC();
+    }
+    if( topStrip && watched == topStrip )
+    {
+        /* the strip counts as part of the controller */
+        switch( event->type() )
+        {
+        case QEvent::Enter:
+            b_mouse_over = true;
+            p_hideTimer->stop();
+            break;
+        case QEvent::Leave:
+            b_mouse_over = false;
+            planHideFSC();
+            break;
+        case QEvent::KeyPress:
+            emit keyPressed( static_cast<QKeyEvent *>( event ) );
+            return true;
+        default:
+            break;
+        }
     }
 
     return AbstractController::eventFilter( watched, event );
@@ -1477,8 +1684,11 @@ void FullscreenControllerWidget::enterEvent( QEvent *event )
 
     p_hideTimer->stop();
 #if HAVE_TRANSPARENCY
-    p_slowHideTimer->stop();
-    setWindowOpacity( f_opacity );
+    if( !Theme::redesign() )
+    {
+        p_slowHideTimer->stop();
+        setWindowOpacity( f_opacity );
+    }
 #endif
     event->accept();
 }
@@ -1604,12 +1814,15 @@ void FullscreenControllerWidget::fullscreenChanged( vout_thread_t *p_vout,
         i_hide_timeout = i_timeout;
         var_AddCallback( p_vout, "mouse-moved",
                 FullscreenControllerWidgetMouseMoved, this );
+        if( Theme::redesign() && var_InheritInteger( p_intf, "qt-autohide-controls" ) == 0 )
+            QApplication::postEvent( this, new IMEvent( IMEvent::FullscreenControlShow, 0 ) );
     }
     /* Quitting fullscreen, unregistering callback */
     else if( !b_fs && b_fullscreen )
     {
         msg_Dbg( p_vout, "Qt: Quitting Fullscreen" );
         b_fullscreen = false;
+        b_suppressed = false;
         i_hide_timeout = i_timeout;
         var_DelCallback( p_vout, "mouse-moved",
                 FullscreenControllerWidgetMouseMoved, this );

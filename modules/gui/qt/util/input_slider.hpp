@@ -48,6 +48,7 @@ class QPropertyAnimation;
 class QVariantAnimation;
 class QCommonStyle;
 class TimeTooltip;
+class SeekPreview;
 class QSequentialAnimationGroup;
 
 /* Input Slider derived from QSlider */
@@ -91,6 +92,7 @@ protected:
     int   getValueFromXPos( int );
 
 private:
+    SeekPreview *preview = NULL;
     intf_thread_t *p_intf;
     bool isSliding;        /* Whether we are currently sliding by user action */
     bool isJumping;              /* if we requested a jump to another chapter */

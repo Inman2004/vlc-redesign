@@ -155,6 +155,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/sidebar_panel.cpp gui/qt/components/sidebar_panel.hpp \
 	gui/qt/components/adjust_panel.cpp gui/qt/components/adjust_panel.hpp \
 	gui/qt/util/redesign_widgets.cpp gui/qt/util/redesign_widgets.hpp \
+	gui/qt/util/seek_preview.cpp gui/qt/util/seek_preview.hpp \
 	gui/qt/dialogs/redesign_dialogs.cpp gui/qt/dialogs/redesign_dialogs.hpp \
 	gui/qt/components/redesign_menus.cpp gui/qt/components/redesign_menus.hpp
 if HAVE_WIN32
@@ -189,6 +190,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/sidebar_panel.moc.cpp \
 	gui/qt/components/adjust_panel.moc.cpp \
 	gui/qt/util/redesign_widgets.moc.cpp \
+	gui/qt/util/seek_preview.moc.cpp \
 	gui/qt/dialogs/redesign_dialogs.moc.cpp \
 	gui/qt/components/redesign_menus.moc.cpp \
 	gui/qt/adapters/seekpoints.moc.cpp \

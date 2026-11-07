@@ -26,6 +26,7 @@
 
 #include <QWidget>
 #include <QPainterPath>
+#include <QImage>
 
 class TimeTooltip : public QWidget
 {
@@ -34,6 +35,10 @@ public:
     explicit TimeTooltip( QWidget *parent = 0 );
     void setTip( const QPoint& pos, const QString& time, const QString& text );
     virtual void show();
+    /* redesign: reserve a thumbnail area above the time (SeekPreview) */
+    void setPreviewEnabled( bool );
+    void setThumbnail( const QImage & );
+    bool previewEnabled() const { return mPreview; }
 
 protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
@@ -49,6 +54,9 @@ private:
     QRect mBox;
     QPainterPath mPainterPath;
     int mTipX;
+    bool mPreview;
+    QImage mThumb;
+    QSize mThumbSize;
 };
 
 #endif // TIMETOOLTIP_H

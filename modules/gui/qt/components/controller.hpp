@@ -286,6 +286,10 @@ public:
     void updateFullwidthGeometry( int number );
     int targetScreen();
     void setTargetScreen( int );
+    /* redesign: Ctrl+\ in fullscreen keeps the chrome away until it is
+     * pressed again (or I shows it) */
+    void setSuppressed( bool );
+    bool isSuppressed() const { return b_suppressed; }
 
 private:
     static int FullscreenChanged( vlc_object_t *obj,
@@ -319,7 +323,7 @@ protected:
 private slots:
     void showFSC();
     void planHideFSC();
-    void hideFSC() { hide(); }
+    void hideFSC();
     void slowHideFSC();
     void restoreFSC();
     void centerFSC( int );
@@ -352,6 +356,17 @@ private:
 
     bool isWideFSC;
     int i_sensitivity;
+
+    /* redesign: 40px title strip at the top of the screen, faded in and
+     * out with the bar; qt-autohide-controls (0 never, 1 fullscreen, 2 always) */
+    QRect fsScreenGeometry();
+    void buildTopStrip();
+    void placeTopStrip();
+    void fadeTo( qreal );
+    QWidget *topStrip = NULL;
+    class QLabel *topTitle = NULL;
+    class QVariantAnimation *fadeAnim = NULL;
+    bool b_suppressed = false;
 };
 
 #endif
