@@ -45,6 +45,7 @@
 #include "adapters/seekpoints.hpp"
 #include "styles/vlc_theme.hpp"                      /* Redesign */
 #include "menus.hpp"                         /* Track popups */
+#include "components/extended_panels.hpp"   /* VideoFilters (rotate) */
 
 #include <QToolButton>
 #include <QHBoxLayout>
@@ -127,6 +128,22 @@ QString toolbarDefault( int which )
     }
 }
 
+/* Saved toolbar line; a line that still equals an earlier redesign default
+ * is upgraded, so new default buttons appear without touching layouts the
+ * user customised */
+static QString toolbarLine( QSettings *settings, int which )
+{
+    QString line = settings->value( toolbarKey( which ), toolbarDefault( which ) ).toString();
+    if( Theme::redesign() )
+    {
+        if( which == TOOLBAR_MAIN2 && line == REDESIGN_TB2_DEFAULT_V1 )
+            line = REDESIGN_TB2_DEFAULT;
+        else if( which == TOOLBAR_FSC && line == REDESIGN_FSC_TB_DEFAULT_V1 )
+            line = REDESIGN_FSC_TB_DEFAULT;
+    }
+    return line;
+}
+
 /* Redesign glyph for a toolbar button, empty if it keeps its legacy icon */
 static QString redesignIconName( int button )
 {
@@ -146,6 +163,8 @@ static QString redesignIconName( int button )
     case OPEN_SUB_BUTTON:
     case SUBTITLE_TRACKS_BUTTON:return "subtitles";
     case AUDIO_TRACKS_BUTTON:   return "audio";
+    case LOOP_BUTTON:           return "repeat";
+    case ROTATE_BUTTON:         return "rotate";
     default:                    return QString();
     }
 }
@@ -170,6 +189,8 @@ static QString buttonTooltip( int button )
     case SUBTITLE_TRACKS_BUTTON:return Theme::tooltipWithKey( NULL, qtr( "Subtitles" ), "key-subtitle-track" );
     case SNAPSHOT_BUTTON:    return Theme::tooltipWithKey( NULL, qtr( "Take a snapshot" ), "key-snapshot" );
     case RECORD_BUTTON:      return Theme::tooltipWithKey( NULL, qtr( "Record" ), "key-record" );
+    case LOOP_BUTTON:        return Theme::tooltipWithKey( NULL, qtr( "Loop: off" ), "key-loop" );
+    case ROTATE_BUTTON:      return qtr( "Rotate video 90\u00B0 (right-click for more)" );
     case EXTENDED_BUTTON:
         return QString( "%1  <span style='color:%2'>Ctrl+E</span>" )
                    .arg( qtr( "Adjustments and effects" ), Theme::colors().textMuted.name() );
@@ -237,6 +258,77 @@ QWidget *AbstractController::trackMenuButton( buttonType_e button )
         if( pos.y() < 0 ) /* no room above (fullscreen top edge): open below */
             pos = b->mapToGlobal( QPoint( b->width() - hint.width(), b->height() + 6 ) );
         menu.exec( pos );
+    } );
+    return b;
+}
+
+/* Rotate: each click turns the video 90 degrees clockwise through the
+ * "transform" filter (none -> 90 -> 180 -> 270 -> none); right-click offers
+ * the other transforms. Accent while the video is transformed. */
+QWidget *AbstractController::rotateButton()
+{
+    QToolButton *b = new QToolButton;
+    b->setObjectName( "ROTATEButton" );
+    setupButton( b, ROTATE_BUTTON );
+    b->setContextMenuPolicy( Qt::CustomContextMenu );
+    intf_thread_t *intf = p_intf;
+
+    auto current = [intf]() -> QString {
+        return VideoFilters::isEnabled( intf, "transform" )
+             ? VideoFilters::option( intf, "transform-type" ).toString() : QString();
+    };
+    auto show = [b]( const QString &t ) {
+        static const struct { const char *type; const char *label; } names[] = {
+            { "90", N_( "Rotated 90\u00B0" ) }, { "180", N_( "Rotated 180\u00B0" ) },
+            { "270", N_( "Rotated 270\u00B0" ) }, { "hflip", N_( "Flipped horizontally" ) },
+            { "vflip", N_( "Flipped vertically" ) }, { "transpose", N_( "Transposed" ) },
+            { "antitranspose", N_( "Anti-transposed" ) } };
+        QString state;
+        for( auto &n : names )
+            if( t == n.type )
+                state = qtr( n.label );
+        b->setIcon( QIcon( Theme::pixmap( "rotate", Theme::BAR_GLYPH,
+                                          t.isEmpty() ? Theme::colors().icon : Theme::accent() ) ) );
+        b->setToolTip( state.isEmpty() ? qtr( "Rotate video 90\u00B0 (right-click for more)" )
+                                       : state + QString( "  <span style='color:%1'>%2</span>" )
+                                             .arg( Theme::colors().textMuted.name(), qtr( "click to rotate further" ) ) );
+    };
+    auto apply = [intf, show]( const QString &t ) {
+        VideoFilters::setEnabled( intf, "transform", false );
+        if( !t.isEmpty() )
+        {
+            VideoFilters::setOption( intf, "transform", "transform-type", t );
+            VideoFilters::setEnabled( intf, "transform", true );
+        }
+        show( t );
+    };
+    show( current() );
+
+    connect( b, &QToolButton::clicked, b, [current, apply]() {
+        const QString t = current();
+        apply( t == "90" ? "180" : t == "180" ? "270" : t == "270" ? "" : "90" );
+    } );
+    connect( b, &QToolButton::customContextMenuRequested, b, [b, current, apply]( const QPoint & ) {
+        QMenu menu( b );
+        const QString t = current();
+        static const struct { const char *type; const char *label; } items[] = {
+            { "90", N_( "Rotate 90\u00B0" ) }, { "180", N_( "Rotate 180\u00B0" ) },
+            { "270", N_( "Rotate 270\u00B0" ) }, { "hflip", N_( "Flip Horizontally" ) },
+            { "vflip", N_( "Flip Vertically" ) } };
+        for( auto &it : items )
+        {
+            QAction *a = menu.addAction( qtr( it.label ) );
+            a->setCheckable( true );
+            a->setChecked( t == it.type );
+            const QString type = it.type;
+            QObject::connect( a, &QAction::triggered, b, [apply, type]() { apply( type ); } );
+        }
+        menu.addSeparator();
+        QAction *reset = menu.addAction( qtr( "Reset" ), b, [apply]() { apply( QString() ); } );
+        reset->setEnabled( !t.isEmpty() );
+        menu.ensurePolished();
+        const QSize hint = menu.sizeHint();
+        menu.exec( b->mapToGlobal( QPoint( b->width() - hint.width(), -hint.height() - 6 ) ) );
     } );
     return b;
 }
@@ -601,9 +693,10 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         break;
     case LOOP_BUTTON:{
         LoopButton *loopButton = new LoopButton;
-        setupButton( loopButton );
+        setupButton( loopButton, LOOP_BUTTON );
         loopButton->setToolTip( qtr( "Click to toggle between loop all, loop one and no loop") );
-        loopButton->setCheckable( true );
+        /* the redesign shows the state with the glyph colour */
+        loopButton->setCheckable( !Theme::redesign() );
         {
             int i_state = NORMAL;
             if( var_GetBool( THEPL, "loop" ) )   i_state = REPEAT_ALL;
@@ -615,6 +708,9 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         connect( loopButton, &LoopButton::clicked, THEMIM, &MainInputManager::loopRepeatLoopStatus );
         widget = loopButton;
         }
+        break;
+    case ROTATE_BUTTON:
+        widget = rotateButton();
         break;
     case INFO_BUTTON: {
         NORMAL_BUTTON( INFO );
@@ -887,8 +983,7 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
         controlLayout->setSpacing( 0 );
         parseAndCreate( getSettings()->value( toolbarKey( TOOLBAR_MAIN1 ),
                             toolbarDefault( TOOLBAR_MAIN1 ) ).toString(), controlLayout );
-        parseAndCreate( getSettings()->value( toolbarKey( TOOLBAR_MAIN2 ),
-                            toolbarDefault( TOOLBAR_MAIN2 ) ).toString(), controlLayout );
+        parseAndCreate( toolbarLine( getSettings(), TOOLBAR_MAIN2 ), controlLayout );
         if( !b_advancedVisible && advControls ) advControls->hide();
         return;
     }
@@ -1025,8 +1120,7 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     }
 
     controlLayout = new QHBoxLayout;
-    QString line = getSettings()->value( toolbarKey( TOOLBAR_FSC ),
-                                         toolbarDefault( TOOLBAR_FSC ) ).toString();
+    QString line = toolbarLine( getSettings(), TOOLBAR_FSC );
     parseAndCreate( line, controlLayout );
     controlLayout2->addLayout( controlLayout );
 

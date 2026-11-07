@@ -438,6 +438,25 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/chevron-down.svg \
 	gui/qt/pixmaps/redesign/link.svg \
 	gui/qt/pixmaps/redesign/check.svg \
+	gui/qt/pixmaps/redesign/repeat.svg \
+	gui/qt/pixmaps/redesign/repeat-one.svg \
+	gui/qt/pixmaps/redesign/rotate.svg \
+	gui/qt/pixmaps/redesign/file.svg \
+	gui/qt/pixmaps/redesign/stream.svg \
+	gui/qt/pixmaps/redesign/disc.svg \
+	gui/qt/pixmaps/redesign/capture.svg \
+	gui/qt/pixmaps/redesign/convert.svg \
+	gui/qt/pixmaps/redesign/profile.svg \
+	gui/qt/pixmaps/redesign/customize.svg \
+	gui/qt/pixmaps/redesign/info.svg \
+	gui/qt/pixmaps/redesign/heart.svg \
+	gui/qt/pixmaps/redesign/shuffle.svg \
+	gui/qt/pixmaps/redesign/save.svg \
+	gui/qt/pixmaps/redesign/watched.svg \
+	gui/qt/pixmaps/redesign/edit.svg \
+	gui/qt/pixmaps/redesign/refresh.svg \
+	gui/qt/pixmaps/redesign/go.svg \
+	gui/qt/pixmaps/redesign/keyboard.svg \
 	gui/qt/pixmaps/redesign/record.svg \
 	gui/qt/pixmaps/redesign/hide-ui.svg \
 	gui/qt/pixmaps/redesign/playback.svg \

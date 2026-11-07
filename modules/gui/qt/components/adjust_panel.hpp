@@ -146,6 +146,7 @@ private:
     ToggleSwitch *shuffleSwitch, *stopAfterSwitch;
     QToolButton *abButton;
     QVBoxLayout *lastSection;
+    QComboBox *rotateCombo;
     QList<std::function<void()>> voutAppliers; /* re-apply on new vout */
     QList<QPair<ToggleSwitch *, AudioFilterControlWidget *>> audioEffects;
 };

@@ -293,6 +293,17 @@ void AtoB_Button::updateButtonIcons( bool timeA, bool timeB )
 
 void LoopButton::updateButtonIcons( int value )
 {
+    if( Theme::redesign() )
+    {
+        /* accent while looping; repeat-one gets its own glyph */
+        setIcon( QIcon( Theme::pixmap( value == REPEAT_ONE ? "repeat-one" : "repeat",
+                                       Theme::BAR_GLYPH,
+                                       value == NORMAL ? Theme::colors().icon : Theme::accent() ) ) );
+        const QString mode = value == REPEAT_ONE ? qtr( "Loop: this item" )
+                           : value == REPEAT_ALL ? qtr( "Loop: all" ) : qtr( "Loop: off" );
+        setToolTip( Theme::tooltipWithKey( NULL, mode, "key-loop" ) );
+        return;
+    }
     setChecked( value != NORMAL );
     setIcon( ( value == REPEAT_ONE ) ? QIcon( ":/buttons/playlist/repeat_one.svg" )
                                      : QIcon( ":/buttons/playlist/repeat_all.svg" ) );

@@ -45,9 +45,13 @@
  * Stored under separate keys so a layout customised for the classic
  * two-row bar does not leak into the redesign (and vice versa). */
 #define REDESIGN_TB1_DEFAULT ""
-#define REDESIGN_TB2_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;26;27;9;64;10"
+/* loop (20) and rotate (28) sit before the track buttons */
+#define REDESIGN_TB2_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;20;28;26;27;9;64;10"
+/* earlier defaults, migrated to the current ones when found unchanged */
+#define REDESIGN_TB2_DEFAULT_V1 "22;0;23;64;43;33-4;44;64;35-4;64;26;27;9;64;10"
 #define REDESIGN_INPT_TB_DEFAULT ""
-#define REDESIGN_FSC_TB_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;26;27;8"
+#define REDESIGN_FSC_TB_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;20;28;26;27;8"
+#define REDESIGN_FSC_TB_DEFAULT_V1 "22;0;23;64;43;33-4;44;64;35-4;64;26;27;8"
 
 /* Settings key / default for each toolbar, depending on the active UI */
 const char *toolbarKey( int which );
@@ -97,6 +101,7 @@ typedef enum buttonType_e
     FULLWIDTH_BUTTON,
     AUDIO_TRACKS_BUTTON,
     SUBTITLE_TRACKS_BUTTON,
+    ROTATE_BUTTON,          /* redesign: 90 degree steps through "transform" */
     BUTTON_MAX,
 
     SPLITTER = 0x20,
@@ -127,7 +132,7 @@ static const char* const nameL[BUTTON_MAX] = { N_("Play"), N_("Stop"), N_("Open"
     N_("Step backward" ), N_("Step forward"), N_("Quit"), N_("Random"),
     N_("Loop / Repeat"), N_("Information"), N_("Previous"), N_("Next"),
     N_("Open subtitles"), N_("Dock fullscreen controller"),
-    N_("Audio tracks"), N_("Subtitle tracks")
+    N_("Audio tracks"), N_("Subtitle tracks"), N_("Rotate video")
 };
 static const char* const tooltipL[BUTTON_MAX] = { I_PLAY_TOOLTIP,
     N_("Stop playback"), N_("Open a medium"),
@@ -143,6 +148,7 @@ static const char* const tooltipL[BUTTON_MAX] = { I_PLAY_TOOLTIP,
     N_("Open subtitle file"),
     N_("Dock/undock fullscreen controller to/from bottom of screen"),
     N_("Audio tracks and output device"), N_("Subtitle tracks"),
+    N_("Rotate the video by 90 degrees"),
 };
 static const QString iconL[BUTTON_MAX] ={ ":/toolbar/play_b.svg", ":/toolbar/stop_b.svg",
     ":/toolbar/eject.svg", ":/toolbar/previous_b.svg", ":/toolbar/next_b.svg",
@@ -153,7 +159,7 @@ static const QString iconL[BUTTON_MAX] ={ ":/toolbar/play_b.svg", ":/toolbar/sto
     ":/toolbar/skip_fw.svg", ":/toolbar/clear.svg", ":/buttons/playlist/shuffle_on.svg",
     ":/buttons/playlist/repeat_all.svg", ":/menu/info.svg",
     ":/toolbar/previous_b.svg", ":/toolbar/next_b.svg", ":/toolbar/eject.svg", ":/toolbar/space.svg",
-    ":/redesign/audio.svg", ":/redesign/subtitles.svg"
+    ":/redesign/audio.svg", ":/redesign/subtitles.svg", ":/redesign/rotate.svg"
 };
 
 enum
@@ -190,6 +196,7 @@ protected:
     QWidget *createWidget( buttonType_e, int options = WIDGET_NORMAL );
 private:
     static void setupButton( QAbstractButton *, buttonType_e type = BUTTON_MAX );
+    QWidget *rotateButton();
     QWidget *trackMenuButton( buttonType_e );
     QFrame *discFrame();
     QFrame *telexFrame();

@@ -136,7 +136,8 @@ AdjustPanel::AdjustPanel( intf_thread_t *_p_intf, QWidget *parent )
       stereoMode( NULL ), aspectCombo( NULL ), cropCombo( NULL ), deintCombo( NULL ),
       deintModeCombo( NULL ), repeatCombo( NULL ), sleepCombo( NULL ), rateSpin( NULL ),
       audioDelay( NULL ), subDelay( NULL ), subFps( NULL ), subDuration( NULL ),
-      shuffleSwitch( NULL ), stopAfterSwitch( NULL ), abButton( NULL ), lastSection( NULL )
+      shuffleSwitch( NULL ), stopAfterSwitch( NULL ), abButton( NULL ), lastSection( NULL ),
+      rotateCombo( NULL )
 {
     setObjectName( "VLCAdjust" );
     setAttribute( Qt::WA_StyledBackground, true );
@@ -336,6 +337,14 @@ bool AdjustPanel::eventFilter( QObject *o, QEvent *e )
 void AdjustPanel::showEvent( QShowEvent *e )
 {
     QWidget::showEvent( e );
+    /* the bar's rotate button may have changed the transform */
+    if( rotateCombo )
+    {
+        QSignalBlocker b( rotateCombo );
+        rotateCombo->setCurrentIndex( VideoFilters::isEnabled( p_intf, "transform" )
+            ? qMax( 0, rotateCombo->findData( VideoFilters::option( p_intf, "transform-type" ).toString() ) )
+            : 0 );
+    }
     refreshInput();
     refreshAudioEffects();
     QTimer::singleShot( 0, this, [this]() { moveUnderline( false ); } );
@@ -938,6 +947,7 @@ QWidget *AdjustPanel::buildVideoTab()
     addRow( sec, qtr( "Deinterlace Mode" ), deintModeCombo );
 
     QComboBox *rotate = makeCombo();
+    rotateCombo = rotate;
     rotate->addItem( qtr( "None" ), QString() );
     {
         char **vals, **texts;
