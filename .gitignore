@@ -14,3 +14,5 @@ autom4te.cache/
 resources.cpp
 *.pc
 resources_modern.cpp
+tools/redesign/packaging/dist/
+*.luac

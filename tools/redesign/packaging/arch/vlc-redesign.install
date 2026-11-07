@@ -1,0 +1,9 @@
+post_install() {
+  /opt/vlc-redesign/lib/vlc/vlc-cache-gen /opt/vlc-redesign/lib/vlc/plugins
+}
+post_upgrade() {
+  post_install
+}
+pre_remove() {
+  rm -f /opt/vlc-redesign/lib/vlc/plugins/plugins.dat
+}

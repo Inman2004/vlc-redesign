@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=VLC Redesign
+GenericName=Media player
+Comment=VLC media player with the redesigned interface (unofficial build)
+Exec=/usr/bin/vlc-redesign --started-from-file %U
+TryExec=/usr/bin/vlc-redesign
+Icon=/opt/vlc-redesign/share/icons/hicolor/256x256/apps/vlc.png
+Terminal=false
+Categories=AudioVideo;Player;Recorder;
+MimeType=video/mp4;video/x-matroska;video/webm;video/x-msvideo;video/quicktime;video/mpeg;video/ogg;video/x-flv;audio/mpeg;audio/flac;audio/ogg;audio/x-wav;audio/mp4;audio/aac;application/x-matroska;
+Keywords=Player;Capture;DVD;Audio;Video;Media;Movie;
+StartupWMClass=vlc

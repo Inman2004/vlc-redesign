@@ -1,0 +1,91 @@
+# VLC 3.0.24 with the redesigned Qt interface (branch redesign/v2).
+# Unofficial build: installs side by side with the distro's vlc under
+# /opt/vlc-redesign and starts as "vlc-redesign".
+#
+#   cd tools/redesign/packaging/arch
+#   BUILDDIR=~/.cache/vlc-redesign-build PKGDEST=../dist makepkg -s
+#   sudo pacman -U ../dist/vlc-redesign-*.pkg.tar.zst
+
+pkgname=vlc-redesign
+pkgver=3.0.24.r11.g389874e
+pkgrel=1
+pkgdesc='VLC media player with the redesigned Qt interface (unofficial build)'
+arch=(x86_64)
+url='https://www.videolan.org/vlc/'
+license=(GPL-2.0-or-later LGPL-2.1-or-later)
+# from the built binaries: ./deps.sh $BUILDDIR/vlc-redesign/pkg/vlc-redesign
+# (minus libvlc: the RUNPATH loads our own core from /opt first)
+depends=(
+  abseil-cpp acl alsa-lib aom aribb24 aribb25 at-spi2-core avahi brotli
+  bzip2 cairo chromaprint cjson curl dav1d db5.3 dbus double-conversion
+  duktape e2fsprogs expat faad2 ffmpeg flac fluidsynth fontconfig freeglut
+  freetype2 fribidi gdk-pixbuf2 glib2 glibc glu glycin gmp gnutls graphite
+  gsm gst-plugins-base-libs gstreamer gtk3 harfbuzz highway icu jack2
+  jansson json-glib keyutils krb5 lame lcms2 ldb leancrypto libarchive
+  libass libasyncns libavc1394 libbluray libbsd libcaca libcap libcddb
+  libcloudproviders libdatrie libdc1394 libdrm libdvbpsi libdvdnav
+  libdvdread libebml libelf libepoxy libffi libgcc libgcrypt libglvnd libgme
+  libgomp libgoom2 libgpg-error libidn libidn2 libjpeg-turbo libjxl libkate
+  libldap libmad libmatroska libmd libmicrodns libmodplug libmpcdec libmtp
+  libnfs libnghttp2 libnghttp3 libngtcp2 libnotify libogg libopenmpt
+  libp11-kit libpgm libpipewire libpng libproxy libpsl libpulse libraw1394
+  librist librsvg libsamplerate libsasl libseccomp libsecret libshout
+  libsndfile libsodium libsoxr libssh libssh2 libstdc++ libtasn1 libthai
+  libtheora libtiger libunibreak libunistring libunwind libupnp libusb libva
+  libvdpau libvorbis libvpl libvpx libwbclient libwebp libx11 libxau libxcb
+  libxcomposite libxcursor libxdamage libxdmcp libxext libxfixes libxi
+  libxinerama libxkbcommon libxml2 libxrandr libxrender libxxf86vm
+  live-media lua51 lz4 mbedtls3 md4c mpg123 ncurses nettle ocl-icd
+  opencore-amr openjpeg2 openssl opus orc pango pcre2 pcsclite pixman
+  portaudio projectm protobuf qt5-base qt5-svg qt5-x11extras rav1e readline
+  sdl12-compat sdl3 sdl_image slang smbclient snappy sndio speex speexdsp
+  sqlite srt svt-av1 systemd-libs taglib talloc tdb tevent tinysparql
+  tpm2-tss twolame util-linux-libs wayland x264 x265 xcb-util-keysyms
+  xvidcore xz zeromq zlib-ng-compat zstd zvbi
+)
+makedepends=(git autoconf automake libtool gettext flex bison lua51)
+options=(!debug !lto)
+install=vlc-redesign.install
+# the local repository at the branch tip; set VLC_REDESIGN_REPO to build elsewhere
+_repo=${VLC_REDESIGN_REPO:-$(cd "$startdir/../../../.." && pwd)}
+source=("vlc::git+file://$_repo#branch=redesign/v2"
+        vlc-redesign.desktop
+        vlc-redesign.sh)
+sha256sums=(SKIP SKIP SKIP)
+
+_prefix=/opt/vlc-redesign
+
+pkgver() {
+  cd vlc
+  printf '3.0.24.r%s.g%s' "$(git rev-list --count 32a367d..HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd vlc
+  ./bootstrap
+}
+
+build() {
+  cd vlc
+  # VLC 3 links Lua 5.1: its scripts must be compiled by the same luac
+  # (plain "luac" is 5.5 on Arch, and 5.1 VMs reject its bytecode)
+  LUAC=/usr/bin/luac5.1 \
+  ./configure --prefix=$_prefix \
+    --enable-qt --disable-skins2 --disable-nls --disable-manual --disable-doc \
+    --enable-alsa --enable-pulse --enable-dbus --disable-libsoup \
+    --disable-update-check
+  make -j"$(nproc)"
+}
+
+package() {
+  cd vlc
+  make DESTDIR="$pkgdir" install
+  # libtool archives are not needed at run time
+  find "$pkgdir" -name '*.la' -delete
+
+  install -Dm755 "$srcdir/vlc-redesign.sh" "$pkgdir/usr/bin/vlc-redesign"
+  install -Dm644 "$srcdir/vlc-redesign.desktop" \
+    "$pkgdir/usr/share/applications/vlc-redesign.desktop"
+  install -Dm644 COPYING "$pkgdir/usr/share/licenses/$pkgname/COPYING"
+  install -Dm644 COPYING.LIB "$pkgdir/usr/share/licenses/$pkgname/COPYING.LIB"
+}
