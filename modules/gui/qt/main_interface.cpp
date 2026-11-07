@@ -42,7 +42,8 @@
 #include "components/playlist/playlist.hpp"     // plWidget
 #include "components/header_bar.hpp"            // Redesign header
 #include "components/nav_rail.hpp"              // Redesign rail
-#include "components/sidebar_panel.hpp"         // Redesign sidebar
+#include "components/sidebar_panel.hpp"
+#include "library/media_library.hpp"         // Redesign sidebar
 #include "components/adjust_panel.hpp"          // Redesign adjustments
 #include "dialogs/redesign_dialogs.hpp"          // Remembered subtitles
 #include "styles/vlc_theme.hpp"                 // Redesign tokens
@@ -409,7 +410,11 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
 
     createMainWidget( settings );
     if( Theme::redesign() )
+    {
         autoHider = new ChromeAutoHider( p_intf, this );
+        /* the library scans in the background from the start (P5a) */
+        MediaLibrary::instance( p_intf );
+    }
 
 #ifndef QT_NO_STATUSBAR
     /**************

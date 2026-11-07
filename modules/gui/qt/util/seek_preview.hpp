@@ -31,14 +31,13 @@
 #include <QMap>
 #include <QList>
 #include <QSet>
-#include <atomic>
 
-/* VLC 3 has no thumbnailer API. A preview is decoded by a second, hidden
- * input whose video goes to the "vmem" display: it starts at the hovered
- * time (fast seek, no audio, no subtitles, no window) and is closed as
- * soon as the first picture after the seek arrives. One job runs at a
- * time; the latest hover wins, and from the first hover the rest of the
- * file is filled in the background, nearest first, about 250 pictures. */
+class FrameGrabber;
+
+/* Seek bar thumbnails: pictures from FrameGrabber at the hovered time,
+ * one job at a time; the latest hover wins. From the first hover the rest
+ * of the file is filled in the background, nearest first, about 250
+ * pictures cached per time bucket for the current file. */
 class SeekPreview : public QObject
 {
     Q_OBJECT
@@ -58,37 +57,30 @@ public:
     /* a cached picture near this time, if any */
     QImage cached( float time, float length ) const;
 
-    struct Job;     /* public for the input event callback */
-
 signals:
     void ready( float time, const QImage & );
 
 private:
-    static unsigned setupCb( void **, char *, unsigned *, unsigned *,
-                             unsigned *, unsigned * );
-    static void *lockCb( void *, void ** );
-    static void displayCb( void *, void * );
-
     int bucketOf( float time, float length ) const;
     void startNext();
     int nextFillBucket() const;
-    void finish( Job *, const QImage & );
+    void grabbed( const QString &uri, const QImage &, qint64 elapsedMs );
     void dropCache();
 
     intf_thread_t *p_intf;
-    vlc_object_t *host;    /* carries the vmem callbacks for the inputs */
-    Job *job;
-    QTimer debounce, watchdog;
+    FrameGrabber *grabber;
+    QTimer debounce;
     QString uri;
     int pendingBucket;
     float pendingTime;
     float pendingLength;
+    int jobBucket = -1;      /* the bucket being decoded */
+    float jobTime = 0;
     QMap<int, QImage> cache;
     QList<int> cacheOrder;
     QSet<int> failed;
     int fillCenter = 0;
     float fillLength = 0;
-    std::atomic<int> closing { 0 };
 };
 
 #endif

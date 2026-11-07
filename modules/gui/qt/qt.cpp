@@ -134,6 +134,9 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define QT_SEEK_PREVIEW_TEXT N_( "Show a thumbnail when hovering the seek bar" )
 #define QT_SEEK_PREVIEW_LONGTEXT N_( "Decode a small preview of the hovered " \
     "position of local video files with a second, hidden input." )
+#define QT_LIBRARY_ROOTS_TEXT N_( "Media library folders" )
+#define QT_LIBRARY_ROOTS_LONGTEXT N_( "Folders the library scans, separated " \
+    "by semicolons. Empty means the Videos and Music folders." )
 static const int i_autohide_list[] = { 0, 1, 2 };
 static const char *const psz_autohide_list_text[] = {
     N_( "Never" ), N_( "In fullscreen only" ), N_( "Always" ) };
@@ -301,6 +304,7 @@ vlc_module_begin ()
               QT_REDESIGN_FRAMELESS_LONGTEXT, false )
     add_integer( "qt-autohide-controls", 1, QT_AUTOHIDE_TEXT, QT_AUTOHIDE_LONGTEXT, false )
         change_integer_list( i_autohide_list, psz_autohide_list_text )
+    add_string( "qt-library-roots", "", QT_LIBRARY_ROOTS_TEXT, QT_LIBRARY_ROOTS_LONGTEXT, false )
     add_bool( "qt-seek-preview", true, QT_SEEK_PREVIEW_TEXT, QT_SEEK_PREVIEW_LONGTEXT, false )
     add_string( "qt-theme", "dark", QT_THEME_TEXT, QT_THEME_LONGTEXT, false )
         change_string_list( psz_theme_values, psz_theme_texts )
