@@ -134,7 +134,8 @@ class NewPlaylistDialog : public RedesignDialog
 {
     Q_OBJECT
 public:
-    NewPlaylistDialog( intf_thread_t *, QWidget *parent );
+    NewPlaylistDialog( intf_thread_t *, QWidget *parent,
+                       const QStringList &initialUris = QStringList() );
 
 protected:
     bool eventFilter( QObject *, QEvent * ) override;
@@ -163,7 +164,10 @@ class AddSubtitlesDialog : public RedesignDialog
 {
     Q_OBJECT
 public:
-    AddSubtitlesDialog( intf_thread_t *, QWidget *parent );
+    enum { SCOPE_FILE, SCOPE_FOLDER, SCOPE_PLAYLIST };
+    /* mediaUri: the file to add subtitles to (default: the playing one) */
+    AddSubtitlesDialog( intf_thread_t *, QWidget *parent,
+                        const QString &mediaUri = QString(), int scope = SCOPE_FILE );
 
 protected:
     bool eventFilter( QObject *, QEvent * ) override;
@@ -219,6 +223,13 @@ namespace SubtitleScope
     QString playlistDir();
     bool writeXspf( const QString &path, const QString &title,
                     const QString &imageUri, const QStringList &uris );
+    /* track locations of an XSPF (title/image are filled in when given) */
+    QStringList readXspf( const QString &path, QString *title = NULL, QString *image = NULL );
+    bool appendToXspf( const QString &path, const QStringList &uris );
+    /* saved playlists, newest first */
+    QStringList savedPlaylists();
+    /* URI of the item that is playing, empty if none */
+    QString playingUri( intf_thread_t * );
 }
 
 #endif

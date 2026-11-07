@@ -46,6 +46,7 @@
 #include "styles/vlc_theme.hpp"                      /* Redesign */
 #include "menus.hpp"                         /* Track popups */
 #include "components/extended_panels.hpp"   /* VideoFilters (rotate) */
+#include "components/redesign_menus.hpp"    /* Track popover */
 
 #include <QToolButton>
 #include <QHBoxLayout>
@@ -246,7 +247,14 @@ QWidget *AbstractController::trackMenuButton( buttonType_e button )
     b->setToolTip( buttonTooltip( button ) );
     b->setIcon( buttonIcon( button ) );
     intf_thread_t *intf = p_intf;
+    b->setProperty( "vlcGlyph", button == AUDIO_TRACKS_BUTTON ? "audio" : "subtitles" );
     connect( b, &QToolButton::clicked, b, [b, button, intf]() {
+        if( Theme::redesign() )
+        {
+            TrackPopover::toggle( intf, b, button == AUDIO_TRACKS_BUTTON
+                                           ? TrackPopover::AUDIO_TAB : TrackPopover::SUBTITLES_TAB );
+            return;
+        }
         QMenu menu( b );
         if( button == AUDIO_TRACKS_BUTTON )
             VLCMenuBar::AudioMenu( intf, &menu );

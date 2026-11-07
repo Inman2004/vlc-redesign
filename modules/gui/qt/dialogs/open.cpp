@@ -25,11 +25,13 @@
 #endif
 
 #include "dialogs/open.hpp"
+#include "styles/vlc_theme.hpp"
 #include "dialogs_provider.hpp"
 #include "recents.hpp"
 #include "util/qt_dirs.hpp"
 
 #include <QRegularExpression>
+#include <QTabBar>
 #include <QMenu>
 
 #include <cstddef>
@@ -253,6 +255,15 @@ void OpenDialog::showTab( int i_tab )
 {
     if( i_tab == OPEN_CAPTURE_TAB ) captureOpenPanel->initialize();
     ui.Tab->setCurrentIndex( i_tab );
+    /* Redesign (P4): one dialog per source rather than a tab strip */
+    if( Theme::redesign() )
+    {
+        ui.Tab->tabBar()->hide();
+        static const char *const titles[] = { N_( "Open File" ), N_( "Open Disc" ),
+                                              N_( "Open Network Stream" ), N_( "Open Capture Device" ) };
+        if( i_tab >= 0 && i_tab < 4 )
+            setWindowTitle( qtr( titles[i_tab] ) );
+    }
     show();
     if( ui.Tab->currentWidget() != NULL )
     {

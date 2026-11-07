@@ -15,6 +15,15 @@ d = display.Display()
 root = d.screen().root
 NET_CLIENTS = d.intern_atom('_NET_CLIENT_LIST')
 
+# VLC_PID=<pid> targets one instance when several are open
+import os
+PID = int(os.environ.get('VLC_PID', '0'))
+NET_WM_PID = d.intern_atom('_NET_WM_PID')
+
+def pid_matches(win):
+    p = win.get_full_property(NET_WM_PID, X.AnyPropertyType)
+    return bool(p) and p.value[0] == PID
+
 def find():
     ids = root.get_full_property(NET_CLIENTS, X.AnyPropertyType)
     for wid in (ids.value if ids else []):
@@ -25,6 +34,8 @@ def find():
         except Exception:
             continue
         if 'vlc' in [c.lower() for c in cls] and 'VLC' in str(name):
+            if PID and not pid_matches(win):
+                continue
             return win
     return None
 

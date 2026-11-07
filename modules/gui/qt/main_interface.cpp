@@ -1251,6 +1251,16 @@ void MainInterface::setAdjustPanelVisible( bool b )
         setFocus();
 }
 
+void MainInterface::showAdjustPanel( int tab )
+{
+    if( !body )
+        return;
+    const bool wasOpen = adjustDock && adjustDock->isOpen();
+    setAdjustPanelVisible( true );
+    if( adjustDock )
+        adjustDock->panel()->setCurrentTab( tab, wasOpen );
+}
+
 void MainInterface::toggleAdjustPanel( int tab )
 {
     if( !body )

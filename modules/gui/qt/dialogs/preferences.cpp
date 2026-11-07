@@ -36,6 +36,7 @@
 #include "util/qvlcframe.hpp"
 #include "main_interface.hpp"
 
+#include <QToolButton>
 #include <QHBoxLayout>
 #include <QGroupBox>
 #include <QRadioButton>
@@ -228,6 +229,17 @@ void PrefsDialog::setSimple()
 }
 
 /* Switching from on simple panel to another */
+void PrefsDialog::showSimplePanel( int number )
+{
+    setSimple();
+    /* click the category button so the list highlight follows */
+    QList<QToolButton *> buttons = simple_tree->findChildren<QToolButton *>();
+    if( number >= 0 && number < buttons.size() )
+        buttons.at( number )->click();
+    else
+        changeSimplePanel( number );
+}
+
 void PrefsDialog::changeSimplePanel( int number )
 {
     if( ! simple_panels[number] )

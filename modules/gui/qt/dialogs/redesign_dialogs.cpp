@@ -60,6 +60,7 @@
 #include <QSettings>
 #include <QCryptographicHash>
 #include <QXmlStreamWriter>
+#include <QXmlStreamReader>
 #include <QRegularExpression>
 #include <QImage>
 #include <QSet>
@@ -328,7 +329,8 @@ void OpenNetworkDialog::accept()
 /**********************************************************************
  * New Playlist (712 x 590 in the Figma frame)
  **********************************************************************/
-NewPlaylistDialog::NewPlaylistDialog( intf_thread_t *_p_intf, QWidget *parent )
+NewPlaylistDialog::NewPlaylistDialog( intf_thread_t *_p_intf, QWidget *parent,
+                                      const QStringList &initialUris )
     : RedesignDialog( _p_intf, qtr( "New Playlist" ), parent )
 {
     setDesignSize( 712, 590 );
@@ -395,6 +397,8 @@ NewPlaylistDialog::NewPlaylistDialog( intf_thread_t *_p_intf, QWidget *parent )
     b->addWidget( dropZone, 1 );
 
     connect( nameEdit, &QLineEdit::textChanged, this, &NewPlaylistDialog::validate );
+    if( !initialUris.isEmpty() )
+        addFiles( initialUris );
     validate();
     nameEdit->setFocus();
 }
@@ -551,10 +555,10 @@ void NewPlaylistDialog::accept()
 /**********************************************************************
  * Add Subtitles (1048 x 798 in the Figma frame)
  **********************************************************************/
-enum { SCOPE_FILE, SCOPE_FOLDER, SCOPE_PLAYLIST };
 enum { SOURCE_COMPUTER, SOURCE_OPENSUBTITLES, SOURCE_LINK };
 
-AddSubtitlesDialog::AddSubtitlesDialog( intf_thread_t *_p_intf, QWidget *parent )
+AddSubtitlesDialog::AddSubtitlesDialog( intf_thread_t *_p_intf, QWidget *parent,
+                                        const QString &mediaUri, int initialScope )
     : RedesignDialog( _p_intf, qtr( "Add Subtitles" ), parent )
 {
     setDesignSize( 1048, 798 );
@@ -563,12 +567,9 @@ AddSubtitlesDialog::AddSubtitlesDialog( intf_thread_t *_p_intf, QWidget *parent 
     findChild<QFrame *>( "RDFrame" )->setProperty( "list", true );
     body()->setContentsMargins( 0, 0, 0, 0 );
 
-    input_thread_t *p_input = THEMIM->getInput();
-    if( p_input )
+    currentUri = mediaUri.isEmpty() ? SubtitleScope::playingUri( p_intf ) : mediaUri;
+    if( !currentUri.isEmpty() )
     {
-        char *uri = input_item_GetURI( input_GetItem( p_input ) );
-        currentUri = qfu( uri );
-        free( uri );
         if( QUrl( currentUri ).isLocalFile() )
             folder = QFileInfo( toPath( currentUri ) ).absolutePath();
     }
@@ -684,6 +685,10 @@ AddSubtitlesDialog::AddSubtitlesDialog( intf_thread_t *_p_intf, QWidget *parent 
     connect( scopeCombo, QOverload<int>::of( &QComboBox::currentIndexChanged ), this, &AddSubtitlesDialog::rebuild );
     connect( sourceCombo, QOverload<int>::of( &QComboBox::currentIndexChanged ), this, &AddSubtitlesDialog::rebuild );
     connect( linkEdit, &QLineEdit::textChanged, this, &AddSubtitlesDialog::rebuild );
+    {
+        QSignalBlocker b( scopeCombo );
+        scopeCombo->setCurrentIndex( qBound( (int) SCOPE_FILE, initialScope, (int) SCOPE_PLAYLIST ) );
+    }
     rebuild();
 }
 
@@ -1070,7 +1075,9 @@ void AddSubtitlesDialog::accept()
         downloadNext();
         return;
     }
+    /* load live only into the file that is actually playing */
     input_thread_t *p_input = THEMIM->getInput();
+    const QString playing = SubtitleScope::playingUri( p_intf );
     if( sourceCombo->currentIndex() == SOURCE_LINK || scopeCombo->currentIndex() == SCOPE_FILE )
     {
         QStringList chosen;
@@ -1081,7 +1088,7 @@ void AddSubtitlesDialog::accept()
         if( chosen.isEmpty() || currentUri.isEmpty() )
             return;
         SubtitleScope::remember( p_intf, currentUri, chosen );
-        if( p_input )
+        if( p_input && playing == currentUri )
             for( int i = 0; i < chosen.count(); i++ )
                 input_AddSlave( p_input, SLAVE_TYPE_SPU, qtu( chosen[i] ), i == 0, true, false );
     }
@@ -1092,7 +1099,7 @@ void AddSubtitlesDialog::accept()
             if( p.subtitle.isEmpty() )
                 continue;
             SubtitleScope::remember( p_intf, p.video, QStringList() << p.subtitle );
-            if( p_input && p.video == currentUri )
+            if( p_input && p.video == playing )
                 input_AddSlave( p_input, SLAVE_TYPE_SPU, qtu( p.subtitle ), true, true, false );
         }
     }
@@ -1223,7 +1230,8 @@ void AddSubtitlesDialog::downloadNext()
         if( downloadedUris.isEmpty() )
             return;
         SubtitleScope::remember( p_intf, currentUri, downloadedUris );
-        if( input_thread_t *p_input = THEMIM->getInput() )
+        input_thread_t *p_input = THEMIM->getInput();
+        if( p_input && SubtitleScope::playingUri( p_intf ) == currentUri )
             for( int i = 0; i < downloadedUris.count(); i++ )
                 input_AddSlave( p_input, SLAVE_TYPE_SPU, qtu( downloadedUris[i] ), i == 0, true, false );
         QDialog::accept();
@@ -1527,6 +1535,65 @@ void SubtitleScope::applyToCurrent( intf_thread_t *p_intf )
     handled.insert( uri );
     for( int i = 0; i < subs.count(); i++ )
         input_AddSlave( p_input, SLAVE_TYPE_SPU, qtu( subs[i] ), i == 0, false, false );
+}
+
+QString SubtitleScope::playingUri( intf_thread_t *p_intf )
+{
+    input_thread_t *p_input = THEMIM->getInput();
+    if( !p_input )
+        return QString();
+    char *uri = input_item_GetURI( input_GetItem( p_input ) );
+    const QString s = qfu( uri );
+    free( uri );
+    return s;
+}
+
+QStringList SubtitleScope::readXspf( const QString &path, QString *title, QString *image )
+{
+    QStringList out;
+    QFile f( path );
+    if( !f.open( QIODevice::ReadOnly ) )
+        return out;
+    QXmlStreamReader x( &f );
+    int depth = 0;
+    while( !x.atEnd() )
+    {
+        x.readNext();
+        if( x.isStartElement() )
+        {
+            depth++;
+            if( x.name() == QLatin1String( "location" ) )
+                out << x.readElementText().trimmed(), depth--;
+            else if( depth == 2 && x.name() == QLatin1String( "title" ) && title )
+                *title = x.readElementText().trimmed(), depth--;
+            else if( depth == 2 && x.name() == QLatin1String( "image" ) && image )
+                *image = x.readElementText().trimmed(), depth--;
+        }
+        else if( x.isEndElement() )
+            depth--;
+    }
+    return out;
+}
+
+bool SubtitleScope::appendToXspf( const QString &path, const QStringList &uris )
+{
+    QString title, image;
+    QStringList tracks = readXspf( path, &title, &image );
+    foreach( const QString &u, uris )
+        if( !tracks.contains( u ) )
+            tracks << u;
+    if( title.isEmpty() )
+        title = QFileInfo( path ).completeBaseName();
+    return writeXspf( path, title, image, tracks );
+}
+
+QStringList SubtitleScope::savedPlaylists()
+{
+    QStringList out;
+    QDir d( playlistDir() );
+    foreach( const QFileInfo &f, d.entryInfoList( QStringList() << "*.xspf", QDir::Files, QDir::Time ) )
+        out << f.absoluteFilePath();
+    return out;
 }
 
 QString SubtitleScope::playlistDir()

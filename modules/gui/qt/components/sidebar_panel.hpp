@@ -37,6 +37,7 @@ class QStackedWidget;
 class QToolButton;
 class QVBoxLayout;
 class PlaylistWidget;
+class StandardPLPanel;
 
 /* The 376px library sidebar. Hosts the existing PlaylistWidget (its
  * StandardPLPanel does the browsing) under a header in the design's
@@ -63,12 +64,14 @@ private slots:
     void goForward();
     void toggleSearch( bool );
     void showSortMenu();
+    void showViewMenu();
     void showMoreMenu();
     void refreshRecents();
 
 private:
     intf_thread_t *p_intf;
     PlaylistWidget *plWidget;
+    StandardPLPanel *plView;
 
     QLabel *title, *count;
     QToolButton *backBtn, *fwdBtn, *moreBtn, *popBtn, *sortBtn, *viewBtn, *searchBtn;

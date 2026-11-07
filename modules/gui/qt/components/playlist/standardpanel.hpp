@@ -75,6 +75,8 @@ protected:
     VLCModel *model;
     void wheelEvent( QWheelEvent *e ) Q_DECL_OVERRIDE;
     bool popup( const QPoint &point );
+    /* redesign: the Figma file / folder item menus (P4b) */
+    bool popupRedesign( const QPoint &point );
 
 private:
     intf_thread_t *p_intf;

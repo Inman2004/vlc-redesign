@@ -218,6 +218,8 @@ public slots:
      * opens it there, or closes it if it is already showing that tab */
     void toggleAdjustPanel( int tab = -1 );
     void setAdjustPanelVisible( bool );
+    /* open (never close) the adjustment sidebar on a tab */
+    void showAdjustPanel( int tab );
     void activateSection( const QString & );
     void toggleMinimalView( bool );
     void togglePlaylist();

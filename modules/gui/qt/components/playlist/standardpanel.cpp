@@ -35,6 +35,13 @@
 #include "components/playlist/selector.hpp"       /* PLSelector */
 #include "util/animators.hpp"                     /* PixmapAnimator */
 #include "menus.hpp"                              /* Popup */
+#include "styles/vlc_theme.hpp"
+#include "components/redesign_menus.hpp"
+#include "dialogs/redesign_dialogs.hpp"
+#include "main_interface.hpp"
+#include <vlc_input_item.h>
+#include <QFileDialog>
+#include <functional>
 #include "input_manager.hpp"                      /* THEMIM */
 #include "dialogs_provider.hpp"                   /* THEDP */
 #include "recents.hpp"                            /* RecentMRL */
@@ -176,6 +183,8 @@ bool StandardPLPanel::popup( const QPoint &point )
 {
     QModelIndex index = popupIndex( currentView ); /* index for menu logic only. Do not store.*/
     VLCModel *model = qobject_cast<VLCModel *>(currentView->model());
+    if( Theme::redesign() && index.isValid() )
+        return popupRedesign( point );
 
 #define ADD_MENU_ENTRY( icon, title, act ) \
     if ( model->isSupportedAction( act, index ) )\
@@ -294,6 +303,160 @@ bool StandardPLPanel::popup( const QPoint &point )
     else return false;
 
 #undef ADD_MENU_ENTRY
+}
+
+/* Figma Components: the file menu (Play .. Properties & Metadata) and the
+ * folder/playlist menu, accent glyphs. Actions the model implements go
+ * through popupAction(); Mark as Watched, Favorite and Go to Source wait
+ * for the library (P5a) and show as disabled. */
+bool StandardPLPanel::popupRedesign( const QPoint &point )
+{
+    QModelIndex index = popupIndex( currentView );
+    VLCModel *model = qobject_cast<VLCModel *>( currentView->model() );
+    if( !model || !index.isValid() )
+        return false;
+    const bool leaf = !model->hasChildren( index );
+    const QModelIndexList rows = currentView->selectionModel()->selectedRows();
+
+    /* every selected item, folders expanded to their media */
+    QStringList uris;
+    QList<input_item_t *> items;
+    std::function<void( const QModelIndex & )> collect = [&]( const QModelIndex &i ) {
+        if( !model->hasChildren( i ) )
+        {
+            const QString u = model->getURI( i );
+            if( !u.isEmpty() && !uris.contains( u ) )
+            {
+                uris << u;
+                if( input_item_t *it = model->getInputItem( i ) )
+                {
+                    input_item_Hold( it ); /* released after the menu */
+                    items << it;
+                }
+            }
+            return;
+        }
+        for( int r = 0; r < model->rowCount( i ); r++ )
+            collect( model->index( r, 0, i ) );
+    };
+    foreach( const QModelIndex &i, rows.isEmpty() ? QModelIndexList() << index : rows )
+        collect( i );
+
+    QMenu menu;
+    menu.setObjectName( "VLCItemMenu" );
+    menu.setToolTipsVisible( true );
+    VLCModelSubInterface::actionsContainerType container;
+    auto modelAction = [&]( const QString &glyph, const QString &title,
+                            VLCModelSubInterface::actions act ) {
+        QAction *a = menu.addAction( RedesignMenus::menuIcon( glyph, 20 ), title );
+        container.action = act;
+        a->setData( QVariant::fromValue( container ) );
+        a->setEnabled( model->isSupportedAction( act, index ) );
+        return a;
+    };
+    auto later = [&]( const QString &glyph, const QString &title ) {
+        QAction *a = menu.addAction( RedesignMenus::menuIcon( glyph, 20 ), title );
+        a->setEnabled( false );
+        a->setToolTip( qtr( "Arrives with the media library" ) );
+    };
+    auto addSubtitles = [&]() {
+        const QString first = uris.value( 0 );
+        menu.addAction( RedesignMenus::menuIcon( "subtitles", 20 ), qtr( "Add Subtitle Tracks" ), this,
+                        [this, first, leaf]() {
+            ( new AddSubtitlesDialog( p_intf, p_intf->p_sys->p_mi, first,
+                  leaf ? AddSubtitlesDialog::SCOPE_FILE : AddSubtitlesDialog::SCOPE_FOLDER ) )->show();
+        } )->setEnabled( !first.isEmpty() );
+    };
+    auto addAudio = [&]() {
+        QList<input_item_t *> targets = items;
+        QAction *a = menu.addAction( RedesignMenus::menuIcon( "audio", 20 ), qtr( "Add Audio Tracks" ), this,
+                                     [this, targets]() {
+            const QStringList files = QFileDialog::getOpenFileNames( this, qtr( "Add Audio Tracks" ),
+                p_intf->p_sys->filepath.toLocalFile(),
+                QString( "%1 (%2);;%3 (*)" ).arg( qtr( "Audio Files" ),
+                    QString( EXTENSIONS_AUDIO ).replace( ';', ' ' ), qtr( "All Files" ) ) );
+            const QString playing = SubtitleScope::playingUri( p_intf );
+            foreach( input_item_t *it, targets )
+            {
+                char *psz = input_item_GetURI( it );
+                const QString uri = qfu( psz );
+                free( psz );
+                foreach( const QString &f, files )
+                {
+                    const QByteArray u = QUrl::fromLocalFile( f ).toString( QUrl::FullyEncoded ).toUtf8();
+                    if( input_item_slave_t *s = input_item_slave_New( u.constData(), SLAVE_TYPE_AUDIO,
+                                                                      SLAVE_PRIORITY_USER ) )
+                        if( input_item_AddSlave( it, s ) != VLC_SUCCESS )
+                            input_item_slave_Delete( s );
+                    if( uri == playing && THEMIM->getInput() )
+                        input_AddSlave( THEMIM->getInput(), SLAVE_TYPE_AUDIO, u.constData(), false, true, false );
+                }
+            }
+        } );
+        a->setEnabled( !targets.isEmpty() );
+    };
+    auto addToPlaylist = [&]() {
+        QMenu *sub = menu.addMenu( RedesignMenus::menuIcon( "playlist", 20 ), qtr( "Add to Playlist" ) );
+        foreach( const QString &path, SubtitleScope::savedPlaylists() )
+        {
+            QString title;
+            SubtitleScope::readXspf( path, &title );
+            sub->addAction( title.isEmpty() ? QFileInfo( path ).completeBaseName() : title, this,
+                            [this, path, uris]() {
+                if( !SubtitleScope::appendToXspf( path, uris ) )
+                    msg_Warn( p_intf, "could not update %s", qtu( path ) );
+            } );
+        }
+        if( !sub->isEmpty() )
+            sub->addSeparator();
+        sub->addAction( RedesignMenus::menuIcon( "add", 20 ), qtr( "New Playlist..." ), this, [this, uris]() {
+            ( new NewPlaylistDialog( p_intf, p_intf->p_sys->p_mi, uris ) )->show();
+        } );
+        sub->setEnabled( !uris.isEmpty() );
+    };
+
+    /* the playing item offers Pause where the others offer Play */
+    if( !model->isSupportedAction( VLCModelSubInterface::ACTION_PLAY, index )
+     && model->isSupportedAction( VLCModelSubInterface::ACTION_PAUSE, index ) )
+        modelAction( "pause", qtr( "Pause" ), VLCModelSubInterface::ACTION_PAUSE );
+    else
+        modelAction( "play-outline", qtr( "Play" ), VLCModelSubInterface::ACTION_PLAY );
+    if( leaf )
+    {
+        later( "watched", qtr( "Mark as Watched" ) );
+        later( "heart", qtr( "Favorite" ) );
+        modelAction( "stream", qtr( "Stream" ), VLCModelSubInterface::ACTION_STREAM );
+        modelAction( "convert", qtr( "Convert" ), VLCModelSubInterface::ACTION_SAVE );
+        modelAction( "queue", qtr( "Add to Queue" ), VLCModelSubInterface::ACTION_ADDTOPLAYLIST );
+        addToPlaylist();
+        modelAction( "folder", qtr( "Show in File Explorer" ), VLCModelSubInterface::ACTION_EXPLORE );
+        later( "go", qtr( "Go to Source" ) );
+        addSubtitles();
+        addAudio();
+        modelAction( "info", qtr( "Properties && Metadata" ), VLCModelSubInterface::ACTION_INFO );
+    }
+    else
+    {
+        later( "heart", qtr( "Favorite" ) );
+        modelAction( "shuffle", qtr( "Shuffle" ), VLCModelSubInterface::ACTION_SHUFFLE );
+        modelAction( "save", qtr( "Export Playlist" ), VLCModelSubInterface::ACTION_SAVETOPLAYLIST );
+        modelAction( "queue", qtr( "Add to Queue" ), VLCModelSubInterface::ACTION_ADDTOPLAYLIST );
+        addSubtitles();
+        addAudio();
+        modelAction( "info", qtr( "Properties && Metadata" ), VLCModelSubInterface::ACTION_INFO );
+    }
+    /* not drawn in the frame, but the queue needs it */
+    menu.addSeparator();
+    modelAction( "win-close", qtr( "Remove" ) + "\tDel", VLCModelSubInterface::ACTION_REMOVE );
+
+    connect( &menu, &QMenu::triggered, this, [this]( QAction *a ) {
+        if( a->data().canConvert<VLCModelSubInterface::actionsContainerType>() )
+            popupAction( a );
+    } );
+    menu.exec( point );
+    foreach( input_item_t *it, items )
+        input_item_Release( it );
+    return true;
 }
 
 void StandardPLPanel::popupAction( QAction *action )

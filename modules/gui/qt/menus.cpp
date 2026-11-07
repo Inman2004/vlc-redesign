@@ -38,6 +38,7 @@
 
 #include "menus.hpp"
 #include "styles/vlc_theme.hpp"
+#include "components/redesign_menus.hpp"
 
 #include "main_interface.hpp"                     /* View modifications */
 #include "dialogs_provider.hpp"                   /* Dialogs display */
@@ -1035,7 +1036,7 @@ QMenu* VLCMenuBar::RedesignPopupMenu( intf_thread_t *p_intf, bool show )
     input_thread_t *p_input = THEMIM->getInput();
     MainInterface *mi = p_intf->p_sys->p_mi;
     const QColor accent = Theme::accent();
-    const QColor grey = Theme::colors().icon;
+    /* Figma "right-click menu": every glyph is drawn in the accent */
     const int G = 20;
     QMenu *menu = new QMenu();
     menu->setObjectName( "VLCContextMenu" );
@@ -1047,7 +1048,7 @@ QMenu* VLCMenuBar::RedesignPopupMenu( intf_thread_t *p_intf, bool show )
     {
         if( var_GetBool( p_vout, "fullscreen" ) )
         {
-            action = menu->addAction( QIcon( Theme::pixmap( "fullscreen", G, grey ) ),
+            action = menu->addAction( RedesignMenus::menuIcon( "fullscreen", G ),
                                       withKey( p_intf, qtr( "Leave Fullscreen" ), "key-leave-fullscreen" ),
                                       ActionsManager::getInstance( p_intf ), [p_intf]() {
                                           ActionsManager::getInstance( p_intf )->doAction( FULLSCREEN_ACTION ); } );
@@ -1057,23 +1058,23 @@ QMenu* VLCMenuBar::RedesignPopupMenu( intf_thread_t *p_intf, bool show )
 
     /* Transport, accent glyphs */
     const bool playing = p_input && var_GetInteger( p_input, "state" ) == PLAYING_S;
-    menu->addAction( QIcon( Theme::pixmap( playing ? "pause" : "play-outline", G, accent ) ),
+    menu->addAction( RedesignMenus::menuIcon( playing ? "pause" : "play-outline", G ),
                      withKey( p_intf, playing ? qtr( "Pause" ) : qtr( "Play" ), "key-play-pause" ),
                      THEMIM, &MainInputManager::togglePlayPause );
-    action = menu->addAction( QIcon( Theme::pixmap( "stop", G, accent ) ),
+    action = menu->addAction( RedesignMenus::menuIcon( "stop", G ),
                               withKey( p_intf, qtr( "Stop" ), "key-stop" ),
                               THEMIM, &MainInputManager::stop );
     action->setEnabled( p_input != NULL );
     const bool empty = THEMIM->hasEmptyPlaylist();
-    action = menu->addAction( QIcon( Theme::pixmap( "prev", G, accent ) ),
+    action = menu->addAction( RedesignMenus::menuIcon( "prev", G ),
                               withKey( p_intf, qtr( "Previous Item" ), "key-prev" ),
                               THEMIM, &MainInputManager::prev );
     action->setEnabled( !empty );
-    action = menu->addAction( QIcon( Theme::pixmap( "next", G, accent ) ),
+    action = menu->addAction( RedesignMenus::menuIcon( "next", G ),
                               withKey( p_intf, qtr( "Next Item" ), "key-next" ),
                               THEMIM, &MainInputManager::next );
     action->setEnabled( !empty );
-    action = menu->addAction( QIcon( Theme::pixmap( "record", G, accent ) ),
+    action = menu->addAction( RedesignMenus::menuIcon( "record", G ),
                               withKey( p_intf, qtr( "Record" ), "key-record" ),
                               THEAM, &ActionsManager::record );
     action->setEnabled( p_input != NULL );
@@ -1081,7 +1082,7 @@ QMenu* VLCMenuBar::RedesignPopupMenu( intf_thread_t *p_intf, bool show )
     /* Hide UI: the redesign's name for the minimal view */
     if( mi )
     {
-        action = menu->addAction( QIcon( Theme::pixmap( "hide-ui", G, grey ) ),
+        action = menu->addAction( RedesignMenus::menuIcon( "hide-ui", G ),
                                   qtr( "Hide UI" ) + "\tCtrl + \\", mi, [mi]() {
                                       mi->toggleMinimalView( true ); } );
     }
@@ -1091,30 +1092,39 @@ QMenu* VLCMenuBar::RedesignPopupMenu( intf_thread_t *p_intf, bool show )
     sub = NavigMenu( p_intf, new QMenu( menu ) );
     action = menu->addMenu( sub );
     action->setText( qtr( "Playback" ) );
-    action->setIcon( QIcon( Theme::pixmap( "playback", G, grey ) ) );
+    action->setIcon( RedesignMenus::menuIcon( "playback", G ) );
 
     sub = VideoMenu( p_intf, new QMenu( menu ) );
     action = menu->addMenu( sub );
     action->setText( qtr( "Video" ) );
-    action->setIcon( QIcon( Theme::pixmap( "video", G, grey ) ) );
+    action->setIcon( RedesignMenus::menuIcon( "video", G ) );
     action->setEnabled( p_input && !sub->isEmpty() );
 
     sub = AudioMenu( p_intf, new QMenu( menu ) );
     action = menu->addMenu( sub );
     action->setText( qtr( "Audio" ) );
-    action->setIcon( QIcon( Theme::pixmap( "audio", G, grey ) ) );
+    action->setIcon( RedesignMenus::menuIcon( "audio", G ) );
 
     sub = SubtitleMenu( p_intf, new QMenu( menu ), true );
     action = menu->addMenu( sub );
     action->setText( qtr( "Subtitle" ) );
-    action->setIcon( QIcon( Theme::pixmap( "subtitles", G, grey ) ) );
+    action->setIcon( RedesignMenus::menuIcon( "subtitles", G ) );
     if( p_input )
         UpdateItem( p_intf, sub, "spu-es", VLC_OBJECT( p_input ), true );
 
     sub = ToolsMenu( p_intf, new QMenu( menu ) );
+    /* the classic View and Help menus live here too, so every legacy
+     * action stays reachable with the mouse (P4b audit) */
+    sub->addSeparator();
+    QAction *viewAction = sub->addMenu( ViewMenu( p_intf, new QMenu( sub ), mi ) );
+    viewAction->setText( qtr( "Interface" ) );
+    viewAction->setIcon( RedesignMenus::menuIcon( "sidebar", G ) );
+    QAction *helpAction = sub->addMenu( HelpMenu( sub ) );
+    helpAction->setText( qtr( "Help" ) );
+    helpAction->setIcon( RedesignMenus::menuIcon( "info", G ) );
     action = menu->addMenu( sub );
     action->setText( qtr( "More Settings" ) );
-    action->setIcon( QIcon( Theme::pixmap( "settings", G, grey ) ) );
+    action->setIcon( RedesignMenus::menuIcon( "settings", G ) );
 
     QMenuView *plMenu = new QMenuView( menu, 25 );
     PLModel *model = PLModel::getPLModel( p_intf );
@@ -1123,14 +1133,14 @@ QMenu* VLCMenuBar::RedesignPopupMenu( intf_thread_t *p_intf, bool show )
              model, QOverload<const QModelIndex &>::of(&PLModel::activateItem) );
     action = menu->addMenu( plMenu );
     action->setText( qtr( "Playlist" ) );
-    action->setIcon( QIcon( Theme::pixmap( "playlist", G, grey ) ) );
+    action->setIcon( RedesignMenus::menuIcon( "playlist", G ) );
 
     sub = FileMenu( p_intf, menu, mi );
     action = menu->addMenu( sub );
     action->setText( qtr( "Open Media" ) );
-    action->setIcon( QIcon( Theme::pixmap( "open", G, grey ) ) );
+    action->setIcon( RedesignMenus::menuIcon( "open", G ) );
 
-    menu->addAction( QIcon( Theme::pixmap( "quit", G, grey ) ),
+    menu->addAction( RedesignMenus::menuIcon( "quit", G ),
                      qtr( "Quit VLC" ) + "\tCtrl + Q", THEDP, &DialogsProvider::quit );
 
     if( show )

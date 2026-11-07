@@ -31,6 +31,7 @@
 #include "components/playlist/vlc_model.hpp"
 #include "util/searchlineedit.hpp"
 #include "styles/vlc_theme.hpp"
+#include "components/redesign_menus.hpp"
 #include "dialogs_provider.hpp"
 #include "recents.hpp"
 
@@ -115,7 +116,7 @@ public:
 }
 
 SidebarPanel::SidebarPanel( intf_thread_t *_p_intf, QWidget *parent )
-    : QWidget( parent ), p_intf( _p_intf ), plWidget( NULL ),
+    : QWidget( parent ), p_intf( _p_intf ), plWidget( NULL ), plView( NULL ),
       historyPos( -1 ), navigating( false ), sortOrder( Qt::AscendingOrder )
 {
     setObjectName( "VLCSidebar" );
@@ -242,7 +243,8 @@ void SidebarPanel::setPlaylistWidget( PlaylistWidget *w )
         tree->setItemDelegate( new SidebarItemDelegate( tree ) );
     }
     connect( view, &StandardPLPanel::viewChanged, this, &SidebarPanel::rootChanged );
-    connect( viewBtn, &QToolButton::clicked, view, &StandardPLPanel::cycleViews );
+    plView = view;
+    connect( viewBtn, &QToolButton::clicked, this, &SidebarPanel::showViewMenu );
 
     QAbstractItemModel *model = PLModel::getPLModel( p_intf );
     connect( model, &QAbstractItemModel::rowsInserted, this, &SidebarPanel::updateCount );
@@ -353,34 +355,68 @@ void SidebarPanel::toggleSearch( bool on )
     }
 }
 
+/* Figma sort menu. Watched/date orders need the library's history and
+ * dates (P5a): shown, disabled. The last choice carries the accent check. */
 void SidebarPanel::showSortMenu()
 {
-    static const struct { int meta; const char *name; } keys[] = {
-        { COLUMN_TITLE,    N_("Title") },
-        { COLUMN_DURATION, N_("Duration") },
-        { COLUMN_ARTIST,   N_("Artist") },
-        { COLUMN_ALBUM,    N_("Album") },
-        { COLUMN_URI,      N_("File name") },
-        { COLUMN_DATE,     N_("Date") },
+    static const struct { const char *name; int meta; int order; } keys[] = {
+        { N_("Unwatched First"), 0, 0 }, { N_("Watched First"), 0, 0 },
+        { N_("Newest First"), 0, 0 },    { N_("Oldest First"), 0, 0 },
+        { N_("Title A-Z"), COLUMN_TITLE, Qt::AscendingOrder },
+        { N_("Title Z-A"), COLUMN_TITLE, Qt::DescendingOrder },
+        { N_("Artist A-Z"), COLUMN_ARTIST, Qt::AscendingOrder },
+        { N_("Artist Z-A"), COLUMN_ARTIST, Qt::DescendingOrder },
+        { N_("Album A-Z"), COLUMN_ALBUM, Qt::AscendingOrder },
+        { N_("Album Z-A"), COLUMN_ALBUM, Qt::DescendingOrder },
+        { N_("Track Number Ascending"), COLUMN_TRACK_NUMBER, Qt::AscendingOrder },
+        { N_("Track Number Descending"), COLUMN_TRACK_NUMBER, Qt::DescendingOrder },
+        { N_("URI Ascending"), COLUMN_URI, Qt::AscendingOrder },
+        { N_("URI Descending"), COLUMN_URI, Qt::DescendingOrder },
+        { N_("Disc Number Ascending"), COLUMN_DISC_NUMBER, Qt::AscendingOrder },
+        { N_("Disc Number Descending"), COLUMN_DISC_NUMBER, Qt::DescendingOrder },
     };
     QMenu menu( this );
+    menu.setObjectName( "VLCSortMenu" );
+    menu.setToolTipsVisible( true );
+    const QString last = getSettings()->value( "Sidebar/sort" ).toString();
     for( size_t i = 0; i < sizeof( keys ) / sizeof( keys[0] ); i++ )
     {
+        const QString key = keys[i].name;
+        QAction *a = menu.addAction( key == last ? RedesignMenus::menuIcon( "check", 20 )
+                                                 : RedesignMenus::menuIcon( "blank", 20 ),
+                                     qtr( keys[i].name ) );
+        if( !keys[i].meta )
+        {
+            a->setEnabled( false );
+            a->setToolTip( qtr( "Arrives with the media library" ) );
+            continue;
+        }
         const int column = VLCModel::columnFromMeta( keys[i].meta );
-        menu.addAction( qtr( keys[i].name ), this, [this, column]() {
-            PLModel::getPLModel( p_intf )->sort( column, sortOrder );
+        const Qt::SortOrder order = (Qt::SortOrder) keys[i].order;
+        connect( a, &QAction::triggered, this, [this, column, order, key]() {
+            sortOrder = order;
+            PLModel::getPLModel( p_intf )->sort( column, order );
+            getSettings()->setValue( "Sidebar/sort", key );
         } );
     }
-    menu.addSeparator();
-    QAction *asc = menu.addAction( qtr( "Ascending" ), this, [this]() {
-        sortOrder = Qt::AscendingOrder; } );
-    QAction *desc = menu.addAction( qtr( "Descending" ), this, [this]() {
-        sortOrder = Qt::DescendingOrder; } );
-    asc->setCheckable( true );
-    desc->setCheckable( true );
-    asc->setChecked( sortOrder == Qt::AscendingOrder );
-    desc->setChecked( sortOrder == Qt::DescendingOrder );
     menu.exec( sortBtn->mapToGlobal( QPoint( 0, sortBtn->height() + 4 ) ) );
+}
+
+/* Figma view menu: Grid View / List View */
+void SidebarPanel::showViewMenu()
+{
+    if( !plView )
+        return;
+    QMenu menu( this );
+    menu.setObjectName( "VLCViewMenu" );
+    const bool grid = plView->currentViewIndex() == StandardPLPanel::ICON_VIEW;
+    menu.addAction( RedesignMenus::menuIcon( "grid", 20 ), qtr( "Grid View" ), this, [this]() {
+        plView->showView( StandardPLPanel::ICON_VIEW );
+    } )->setEnabled( !grid );
+    menu.addAction( RedesignMenus::menuIcon( "view", 20 ), qtr( "List View" ), this, [this]() {
+        plView->showView( StandardPLPanel::TREE_VIEW );
+    } )->setEnabled( grid );
+    menu.exec( viewBtn->mapToGlobal( QPoint( 0, viewBtn->height() + 4 ) ) );
 }
 
 void SidebarPanel::showMoreMenu()

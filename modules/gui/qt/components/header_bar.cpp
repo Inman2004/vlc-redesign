@@ -28,6 +28,7 @@
 #include "input_manager.hpp"
 #include "actions_manager.hpp"
 #include "menus.hpp"
+#include "components/redesign_menus.hpp"
 
 #include <vlc_input.h>
 #include <vlc_url.h>
@@ -203,11 +204,11 @@ void HeaderBar::updateCrumb()
 
 void HeaderBar::showMainMenu()
 {
-    /* Same menus as the classic menu bar, one level down */
-    QMenu menu( this );
-    foreach( QAction *a, mi->menuBar()->actions() )
-        menu.addAction( a );
-    menu.exec( menuBtn->mapToGlobal( QPoint( 0, menuBtn->height() + 4 ) ) );
+    /* The single designed menu; the classic eight stay reachable through
+     * the right-click menu and keep their shortcuts in the hidden menu bar */
+    QMenu *menu = RedesignMenus::mainMenu( p_intf, this );
+    menu->exec( menuBtn->mapToGlobal( QPoint( 0, menuBtn->height() + 4 ) ) );
+    menu->deleteLater();
 }
 
 void HeaderBar::toggleMaximized()

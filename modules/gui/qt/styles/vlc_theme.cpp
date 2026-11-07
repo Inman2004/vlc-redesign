@@ -568,6 +568,77 @@ static QString buildStyleSheet()
     "#VLCRedesignDialog QScrollBar::add-line, #VLCRedesignDialog QScrollBar::sub-line,"
     " #VLCRedesignDialog QScrollBar::add-page, #VLCRedesignDialog QScrollBar::sub-page { background: none; height: 0; }\n"
 
+    /* Stock dialogs without a Figma frame (Open Disc, Capture, Convert,
+     * Media Information, About, Preferences): tokens only, layouts untouched */
+    "QDialog { background: @rail; color: @muted; }\n"
+    "QDialog, QDialog QWidget { font-family: 'Google Sans', 'Noto Sans', sans-serif; }\n"
+    "#VLCRedesignDialog { background: transparent; }\n"
+    "QDialog QLabel { color: @muted; background: transparent; }\n"
+    "QDialog QGroupBox { border: 1px solid #262626; border-radius: 6px; margin-top: 14px; padding-top: 6px;"
+    "  color: @muted; }\n"
+    "QDialog QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; color: @muted; }\n"
+    "QDialog QLineEdit, QDialog QComboBox, QDialog QAbstractSpinBox, QDialog QPlainTextEdit,"
+    " QDialog QTextEdit, QDialog QTextBrowser { background: @track; border: 1px solid #262626;"
+    "  border-radius: 4px; color: @text; padding: 3px 8px; selection-background-color: @accentSoft;"
+    "  selection-color: @text; }\n"
+    "QDialog QLineEdit:focus, QDialog QComboBox:focus, QDialog QAbstractSpinBox:focus,"
+    " QDialog QPlainTextEdit:focus, QDialog QTextEdit:focus { border-color: @accentPre; }\n"
+    "QDialog QLineEdit:disabled, QDialog QComboBox:disabled, QDialog QAbstractSpinBox:disabled"
+    " { color: @iconDisabled; }\n"
+    "QDialog QComboBox::drop-down { border: none; width: 22px; }\n"
+    "QDialog QComboBox::down-arrow { image: url(:/redesign/chevron-down.svg); width: 12px; height: 12px; }\n"
+    "QDialog QComboBox QAbstractItemView { background: @menu; border: 1px solid @menuBorder; color: @muted;"
+    "  selection-background-color: @hover; selection-color: @text; outline: 0; }\n"
+    "QDialog QPushButton { background: #262626; color: @text; border: none; border-radius: 4px;"
+    "  padding: 6px 16px; min-height: 18px; }\n"
+    "QDialog QPushButton:hover { background: #2E2E2E; }\n"
+    "QDialog QPushButton:default { background: @accentSoft; color: @accent; }\n"
+    "QDialog QPushButton:default:hover { background: @accentPre; color: #FFFFFF; }\n"
+    "QDialog QPushButton:disabled { background: #1E1E1E; color: @iconDisabled; }\n"
+    "QDialog QToolButton { color: @muted; }\n"
+    "QDialog QTabWidget::pane { border: 1px solid #262626; border-radius: 6px; top: -1px; background: @rail; }\n"
+    "QDialog QTabBar::tab { background: transparent; color: @adjLabel; padding: 8px 14px; border: none;"
+    "  border-bottom: 2px solid transparent; }\n"
+    "QDialog QTabBar::tab:hover { color: @muted; }\n"
+    "QDialog QTabBar::tab:selected { color: @text; border-bottom-color: @accent; }\n"
+    "QDialog QTreeView, QDialog QListView, QDialog QTableView { background: @track;"
+    "  alternate-background-color: #0F0F0F; border: 1px solid #262626; color: @muted;"
+    "  selection-background-color: @accentSoft; selection-color: @text; outline: 0; }\n"
+    "QDialog QHeaderView::section { background: @rail; color: @adjLabel; border: none;"
+    "  border-bottom: 1px solid #262626; padding: 4px 8px; }\n"
+    "QDialog QCheckBox, QDialog QRadioButton { color: @muted; background: transparent; }\n"
+    "QDialog QScrollBar:vertical { background: transparent; width: 8px; margin: 2px; }\n"
+    "QDialog QScrollBar::handle:vertical { background: @border; border-radius: 3px; min-height: 24px; }\n"
+    "QDialog QScrollBar:horizontal { background: transparent; height: 8px; margin: 2px; }\n"
+    "QDialog QScrollBar::handle:horizontal { background: @border; border-radius: 3px; min-width: 24px; }\n"
+    "QDialog QScrollBar::add-line, QDialog QScrollBar::sub-line, QDialog QScrollBar::add-page,"
+    " QDialog QScrollBar::sub-page { background: none; width: 0; height: 0; }\n"
+
+    /* Track popover (P4b): Figma Components, 400x522 */
+    "#VLCTrackPopover, #VLCTrackPopover QWidget { font-family: 'Google Sans', 'Noto Sans', sans-serif; }\n"
+    "#VLCTrackPopover QFrame#TPFrame { background: @adjBg; border: 1px solid @titlebar; border-radius: 8px; }\n"
+    "#VLCTrackPopover QWidget#TPTabs { background: @track; border-top-left-radius: 8px; border-top-right-radius: 8px; }\n"
+    "#VLCTrackPopover QWidget#TPTabs QToolButton { color: @adjLabel; font-size: 14px; border: none;"
+    "  background: transparent; }\n"
+    "#VLCTrackPopover QWidget#TPTabs QToolButton:hover, #VLCTrackPopover QWidget#TPTabs QToolButton:checked"
+    " { color: @muted; }\n"
+    "#VLCTrackPopover QWidget#TPTabLine { background: @accent; }\n"
+    "#VLCTrackPopover QScrollArea#TPScroll, #VLCTrackPopover QWidget#TPPage { background: transparent; border: none; }\n"
+    "#VLCTrackPopover QLabel#TPSection { color: @adjLabel; font-size: 14px; }\n"
+    "#VLCTrackPopover QPushButton#TPRow { background: transparent; border: none; color: @muted; font-size: 15px;"
+    "  text-align: left; padding-left: 61px; padding-right: 20px; }\n"
+    "#VLCTrackPopover QPushButton#TPRow:hover { background: @hover; color: @text; }\n"
+    "#VLCTrackPopover QPushButton#TPRow[current=\"true\"] { color: @text; }\n"
+    "#VLCTrackPopover QPushButton#TPRow:disabled { color: @adjLabel; }\n"
+    "#VLCTrackPopover QFrame#TPRule { background: @titlebar; border: none; }\n"
+    "#VLCTrackPopover QPushButton#TPPrefs { background: @track; border: none; border-radius: 4px;"
+    "  color: @muted; font-size: 14px; }\n"
+    "#VLCTrackPopover QPushButton#TPPrefs:hover { background: #151515; color: @text; }\n"
+    "#VLCTrackPopover QScrollBar:vertical { background: transparent; width: 6px; margin: 2px; }\n"
+    "#VLCTrackPopover QScrollBar::handle:vertical { background: @border; border-radius: 3px; min-height: 24px; }\n"
+    "#VLCTrackPopover QScrollBar::add-line, #VLCTrackPopover QScrollBar::sub-line,"
+    " #VLCTrackPopover QScrollBar::add-page, #VLCTrackPopover QScrollBar::sub-page { background: none; height: 0; }\n"
+
     /* Menus and tooltips, application wide */
     /* Menus, measured on the "right-click menu" frame: #232323, 45px rows,
      * 15px text, icon column 20-36, text at 49, shortcut flush right */
@@ -579,6 +650,10 @@ static QString buildStyleSheet()
     "QMenu::item:disabled { color: @iconDisabled; }\n"
     "QMenu::separator { height: 1px; background: @menuBorder; margin: 4px 14px; }\n"
     "QMenu::icon { padding-left: 14px; }\n"
+    /* main menu: 28px glyph boxes (Iconoir ink ~20px, as drawn), 45px rows */
+    "QMenu#VLCMainMenu { font-size: 14px; }\n"
+    "QMenu#VLCMainMenu::item { padding: 8px 20px 9px 12px; }\n"
+    "QMenu#VLCMainMenu::icon { padding-left: 12px; }\n"
     "QMenu::right-arrow { image: url(:/redesign/chevron.svg); width: 12px; height: 12px;"
     "  padding-right: 10px; }\n"
     "QMenu::indicator { width: 14px; height: 14px; padding-left: 14px; }\n"
@@ -614,8 +689,9 @@ public:
     RedesignStyle( QStyle *base ) : QProxyStyle( base ) {}
     int pixelMetric( PixelMetric m, const QStyleOption *o, const QWidget *w ) const Q_DECL_OVERRIDE
     {
+        /* the main menu draws its glyphs larger (Figma Components) */
         if( m == PM_SmallIconSize && qobject_cast<const QMenu *>( w ) )
-            return 20;
+            return w->objectName() == "VLCMainMenu" ? 28 : 20;
         return QProxyStyle::pixelMetric( m, o, w );
     }
 };

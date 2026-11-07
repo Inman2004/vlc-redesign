@@ -256,6 +256,14 @@ void DialogsProvider::prefsDialog()
     p->toggleVisible();
 }
 
+/* Keyboard Shortcuts: the Hotkeys page until the P6b screen exists */
+void DialogsProvider::hotkeysDialog()
+{
+    PrefsDialog *p = new PrefsDialog( (QWidget *)p_intf->p_sys->p_mi, p_intf );
+    p->showSimplePanel( SPrefsHotkeys );
+    p->toggleVisible();
+}
+
 void DialogsProvider::extendedDialog()
 {
     if( Theme::redesign() && p_intf->p_sys->p_mi )

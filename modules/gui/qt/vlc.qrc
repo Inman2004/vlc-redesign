@@ -31,6 +31,7 @@
         <file alias="chevron-down.svg">pixmaps/redesign/chevron-down.svg</file>
         <file alias="link.svg">pixmaps/redesign/link.svg</file>
         <file alias="check.svg">pixmaps/redesign/check.svg</file>
+        <file alias="blank.svg">pixmaps/redesign/blank.svg</file>
         <file alias="repeat.svg">pixmaps/redesign/repeat.svg</file>
         <file alias="repeat-one.svg">pixmaps/redesign/repeat-one.svg</file>
         <file alias="rotate.svg">pixmaps/redesign/rotate.svg</file>
