@@ -368,6 +368,9 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QWidget *parent, MainInterfa
         ":/type/disc.svg", SLOT( openDiscDialog() ), "Ctrl+D" );
     addDPStaticEntry( menu, qtr( "Open &Network Stream..." ),
         ":/type/network.svg", SLOT( openNetDialog() ), "Ctrl+N" );
+    if( Theme::redesign() )
+        addDPStaticEntry( menu, qtr( "New &Playlist..." ),
+            ":/type/playlist.svg", SLOT( newPlaylistDialog() ) );
     addDPStaticEntry( menu, qtr( "Open &Capture Device..." ),
         ":/type/capture-card.svg", SLOT( openCaptureDialog() ), "Ctrl+C" );
 

@@ -388,7 +388,9 @@ void SidebarPanel::showMoreMenu()
     QMenu menu( this );
     menu.addAction( qtr( "Add file..." ), THEDP, [](){ THEDP->PLAppendDialog(); } );
     menu.addAction( qtr( "Add folder..." ), THEDP, &DialogsProvider::PLAppendDir );
+    menu.addAction( qtr( "Open network stream..." ), THEDP, &DialogsProvider::openNetDialog );
     menu.addSeparator();
+    menu.addAction( qtr( "New playlist..." ), THEDP, &DialogsProvider::newPlaylistDialog );
     menu.addAction( qtr( "Save playlist to file..." ), THEDP,
                     &DialogsProvider::savePlayingToPlaylist );
     menu.addAction( qtr( "Clear the playlist" ), this, [this]() {

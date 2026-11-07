@@ -160,6 +160,7 @@ public slots:
     void openFileDialog();
     void openUrlDialog();
     void openNetDialog();
+    void newPlaylistDialog();
     void openCaptureDialog();
 
     void PLAppendDialog( int tab = OPEN_FILE_TAB );

@@ -30,6 +30,7 @@
         <file alias="add.svg">pixmaps/redesign/add.svg</file>
         <file alias="chevron-down.svg">pixmaps/redesign/chevron-down.svg</file>
         <file alias="link.svg">pixmaps/redesign/link.svg</file>
+        <file alias="check.svg">pixmaps/redesign/check.svg</file>
         <file alias="chevron.svg">pixmaps/redesign/chevron.svg</file>
         <file alias="record.svg">pixmaps/redesign/record.svg</file>
         <file alias="hide-ui.svg">pixmaps/redesign/hide-ui.svg</file>

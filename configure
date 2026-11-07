@@ -62682,19 +62682,19 @@ then :
 
 
 pkg_failed=no
-{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg" >&5
-printf %s "checking for Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg... " >&6; }
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network" >&5
+printf %s "checking for Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network... " >&6; }
 
 if test -n "$QT_CFLAGS"; then
     pkg_cv_QT_CFLAGS="$QT_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg") 2>&5
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network") 2>&5
   ac_status=$?
   printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_QT_CFLAGS=`$PKG_CONFIG --cflags "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg" 2>/dev/null`
+  pkg_cv_QT_CFLAGS=`$PKG_CONFIG --cflags "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -62706,12 +62706,12 @@ if test -n "$QT_LIBS"; then
     pkg_cv_QT_LIBS="$QT_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg") 2>&5
+    { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network") 2>&5
   ac_status=$?
   printf '%s\n' "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_QT_LIBS=`$PKG_CONFIG --libs "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg" 2>/dev/null`
+  pkg_cv_QT_LIBS=`$PKG_CONFIG --libs "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -62732,9 +62732,9 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-                QT_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg" 2>&1`
+                QT_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network" 2>&1`
         else
-                QT_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg" 2>&1`
+                QT_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network" 2>&1`
         fi
         # Put the nasty error message in config.log where it belongs
         echo "$QT_PKG_ERRORS" >&5

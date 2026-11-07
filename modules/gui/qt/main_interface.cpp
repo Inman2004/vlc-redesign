@@ -44,6 +44,7 @@
 #include "components/nav_rail.hpp"              // Redesign rail
 #include "components/sidebar_panel.hpp"         // Redesign sidebar
 #include "components/adjust_panel.hpp"          // Redesign adjustments
+#include "dialogs/redesign_dialogs.hpp"          // Remembered subtitles
 #include "styles/vlc_theme.hpp"                 // Redesign tokens
 #include "dialogs/firstrun.hpp"                 // First Run
 #include "dialogs/playlist.hpp"                 // PlaylistDialog
@@ -229,6 +230,22 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
                  this, &MainInterface::setVLCWindowsTitle );
     }
     connect( THEMIM, &MainInputManager::inputChanged, this, &MainInterface::onInputChanged );
+    if( Theme::redesign() ) /* subtitles chosen with "To This Folder / Playlist" */
+    {
+        connect( THEMIM, &MainInputManager::playlistItemAppended, this, [this]( int id, int ) {
+            SubtitleScope::attachToItem( p_intf, id );
+        } );
+        connect( THEMIM, &MainInputManager::inputChanged, this, [this]( bool b ) {
+            if( b )
+                SubtitleScope::applyToCurrent( p_intf );
+        } );
+        /* a file given on the command line may already be playing */
+        QTimer::singleShot( 0, this, [this]() {
+            /* the playing item first: attaching would mark it as handled */
+            SubtitleScope::applyToCurrent( p_intf );
+            SubtitleScope::attachToQueued( p_intf );
+        } );
+    }
     connect( THEMIM->getIM(), &InputManager::voutChanged, this, &MainInterface::onVOutChanged );
 
     /* END CONNECTS ON IM */

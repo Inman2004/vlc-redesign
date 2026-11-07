@@ -38,6 +38,7 @@
 #include "main_interface.hpp"
 #include "styles/vlc_theme.hpp"
 #include "components/adjust_panel.hpp"
+#include "dialogs/redesign_dialogs.hpp"
 
 /* The dialogs */
 #include "dialogs/playlist.hpp"
@@ -468,7 +469,17 @@ void DialogsProvider::openDiscDialog()
 }
 void DialogsProvider::openNetDialog()
 {
+    if( Theme::redesign() )
+    {
+        ( new OpenNetworkDialog( p_intf, p_intf->p_sys->p_mi ) )->show();
+        return;
+    }
     openDialog( OPEN_NETWORK_TAB );
+}
+
+void DialogsProvider::newPlaylistDialog()
+{
+    ( new NewPlaylistDialog( p_intf, p_intf->p_sys->p_mi ) )->show();
 }
 void DialogsProvider::openCaptureDialog()
 {
@@ -816,6 +827,11 @@ void DialogsProvider::openAndTranscodingDialogs()
 
 void DialogsProvider::loadSubtitlesFile()
 {
+    if( Theme::redesign() )
+    {
+        ( new AddSubtitlesDialog( p_intf, p_intf->p_sys->p_mi ) )->show();
+        return;
+    }
     input_thread_t *p_input = THEMIM->getInput();
     if( !p_input ) return;
 
