@@ -171,6 +171,8 @@ protected:
     bool                 b_libraryMode = false;
     friend class ChromeAutoHider;
     void setChromeVisible( bool );
+    /* the video goes into the library's mini player while it is shown */
+    void placeVideo();
     QSplitter           *bodySplitter;
     QWidget             *body;
     QString              lastSection;

@@ -22,6 +22,8 @@
 
 #include "library/library_view.hpp"
 #include "library/media_library.hpp"
+#include "library/mini_player.hpp"
+#include "input_manager.hpp"
 #include "components/redesign_menus.hpp"
 #include "styles/vlc_theme.hpp"
 #include "dialogs_provider.hpp"
@@ -446,6 +448,17 @@ LibraryView::LibraryView( intf_thread_t *_p_intf, QWidget *parent )
         if( !refresh->isActive() )
             refresh->start();
     } );
+
+    /* the mini player, over the grid while something plays */
+    mini = new MiniPlayer( p_intf, this );
+    mini->setDocked( getSettings()->value( "Library/miniDocked", false ).toBool() );
+    connect( mini, &MiniPlayer::dockChanged, this, [this]( bool d ) {
+        getSettings()->setValue( "Library/miniDocked", d );
+        placeMini();
+    } );
+    connect( THEMIM, &MainInputManager::inputChanged, this, &LibraryView::placeMini );
+    connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this, &LibraryView::placeMini );
+    placeMini();
 
     sortKey = getSettings()->value( "Library/sort", UNWATCHED_FIRST ).toInt();
     grid->setMode( getSettings()->value( "Library/view", "grid" ).toString() == "list"
@@ -874,6 +887,8 @@ void LibraryView::play( const QStringList &paths )
         Open::openMRLwithOptions( p_intf, uri, options.isEmpty() ? NULL : &options, k == 0, true );
     }
     grid->setPlayingPath( paths.first() );
+    /* the playlist chip names where playback came from */
+    mini->setSourceLabel( location.size() > 1 ? location.last() : sectionTitle( location.value( 0 ) ) );
     emit played();
 }
 
@@ -929,6 +944,28 @@ void LibraryView::showSortMenu()
         } );
     }
     menu.exec( sortBtn->mapToGlobal( QPoint( 0, sortBtn->height() + 4 ) ) );
+}
+
+void LibraryView::resizeEvent( QResizeEvent *e )
+{
+    QWidget::resizeEvent( e );
+    placeMini();
+}
+
+/* Figma #3-4 floating bottom right (9px, 6px in), #5 docked bottom left */
+void LibraryView::placeMini()
+{
+    const bool playing = THEMIM->getInput() != NULL
+                         && THEMIM->getIM()->playingStatus() != END_S;
+    if( !playing )
+    {
+        mini->hide();
+        return;
+    }
+    const int x = mini->isDocked() ? PAGE_INSET : width() - MiniPlayer::CARD_W - 9;
+    mini->move( x, height() - MiniPlayer::CARD_H - 6 );
+    mini->show();
+    mini->raise();
 }
 
 void LibraryView::keyPressEvent( QKeyEvent *e )

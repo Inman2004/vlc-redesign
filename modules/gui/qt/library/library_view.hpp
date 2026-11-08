@@ -39,6 +39,7 @@ class QAbstractButton;
 class QLineEdit;
 class QToolButton;
 class MediaLibrary;
+class MiniPlayer;
 
 /* One tile or row: a library item, or a group (a show, a season, the
  * "Shows" folder) that opens a deeper level. */
@@ -114,6 +115,7 @@ public:
     LibraryView( intf_thread_t *, QWidget *parent );
 
     QString section() const { return location.value( 0 ); }
+    MiniPlayer *miniPlayer() const { return mini; }
 
 public slots:
     void openSection( const QString &key );   /* "videos", "music", "recent" */
@@ -127,6 +129,7 @@ signals:
 
 protected:
     void keyPressEvent( QKeyEvent * ) override;
+    void resizeEvent( QResizeEvent * ) override;
 
 private:
     QWidget *buildNav();
@@ -140,6 +143,7 @@ private:
     void showEntryMenu( int entry, const QPoint & );
     void showSortMenu();
     void play( const QStringList &paths );
+    void placeMini();
 
     intf_thread_t *p_intf;
     MediaLibrary *lib;
@@ -150,6 +154,7 @@ private:
     QLabel *countLabel;
     QLineEdit *search;
     LibraryGrid *grid;
+    MiniPlayer *mini;
 
     QStringList location;
     QList<QStringList> backStack, fwdStack;

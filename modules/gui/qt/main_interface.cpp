@@ -44,7 +44,8 @@
 #include "components/nav_rail.hpp"              // Redesign rail
 #include "components/sidebar_panel.hpp"
 #include "library/media_library.hpp"
-#include "library/library_view.hpp"         // Redesign sidebar
+#include "library/library_view.hpp"
+#include "library/mini_player.hpp"         // Redesign sidebar
 #include "components/adjust_panel.hpp"          // Redesign adjustments
 #include "dialogs/redesign_dialogs.hpp"          // Remembered subtitles
 #include "styles/vlc_theme.hpp"                 // Redesign tokens
@@ -820,7 +821,17 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
         libraryView->hide();
         mainLayout->addWidget( libraryView, 1 );
         connect( libraryView, &LibraryView::closeRequested, this, [this]() { setLibraryMode( false ); } );
-        connect( libraryView, &LibraryView::played, this, [this]() { setLibraryMode( false ); } );
+        /* playing from the library stays there: the mini player shows it */
+        connect( libraryView->miniPlayer(), &MiniPlayer::expandRequested, this,
+                 [this]() { setLibraryMode( false ); } );
+        connect( libraryView->miniPlayer(), &MiniPlayer::queueRequested, this, [this]() {
+            setLibraryMode( false );
+            activateSection( "playlists" );
+            setSidebarVisible( true );
+        } );
+        connect( THEMIM->getIM(), &InputManager::voutChanged, this, [this]() {
+            QTimer::singleShot( 0, this, &MainInterface::placeVideo );
+        } );
         connect( libraryView, &LibraryView::playerSectionRequested, this, [this]( const QString &key ) {
             setLibraryMode( false );
             activateSection( key );
@@ -1155,9 +1166,12 @@ void MainInterface::getVideoSlot( struct vout_window_t *p_wnd,
 
         /* Consider the video active now */
         showVideo();
+        if( b_libraryMode )
+            QTimer::singleShot( 0, this, &MainInterface::placeVideo );
 
-        /* Ask videoWidget to resize correctly, if we are in normal mode */
-        if( b_autoresize ) {
+        /* Ask videoWidget to resize correctly, if we are in normal mode
+         * (in the library the video sits in the fixed-size mini player) */
+        if( b_autoresize && !b_libraryMode ) {
 #if HAS_QT56
             qreal factor = videoWidget->devicePixelRatioF();
 
@@ -1210,9 +1224,10 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
          * size. Call setSize() either way so that vout_window_ReportSize
          * will always get called.
          * If the video size is too large for the screen, resize it
-         * to the screen size.
+         * to the screen size. Not in the library: the video is in the
+         * fixed-size mini player and the window must not follow it.
          */
-        if (b_autoresize)
+        if (b_autoresize && !b_libraryMode)
         {
             QRect screen = QGuiApplication::primaryScreen()->availableGeometry();
 #if HAS_QT56
@@ -1257,12 +1272,17 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
 
 void MainInterface::videoSizeChanged( int w, int h )
 {
+    if( b_libraryMode )
+        return;
     if( !playlistWidget || playlistWidget->artContainer->currentWidget() != videoWidget )
         resizeStack( w, h );
 }
 
 void MainInterface::setVideoFullScreen( bool fs )
 {
+    /* fullscreen is the player's: leave the library first */
+    if( fs && b_libraryMode )
+        setLibraryMode( false );
     b_videoFullScreen = fs;
     if( fs )
     {
@@ -1733,7 +1753,7 @@ void MainInterface::setMinimalView( bool b_minimal )
     }
 
     menuBar()->setVisible( !b_minimal );
-    controls->setVisible( !b_minimal );
+    controls->setVisible( !b_minimal && !b_libraryMode );
     if( header )
     {
         header->setVisible( !b_minimal );
@@ -1796,6 +1816,32 @@ void MainInterface::setLibraryMode( bool on, const QString &section )
         libraryView->hide();
         body->show();
         controls->setVisible( !b_minimalView );
+    }
+    placeVideo();
+}
+
+void MainInterface::placeVideo()
+{
+    if( !videoWidget || !libraryView )
+        return;
+    MiniPlayer *mini = libraryView->miniPlayer();
+    const bool wantMini = b_libraryMode && THEMIM->getIM()->hasVideo();
+    if( wantMini && mini->video() != videoWidget )
+    {
+        if( stackCentralW->indexOf( videoWidget ) >= 0 )
+        {
+            stackCentralW->removeWidget( videoWidget );
+            stackCentralW->setCurrentWidget( bgWidget );
+        }
+        mini->setVideo( videoWidget );
+    }
+    else if( !wantMini && mini->video() == videoWidget )
+    {
+        mini->takeVideo();
+        stackCentralW->addWidget( videoWidget );
+        videoWidget->show();
+        if( THEMIM->getIM()->hasVideo() )
+            stackCentralW->setCurrentWidget( videoWidget );
     }
 }
 
