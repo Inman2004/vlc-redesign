@@ -34,8 +34,12 @@
 #include "components/redesign_menus.hpp"
 #include "dialogs_provider.hpp"
 #include "recents.hpp"
+#include "library/library_browser.hpp"
+#include "library/library_view.hpp"
+#include "library/media_library.hpp"
 
 #include <vlc_playlist.h>
+#include <vlc_services_discovery.h>
 
 #include <QFileInfo>
 #include <QHeaderView>
@@ -44,6 +48,13 @@
 #include <QTreeView>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
+#include <QMouseEvent>
+
+#include <QCollator>
+
+#include <algorithm>
+#include <functional>
 #include <QListWidget>
 #include <QMenu>
 #include <QStackedWidget>
@@ -61,6 +72,28 @@ static QToolButton *sideButton( QWidget *parent, const QString &icon, const QStr
 
 /* Library rows as drawn in the design: 42px, line icon, muted name */
 namespace {
+/* a breadcrumb segment that goes back to its level: plain text, flush
+ * like the others (a QToolButton would add its own padding) */
+class CrumbLink : public QLabel
+{
+public:
+    CrumbLink( const QString &text, std::function<void()> f, QWidget *parent )
+        : QLabel( text, parent ), onClick( f )
+    {
+        setObjectName( "SidebarCrumbLink" );
+        setCursor( Qt::PointingHandCursor );
+        setAttribute( Qt::WA_Hover );
+    }
+protected:
+    void mouseReleaseEvent( QMouseEvent *e ) override
+    {
+        if( e->button() == Qt::LeftButton && rect().contains( e->pos() ) )
+            onClick();
+    }
+private:
+    std::function<void()> onClick;
+};
+
 class SidebarItemDelegate : public QStyledItemDelegate
 {
 public:
@@ -117,6 +150,7 @@ public:
 
 SidebarPanel::SidebarPanel( intf_thread_t *_p_intf, QWidget *parent )
     : QWidget( parent ), p_intf( _p_intf ), plWidget( NULL ), plView( NULL ),
+      browser( NULL ), libGrid( NULL ), libSearch( NULL ),
       historyPos( -1 ), navigating( false ), sortOrder( Qt::AscendingOrder )
 {
     setObjectName( "VLCSidebar" );
@@ -132,8 +166,11 @@ SidebarPanel::SidebarPanel( intf_thread_t *_p_intf, QWidget *parent )
     row1->setSpacing( 2 );
     backBtn = sideButton( this, "back", qtr( "Back" ) );
     fwdBtn  = sideButton( this, "forward", qtr( "Forward" ) );
-    title = new QLabel( this );
-    title->setObjectName( "SidebarTitle" );
+    /* the title is a breadcrumb: earlier segments link back to that level */
+    title = new QWidget( this );
+    crumbLayout = new QHBoxLayout( title );
+    crumbLayout->setContentsMargins( 0, 0, 0, 0 );
+    crumbLayout->setSpacing( 0 );
     moreBtn = sideButton( this, "dots", qtr( "More" ) );
     popBtn = sideButton( this, "popout", qtr( "Open in a separate window" ) );
     row1->setSpacing( 4 );
@@ -192,7 +229,33 @@ SidebarPanel::SidebarPanel( intf_thread_t *_p_intf, QWidget *parent )
     recents->setFrameShape( QFrame::NoFrame );
     recents->setIconSize( QSize( 18, 18 ) );
     pages->addWidget( recents );
+
+    /* Videos, Music, Network: the library's rows, one column */
+    browser = new LibraryBrowser( p_intf, "Sidebar/librarySort", this );
+    browser->setActionRows( true );
+    libGrid = new LibraryGrid( p_intf, pages );
+    libGrid->setCompact( true );
+    libGrid->setMode( getSettings()->value( "Sidebar/libraryView", "list" ).toString() == "grid"
+                      ? LibraryGrid::GRID : LibraryGrid::LIST );
+    pages->addWidget( libGrid );
     layout->addWidget( pages, 1 );
+
+    libSearch = new QLineEdit( searchRow );
+    libSearch->setPlaceholderText( qtr( "Search" ) );
+    libSearch->setClearButtonEnabled( true );
+    libSearch->hide();
+    searchLayout->addWidget( libSearch );
+
+    MediaLibrary *lib = MediaLibrary::instance( p_intf );
+    connect( lib, &MediaLibrary::thumbnailReady, libGrid, &LibraryGrid::refreshThumbnail );
+    connect( libGrid, &LibraryGrid::activated, browser, &LibraryBrowser::activate );
+    connect( libGrid, &LibraryGrid::contextMenu, this, [this]( int i, const QPoint &pos ) {
+        browser->showEntryMenu( i, pos, this );
+    } );
+    connect( browser, &LibraryBrowser::locationChanged, this, &SidebarPanel::libraryLocationChanged );
+    connect( browser, &LibraryBrowser::entriesChanged, this, &SidebarPanel::libraryEntriesChanged );
+    connect( browser, &LibraryBrowser::actionRequested, this, &SidebarPanel::libraryAction );
+    connect( libSearch, &QLineEdit::textChanged, browser, &LibraryBrowser::setSearch );
 
     connect( backBtn, &QToolButton::clicked, this, &SidebarPanel::goBack );
     connect( fwdBtn, &QToolButton::clicked, this, &SidebarPanel::goForward );
@@ -200,6 +263,7 @@ SidebarPanel::SidebarPanel( intf_thread_t *_p_intf, QWidget *parent )
     connect( sortBtn, &QToolButton::clicked, this, &SidebarPanel::showSortMenu );
     connect( moreBtn, &QToolButton::clicked, this, &SidebarPanel::showMoreMenu );
     connect( popBtn, &QToolButton::clicked, this, &SidebarPanel::popOutRequested );
+    connect( viewBtn, &QToolButton::clicked, this, &SidebarPanel::showViewMenu );
     connect( recents, &QListWidget::itemActivated, this, [this]( QListWidgetItem *item ) {
         Open::openMRL( p_intf, item->data( Qt::UserRole ).toString(), true, true );
     } );
@@ -237,6 +301,7 @@ void SidebarPanel::setPlaylistWidget( PlaylistWidget *w )
         tree->setRootIsDecorated( false );
         tree->setIndentation( 0 );
         tree->setUniformRowHeights( true );
+        tree->setAlternatingRowColors( false );   /* Figma rows are never striped */
         tree->setFrameShape( QFrame::NoFrame );
         tree->setMouseTracking( true );
         tree->viewport()->setAttribute( Qt::WA_Hover );
@@ -244,7 +309,6 @@ void SidebarPanel::setPlaylistWidget( PlaylistWidget *w )
     }
     connect( view, &StandardPLPanel::viewChanged, this, &SidebarPanel::rootChanged );
     plView = view;
-    connect( viewBtn, &QToolButton::clicked, this, &SidebarPanel::showViewMenu );
 
     QAbstractItemModel *model = PLModel::getPLModel( p_intf );
     connect( model, &QAbstractItemModel::rowsInserted, this, &SidebarPanel::updateCount );
@@ -254,11 +318,88 @@ void SidebarPanel::setPlaylistWidget( PlaylistWidget *w )
     updateCount();
 }
 
+bool SidebarPanel::libraryShown() const
+{
+    return pages->currentWidget() == libGrid;
+}
+
+/* The title as a breadcrumb (Components: "… ▸ The Wand ▸ S01"): the
+ * last two segments, an ellipsis before them when there are more. */
+void SidebarPanel::setTitleCrumb( const QStringList &segments, int linkedFrom )
+{
+    QLayoutItem *child;
+    while( ( child = crumbLayout->takeAt( 0 ) ) )
+    {
+        delete child->widget();
+        delete child;
+    }
+    /* Figma: a 6px triangle with 8-9px either side */
+    auto separator = [this]() {
+        QLabel *sep = new QLabel( QString::fromUtf8( "▸" ), title );
+        sep->setObjectName( "SidebarCrumbSeparator" );
+        sep->setContentsMargins( 7, 1, 6, 0 );
+        crumbLayout->addWidget( sep );
+    };
+    const int first = qMax( 0, segments.size() - 2 );
+    if( first > 0 )
+    {
+        QLabel *more = new QLabel( QString::fromUtf8( "…" ), title );
+        more->setObjectName( "SidebarTitle" );
+        more->setToolTip( segments.mid( 0, first ).join( QString::fromUtf8( " ▸ " ) ) );
+        crumbLayout->addWidget( more );
+        separator();
+    }
+    for( int i = first; i < segments.size(); i++ )
+    {
+        const bool last = i == segments.size() - 1;
+        if( !last && i >= linkedFrom )
+        {
+            crumbLayout->addWidget( new CrumbLink( segments[i], [this, i]() {
+                if( libraryShown() )
+                    browser->setLocation( browser->location().mid( 0, i + 1 ) );
+                else if( !sdFromNetwork.isEmpty() && i == 0 )
+                    showSection( "network" );
+            }, title ) );
+        }
+        else
+        {
+            QLabel *seg = new QLabel( segments[i], title );
+            seg->setObjectName( "SidebarTitle" );
+            crumbLayout->addWidget( seg, last ? 1 : 0 );
+        }
+        if( !last )
+            separator();
+    }
+}
+
 void SidebarPanel::showSection( const QString &key )
 {
     section = key;
-    title->setText( NavRail::titleFor( key ) );
+    sdFromNetwork.clear();
+    setTitleCrumb( QStringList( NavRail::titleFor( key ) ), 0 );
 
+    const bool library = key == "videos" || key == "music" || key == "network";
+    searchBtn->blockSignals( true );
+    searchBtn->setChecked( false );
+    searchBtn->blockSignals( false );
+    searchRow->hide();
+    libSearch->clear();
+    if( plWidget )
+        plWidget->searchField()->setVisible( !library );
+    libSearch->setVisible( library );
+
+    if( library )
+    {
+        pages->setCurrentWidget( libGrid );
+        const bool browse = key != "network";
+        sortBtn->setEnabled( browse );
+        viewBtn->setEnabled( browse );
+        searchBtn->setEnabled( browse );
+        browser->openSection( key );
+        return;
+    }
+
+    setSortDot( false );
     if( key == "recents" )
     {
         refreshRecents();
@@ -278,12 +419,9 @@ void SidebarPanel::showSection( const QString &key )
     if( !plWidget )
         return;
 
-    /* Rail section -> existing service discovery / playlist node */
+    /* Rail section -> existing playlist node */
     QStringList candidates;
     if( key == "home" )            candidates << "library" << "playlist";
-    else if( key == "videos" )     candidates << "video_dir";
-    else if( key == "music" )      candidates << "audio_dir";
-    else if( key == "network" )    candidates << "upnp" << "sap" << "podcast";
     else                           candidates << "playlist";
 
     history.clear();
@@ -306,13 +444,26 @@ void SidebarPanel::rootChanged( const QModelIndex &index )
         historyPos = history.size() - 1;
     }
     navigating = false;
-    backBtn->setEnabled( historyPos > 0 );
+    if( pages->currentWidget() != plPage )
+        return;
+    /* a source opened from Network: Back returns to the Network list */
+    backBtn->setEnabled( historyPos > 0 || !sdFromNetwork.isEmpty() );
     fwdBtn->setEnabled( historyPos >= 0 && historyPos < history.size() - 1 );
     updateCount();
 }
 
 void SidebarPanel::goBack()
 {
+    if( libraryShown() )
+    {
+        browser->goBack();
+        return;
+    }
+    if( historyPos <= 0 && !sdFromNetwork.isEmpty() )
+    {
+        showSection( "network" );
+        return;
+    }
     if( historyPos <= 0 || !plWidget )
         return;
     navigating = true;
@@ -322,6 +473,11 @@ void SidebarPanel::goBack()
 
 void SidebarPanel::goForward()
 {
+    if( libraryShown() )
+    {
+        browser->goForward();
+        return;
+    }
     if( historyPos >= history.size() - 1 || !plWidget )
         return;
     navigating = true;
@@ -331,6 +487,12 @@ void SidebarPanel::goForward()
 
 void SidebarPanel::updateCount()
 {
+    if( libraryShown() )
+    {
+        const int n = browser->itemCount();
+        count->setText( n == 1 ? qtr( "1 item" ) : qtr( "%1 items" ).arg( n ) );
+        return;
+    }
     if( section == "recents" )
     {
         const int r = recents->count();
@@ -346,6 +508,14 @@ void SidebarPanel::updateCount()
 void SidebarPanel::toggleSearch( bool on )
 {
     searchRow->setVisible( on );
+    if( libraryShown() )
+    {
+        if( on )
+            libSearch->setFocus();
+        else
+            libSearch->clear();
+        return;
+    }
     if( plWidget )
     {
         if( on )
@@ -359,6 +529,11 @@ void SidebarPanel::toggleSearch( bool on )
  * dates (P5a): shown, disabled. The last choice carries the accent check. */
 void SidebarPanel::showSortMenu()
 {
+    if( libraryShown() )
+    {
+        browser->showSortMenu( sortBtn->mapToGlobal( QPoint( 0, sortBtn->height() + 4 ) ), this );
+        return;
+    }
     static const struct { const char *name; int meta; int order; } keys[] = {
         { N_("Unwatched First"), 0, 0 }, { N_("Watched First"), 0, 0 },
         { N_("Newest First"), 0, 0 },    { N_("Oldest First"), 0, 0 },
@@ -405,6 +580,22 @@ void SidebarPanel::showSortMenu()
 /* Figma view menu: Grid View / List View */
 void SidebarPanel::showViewMenu()
 {
+    if( libraryShown() )
+    {
+        QMenu menu( this );
+        menu.setObjectName( "VLCViewMenu" );
+        const bool grid = libGrid->mode() == LibraryGrid::GRID;
+        menu.addAction( RedesignMenus::menuIcon( "grid", 20 ), qtr( "Grid View" ), this, [this]() {
+            libGrid->setMode( LibraryGrid::GRID );
+            getSettings()->setValue( "Sidebar/libraryView", "grid" );
+        } )->setEnabled( !grid );
+        menu.addAction( RedesignMenus::menuIcon( "view", 20 ), qtr( "List View" ), this, [this]() {
+            libGrid->setMode( LibraryGrid::LIST );
+            getSettings()->setValue( "Sidebar/libraryView", "list" );
+        } )->setEnabled( grid );
+        menu.exec( viewBtn->mapToGlobal( QPoint( 0, viewBtn->height() + 4 ) ) );
+        return;
+    }
     if( !plView )
         return;
     QMenu menu( this );
@@ -422,6 +613,36 @@ void SidebarPanel::showViewMenu()
 void SidebarPanel::showMoreMenu()
 {
     QMenu menu( this );
+    if( section == "network" )
+    {
+        /* every other discovery source of VLC 3 (local network, SAP...):
+         * the panel shows the design's three rows only */
+        char **longnames;
+        int *categories;
+        char **names = vlc_sd_GetNames( THEPL, &longnames, &categories );
+        if( names )
+        {
+            for( int i = 0; names[i]; i++ )
+            {
+                const QString name = qfu( names[i] );
+                const QString longname = qfu( longnames[i] );
+                if( ( categories[i] == SD_CAT_LAN || categories[i] == SD_CAT_INTERNET )
+                    && !name.startsWith( "podcast" ) && !name.contains( "icecast" ) )
+                    menu.addAction( RedesignMenus::menuIcon( "network", 20 ), longname, this,
+                                    [this, name, longname]() { openSource( name, longname ); } );
+                free( names[i] );
+                free( longnames[i] );
+            }
+            free( names );
+            free( longnames );
+            free( categories );
+        }
+        if( !menu.isEmpty() )
+            menu.addSeparator();
+        menu.addAction( RedesignMenus::menuIcon( "add", 20 ), qtr( "Subscribe to a podcast..." ),
+                        THEDP, &DialogsProvider::podcastConfigureDialog );
+        menu.addSeparator();
+    }
     menu.addAction( qtr( "Add file..." ), THEDP, [](){ THEDP->PLAppendDialog(); } );
     menu.addAction( qtr( "Add folder..." ), THEDP, &DialogsProvider::PLAppendDir );
     menu.addAction( qtr( "Open network stream..." ), THEDP, &DialogsProvider::openNetDialog );
@@ -452,5 +673,101 @@ void SidebarPanel::refreshRecents()
         item->setToolTip( url.toDisplayString() );
         item->setData( Qt::UserRole, mrl );
     }
+    updateCount();
+}
+
+void SidebarPanel::libraryLocationChanged()
+{
+    QStringList segments;
+    for( int i = 0; i < browser->location().size(); i++ )
+        segments << browser->segmentTitle( i );
+    setTitleCrumb( segments, 0 );
+    backBtn->setEnabled( browser->canGoBack() );
+    fwdBtn->setEnabled( browser->canGoForward() );
+}
+
+void SidebarPanel::libraryEntriesChanged()
+{
+    libGrid->setEntries( browser->entries() );
+    updateCount();
+
+    /* Components "S01": an accent dot on the sort glyph while the rows are
+     * not in plain A-Z order (watched last, newest first...) */
+    QCollator coll;
+    coll.setNumericMode( true );
+    coll.setCaseSensitivity( Qt::CaseInsensitive );
+    QStringList titles;
+    foreach( const LibraryEntry &e, browser->entries() )
+        if( e.type == LibraryEntry::ITEM )
+            titles << e.title;
+    QStringList sorted = titles;
+    std::sort( sorted.begin(), sorted.end(), [&coll]( const QString &a, const QString &b ) {
+        return coll.compare( a, b ) < 0;
+    } );
+    setSortDot( titles != sorted );
+}
+
+void SidebarPanel::setSortDot( bool on )
+{
+    if( !on )
+    {
+        sortBtn->setIcon( Theme::icon( "sort", 24 ) );
+        return;
+    }
+    QIcon icon;
+    for( QIcon::Mode mode : { QIcon::Normal, QIcon::Active } )
+    {
+        const QColor fg = mode == QIcon::Normal ? Theme::colors().icon : Theme::colors().iconHover;
+        QPixmap pm = Theme::pixmap( "sort", 24, fg );
+        QPainter p( &pm );
+        p.setRenderHint( QPainter::Antialiasing );
+        p.setPen( Qt::NoPen );
+        p.setBrush( Theme::accent() );
+        p.drawEllipse( QRectF( 18.5, 1.5, 4, 4 ) );
+        p.end();
+        icon.addPixmap( pm, mode );
+    }
+    sortBtn->setIcon( icon );
+}
+
+/* Network rows: Podcasts and Radio are VLC 3 discovery sources */
+void SidebarPanel::libraryAction( const QString &key )
+{
+    if( key == "podcast" )
+        openSource( "podcast", qtr( "Podcasts" ) );
+    else if( key == "radio" )
+        openSource( "lua{sd='icecast'}", qtr( "Radio" ) );   /* share/lua/sd/icecast.lua */
+}
+
+void SidebarPanel::openSource( const QString &name, const QString &label )
+{
+    if( !plWidget )
+        return;
+    pages->setCurrentWidget( plPage );
+    sortBtn->setEnabled( true );
+    viewBtn->setEnabled( true );
+    searchBtn->setEnabled( true );
+    plWidget->searchField()->setVisible( true );
+    libSearch->setVisible( false );
+    history.clear();
+    historyPos = -1;
+    navigating = false;
+    const QString longname = plWidget->sourceSelector()->selectSource( name );
+    if( longname.isEmpty() )
+        msg_Warn( p_intf, "sidebar: no discovery source %s", qtu( name ) );
+    else if( name == "podcast" )
+    {
+        /* the selector lists podcast feeds in its own tree and never shows
+         * the node: show it here, feeds as folders */
+        playlist_Lock( THEPL );
+        playlist_item_t *node = playlist_ChildSearchName( &THEPL->root,
+                                                          vlc_gettext( qtu( longname ) ) );
+        playlist_Unlock( THEPL );
+        if( node )
+            plWidget->mainView->setRootItem( node, false );
+    }
+    sdFromNetwork = name;
+    setTitleCrumb( QStringList() << qtr( "Network" ) << label, 0 );
+    backBtn->setEnabled( true );
     updateCount();
 }

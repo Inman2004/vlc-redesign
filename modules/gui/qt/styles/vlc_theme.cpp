@@ -418,6 +418,9 @@ static QString buildStyleSheet()
     /* Sidebar */
     "#VLCSidebar { background: @sidebar; }\n"
     "#VLCSidebar QLabel#SidebarTitle { color: @muted; font-size: 16px; }\n"
+    "#VLCSidebar QLabel#SidebarCrumbLink { color: @muted; font-size: 16px; }\n"
+    "#VLCSidebar QLabel#SidebarCrumbLink:hover { color: @text; }\n"
+    "#VLCSidebar QLabel#SidebarCrumbSeparator { color: @faint; font-size: 15px; }\n"
     "#VLCSidebar QLabel#SidebarCount { color: @faint; font-size: 14px; }\n"
     "#VLCSidebar QFrame#SidebarRule { background: @rail; }\n"
     "#VLCSidebar QAbstractScrollArea { qproperty-horizontalScrollBarPolicy: ScrollBarAlwaysOff; }\n"

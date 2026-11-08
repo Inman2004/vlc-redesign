@@ -24,6 +24,7 @@
 #endif
 
 #include "qt.hpp"
+#include "library/library_browser.hpp"
 
 #include <QAbstractScrollArea>
 #include <QHash>
@@ -41,24 +42,9 @@ class QToolButton;
 class MediaLibrary;
 class MiniPlayer;
 
-/* One tile or row: a library item, or a group (a show, a season, the
- * "Shows" folder) that opens a deeper level. */
-struct LibraryEntry
-{
-    enum Type { ITEM, GROUP };
-    Type type = ITEM;
-    QString title;
-    QString segment;        /* GROUP: the location segment it opens */
-    int index = -1;         /* ITEM: index in MediaLibrary::items() */
-    QString thumbFrom;      /* the item whose thumbnail stands for it */
-    int count = 0;          /* GROUP: items inside */
-    bool watched = false;
-    qreal progress = 0.0;
-    qint64 date = 0;        /* newest file date, for sorting */
-};
-
 /* Grid of 16:9 tiles or four columns of rows, painted directly (a few
- * hundred visible entries, exact Figma geometry, no per-tile widgets). */
+ * hundred visible entries, exact Figma geometry, no per-tile widgets).
+ * Compact: the player sidebar's one-column rows (Components panels). */
 class LibraryGrid : public QAbstractScrollArea
 {
     Q_OBJECT
@@ -69,6 +55,7 @@ public:
     void setEntries( const QVector<LibraryEntry> & );
     void setMode( Mode );
     Mode mode() const { return viewMode; }
+    void setCompact( bool );
     void setPlayingPath( const QString & );
     void refreshThumbnail( const QString &path );
 
@@ -86,7 +73,15 @@ protected:
     void contextMenuEvent( QContextMenuEvent * ) override;
     void scrollContentsBy( int dx, int dy ) override;
 
+private slots:
+    void followInput();
+
 private:
+    int marginLeft() const;
+    int marginRight() const;
+    int topOffset() const;
+    int tileGap() const;
+    int labelHeight() const;
     void relayout();
     QRect entryRect( int i ) const;   /* in content coordinates */
     int entryAt( const QPoint &viewportPos ) const;
@@ -97,6 +92,7 @@ private:
     MediaLibrary *lib;
     QVector<LibraryEntry> entries;
     Mode viewMode = GRID;
+    bool compact = false;
     int columns = 1;
     QSize cell;           /* tile, or row */
     int hovered = -1, pressed = -1;
@@ -114,7 +110,7 @@ class LibraryView : public QWidget
 public:
     LibraryView( intf_thread_t *, QWidget *parent );
 
-    QString section() const { return location.value( 0 ); }
+    QString section() const { return browser->section(); }
     MiniPlayer *miniPlayer() const { return mini; }
 
 public slots:
@@ -134,15 +130,9 @@ protected:
 private:
     QWidget *buildNav();
     QWidget *buildToolbar();
-    void setLocation( const QStringList &, bool record = true );
-    void rebuild();
+    void locationChanged();
+    void entriesChanged();
     void rebuildCrumb();
-    QVector<LibraryEntry> collect() const;
-    void sortEntries( QVector<LibraryEntry> & ) const;
-    void activate( int entry );
-    void showEntryMenu( int entry, const QPoint & );
-    void showSortMenu();
-    void play( const QStringList &paths );
     void placeMini();
 
     intf_thread_t *p_intf;
@@ -155,11 +145,7 @@ private:
     QLineEdit *search;
     LibraryGrid *grid;
     MiniPlayer *mini;
-
-    QStringList location;
-    QList<QStringList> backStack, fwdStack;
-    QVector<LibraryEntry> current;
-    int sortKey;
+    LibraryBrowser *browser;
 };
 
 #endif

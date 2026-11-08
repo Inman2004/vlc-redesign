@@ -191,7 +191,7 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_intf, QWidget *parent )
     folderChip = new QLabel( this );
     folderChip->setObjectName( "MiniChip" );
     QLabel *sourceIcon = new QLabel( this );
-    sourceIcon->setPixmap( Theme::pixmap( "playlist", 20, Theme::colors().icon ) );
+    sourceIcon->setPixmap( Theme::pixmap( "artist", 20, Theme::colors().icon ) );
     sourceChip = new QLabel( this );
     sourceChip->setObjectName( "MiniChip" );
     QToolButton *queue = new QToolButton( this );

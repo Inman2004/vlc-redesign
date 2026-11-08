@@ -31,17 +31,23 @@
 #include <QPersistentModelIndex>
 #include <QList>
 
+class QHBoxLayout;
 class QLabel;
+class QLineEdit;
 class QListWidget;
 class QStackedWidget;
 class QToolButton;
 class QVBoxLayout;
 class PlaylistWidget;
 class StandardPLPanel;
+class LibraryBrowser;
+class LibraryGrid;
 
-/* The 376px library sidebar. Hosts the existing PlaylistWidget (its
- * StandardPLPanel does the browsing) under a header in the design's
- * style, plus a Recents page backed by RecentsMRL. */
+/* The 376px library sidebar (Components panels). Videos, Music and
+ * Network browse the Qt-side library through a LibraryBrowser; Home and
+ * Playlists, and the discovery sources opened from Network, use the
+ * existing PlaylistWidget (its StandardPLPanel does the browsing); Recents
+ * is backed by RecentsMRL. */
 class SidebarPanel : public QWidget
 {
     Q_OBJECT
@@ -67,13 +73,23 @@ private slots:
     void showViewMenu();
     void showMoreMenu();
     void refreshRecents();
+    void libraryLocationChanged();
+    void libraryEntriesChanged();
+    void libraryAction( const QString & );
 
 private:
+    bool libraryShown() const;
+    void openSource( const QString &name, const QString &title );
+    void setTitleCrumb( const QStringList &segments, int linkedFrom );
+    void setSortDot( bool );
+
     intf_thread_t *p_intf;
     PlaylistWidget *plWidget;
     StandardPLPanel *plView;
 
-    QLabel *title, *count;
+    QWidget *title;            /* the breadcrumb */
+    QHBoxLayout *crumbLayout;
+    QLabel *count;
     QToolButton *backBtn, *fwdBtn, *moreBtn, *popBtn, *sortBtn, *viewBtn, *searchBtn;
     QWidget *searchRow;
     QVBoxLayout *searchLayout;
@@ -81,6 +97,11 @@ private:
     QWidget *plPage;
     QVBoxLayout *plLayout;
     QListWidget *recents;
+    LibraryBrowser *browser;
+    LibraryGrid *libGrid;
+    QLineEdit *libSearch;
+    /* a discovery source opened from the Network panel: Back returns there */
+    QString sdFromNetwork;
 
     QString section;
     QPersistentModelIndex currentRoot;

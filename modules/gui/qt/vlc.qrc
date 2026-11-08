@@ -41,6 +41,7 @@
         <file alias="capture.svg">pixmaps/redesign/capture.svg</file>
         <file alias="convert.svg">pixmaps/redesign/convert.svg</file>
         <file alias="profile.svg">pixmaps/redesign/profile.svg</file>
+        <file alias="artist.svg">pixmaps/redesign/artist.svg</file>
         <file alias="customize.svg">pixmaps/redesign/customize.svg</file>
         <file alias="info.svg">pixmaps/redesign/info.svg</file>
         <file alias="heart.svg">pixmaps/redesign/heart.svg</file>

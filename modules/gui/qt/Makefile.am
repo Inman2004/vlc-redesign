@@ -160,6 +160,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/library/media_library.cpp gui/qt/library/media_library.hpp \
 	gui/qt/library/library_view.cpp gui/qt/library/library_view.hpp \
 	gui/qt/library/mini_player.cpp gui/qt/library/mini_player.hpp \
+	gui/qt/library/library_browser.cpp gui/qt/library/library_browser.hpp \
 	gui/qt/dialogs/redesign_dialogs.cpp gui/qt/dialogs/redesign_dialogs.hpp \
 	gui/qt/components/redesign_menus.cpp gui/qt/components/redesign_menus.hpp
 if HAVE_WIN32
@@ -199,6 +200,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/library/media_library.moc.cpp \
 	gui/qt/library/library_view.moc.cpp \
 	gui/qt/library/mini_player.moc.cpp \
+	gui/qt/library/library_browser.moc.cpp \
 	gui/qt/dialogs/redesign_dialogs.moc.cpp \
 	gui/qt/components/redesign_menus.moc.cpp \
 	gui/qt/adapters/seekpoints.moc.cpp \
@@ -460,6 +462,7 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/capture.svg \
 	gui/qt/pixmaps/redesign/convert.svg \
 	gui/qt/pixmaps/redesign/profile.svg \
+	gui/qt/pixmaps/redesign/artist.svg \
 	gui/qt/pixmaps/redesign/customize.svg \
 	gui/qt/pixmaps/redesign/info.svg \
 	gui/qt/pixmaps/redesign/heart.svg \
