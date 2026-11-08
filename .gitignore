@@ -16,3 +16,7 @@ resources.cpp
 resources_modern.cpp
 tools/redesign/packaging/dist/
 *.luac
+tools/redesign/packaging/arch/vlc/
+tools/redesign/packaging/arch/src/
+tools/redesign/packaging/arch/pkg/
+tools/redesign/packaging/*.log
