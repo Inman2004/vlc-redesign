@@ -162,8 +162,8 @@ static QString redesignIconName( int button )
     case NEXT_BUTTON:           return "next";
     case FULLSCREEN_BUTTON:
     case DEFULLSCREEN_BUTTON:   return "fullscreen";
-    case EXTENDED_BUTTON:       return "settings";
-    case PLAYLIST_BUTTON:       return "queue";
+    case EXTENDED_BUTTON:       return "playback-settings";
+    case PLAYLIST_BUTTON:       return "lists";
     case OPEN_SUB_BUTTON:
     case SUBTITLE_TRACKS_BUTTON:return "subtitles";
     case AUDIO_TRACKS_BUTTON:   return "audio";

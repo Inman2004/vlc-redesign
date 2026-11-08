@@ -92,6 +92,13 @@
         <file alias="win-max.svg">pixmaps/redesign/win-max.svg</file>
         <file alias="win-min.svg">pixmaps/redesign/win-min.svg</file>
         <file alias="win-restore.svg">pixmaps/redesign/win-restore.svg</file>
+        <file alias="lists.svg">pixmaps/redesign/lists.svg</file>
+        <file alias="playback-settings.svg">pixmaps/redesign/playback-settings.svg</file>
+        <file alias="replay.svg">pixmaps/redesign/replay.svg</file>
+        <file alias="sidebar-left.svg">pixmaps/redesign/sidebar-left.svg</file>
+        <file alias="songs.svg">pixmaps/redesign/songs.svg</file>
+        <file alias="videos.svg">pixmaps/redesign/videos.svg</file>
+        <file alias="vlc.svg">pixmaps/redesign/vlc.svg</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="faster.svg">pixmaps/faster.svg</file>

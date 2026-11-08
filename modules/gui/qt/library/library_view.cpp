@@ -587,8 +587,8 @@ QWidget *LibraryView::buildNav()
 
     struct { const char *key, *icon; const char *label; } items[] = {
         { "home", "home", N_( "Home" ) },
-        { "videos", "video", N_( "Videos" ) },
-        { "music", "music", N_( "Music" ) },
+        { "videos", "videos", N_( "Videos" ) },
+        { "music", "songs", N_( "Music" ) },
         { "network", "network", N_( "Network" ) },
         { "playlists", "playlist", N_( "Playlists" ) },
         { "recent", "recent", N_( "Recent" ) },

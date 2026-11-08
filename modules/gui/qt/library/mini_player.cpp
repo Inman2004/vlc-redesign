@@ -195,7 +195,7 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_intf, QWidget *parent )
     sourceChip = new QLabel( this );
     sourceChip->setObjectName( "MiniChip" );
     QToolButton *queue = new QToolButton( this );
-    Theme::setupIconButton( queue, "queue", 32, 20 );
+    Theme::setupIconButton( queue, "lists", 32, 20 );
     queue->setToolTip( qtr( "Queue" ) );
     connect( queue, &QToolButton::clicked, this, &MiniPlayer::queueRequested );
     /* glyph to text 16, text to the next glyph 30 (Figma) */

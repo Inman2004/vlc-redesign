@@ -512,6 +512,13 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/win-max.svg \
 	gui/qt/pixmaps/redesign/win-min.svg \
 	gui/qt/pixmaps/redesign/win-restore.svg \
+	gui/qt/pixmaps/redesign/lists.svg \
+	gui/qt/pixmaps/redesign/playback-settings.svg \
+	gui/qt/pixmaps/redesign/replay.svg \
+	gui/qt/pixmaps/redesign/sidebar-left.svg \
+	gui/qt/pixmaps/redesign/songs.svg \
+	gui/qt/pixmaps/redesign/videos.svg \
+	gui/qt/pixmaps/redesign/vlc.svg \
 	gui/qt/pixmaps/toolbar/volume-slider-inside.svg \
 	gui/qt/pixmaps/toolbar/volume-slider-outside.svg \
 	gui/qt/pixmaps/types/capture-card_16px.svg \

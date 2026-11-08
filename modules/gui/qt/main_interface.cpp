@@ -1502,7 +1502,7 @@ void MainInterface::setAdjustPanelVisible( bool b )
     {
         if( !btn->property( "vlcIcon" ).isValid() )
             btn->setProperty( "vlcIcon", btn->icon() );
-        btn->setIcon( b ? QIcon( Theme::pixmap( "settings", Theme::BAR_GLYPH, Theme::accent() ) )
+        btn->setIcon( b ? QIcon( Theme::pixmap( "playback-settings", Theme::BAR_GLYPH, Theme::accent() ) )
                         : btn->property( "vlcIcon" ).value<QIcon>() );
     }
     if( !b && adjustDock->panel()->isAncestorOf( QApplication::focusWidget() ) )

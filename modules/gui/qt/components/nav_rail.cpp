@@ -35,8 +35,8 @@ static const struct
     const char *title;
 } sections[] = {
     { "home",      "home",     N_("Home") },
-    { "videos",    "video",    N_("Videos") },
-    { "music",     "music",    N_("Music") },
+    { "videos",    "videos",   N_("Videos") },
+    { "music",     "songs",    N_("Music") },
     { "network",   "network",  N_("Network") },
     { "playlists", "playlist", N_("Playlists") },
     { "recents",   "recent",   N_("Recent") },

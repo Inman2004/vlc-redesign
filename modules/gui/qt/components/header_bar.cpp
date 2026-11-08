@@ -33,6 +33,9 @@
 #include <vlc_input.h>
 #include <vlc_url.h>
 
+#include <QPainter>
+#include <QSvgRenderer>
+
 #include <QApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -73,8 +76,18 @@ HeaderBar::HeaderBar( intf_thread_t *_p_intf, MainInterface *_mi )
     left->setSpacing( 6 );
 
     QLabel *cone = new QLabel( leftGroup );
-    QPixmap conePix = QIcon( ":/logo/vlc128.png" ).pixmap( 20, 20 );
-    cone->setPixmap( conePix );
+    {
+        /* Figma's cone (Icon "vlc"), drawn in its own colours */
+        const qreal dpr = devicePixelRatioF();
+        QImage img( QSize( 24, 24 ) * dpr, QImage::Format_ARGB32_Premultiplied );
+        img.fill( Qt::transparent );
+        QPainter p( &img );
+        QSvgRenderer( QString( ":/redesign/vlc.svg" ) ).render( &p, QRectF( 0, 0, img.width(), img.height() ) );
+        p.end();
+        QPixmap conePix = QPixmap::fromImage( img );
+        conePix.setDevicePixelRatio( dpr );
+        cone->setPixmap( conePix );
+    }
     cone->setFixedSize( 26, 32 );
     cone->setAlignment( Qt::AlignCenter );
     left->addWidget( cone );
@@ -87,14 +100,15 @@ HeaderBar::HeaderBar( intf_thread_t *_p_intf, MainInterface *_mi )
     sidebarBtn = headerButton( leftGroup, "sidebar", qtr( "Show or hide the library" ) );
     sidebarBtn->setCheckable( true );
     {
-        /* the design keeps this glyph grey in both states */
+        /* the design keeps this glyph grey in both states; the panel in
+         * the glyph is wide while the sidebar is open (Figma "sidebar"
+         * active / left) */
         QIcon ic;
-        const QPixmap n = Theme::pixmap( "sidebar", 24, Theme::colors().icon );
-        const QPixmap h = Theme::pixmap( "sidebar", 24, Theme::colors().iconHover );
-        ic.addPixmap( n, QIcon::Normal, QIcon::Off );
-        ic.addPixmap( n, QIcon::Normal, QIcon::On );
-        ic.addPixmap( h, QIcon::Active, QIcon::Off );
-        ic.addPixmap( h, QIcon::Active, QIcon::On );
+        const QColor n = Theme::colors().icon, h = Theme::colors().iconHover;
+        ic.addPixmap( Theme::pixmap( "sidebar-left", 24, n ), QIcon::Normal, QIcon::Off );
+        ic.addPixmap( Theme::pixmap( "sidebar", 24, n ), QIcon::Normal, QIcon::On );
+        ic.addPixmap( Theme::pixmap( "sidebar-left", 24, h ), QIcon::Active, QIcon::Off );
+        ic.addPixmap( Theme::pixmap( "sidebar", 24, h ), QIcon::Active, QIcon::On );
         sidebarBtn->setIcon( ic );
     }
     connect( sidebarBtn, &QToolButton::toggled, this, &HeaderBar::sidebarToggled );
