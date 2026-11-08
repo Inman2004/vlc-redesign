@@ -33,11 +33,14 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QSet>
 #include <QHash>
 #include <QMenu>
 #include <QUrl>
 
 #include <algorithm>
+#include <climits>
 
 LibraryBrowser::LibraryBrowser( intf_thread_t *_p_intf, const QString &key, QObject *parent )
     : QObject( parent ), p_intf( _p_intf ), lib( MediaLibrary::instance( _p_intf ) ),
@@ -68,9 +71,20 @@ QString LibraryBrowser::sectionTitle( const QString &key )
     return key;
 }
 
+QString LibraryBrowser::shelfTitle( const QString &key )
+{
+    if( key == "continue" ) return qtr( "Continue Watching" );
+    if( key == "listen" )   return qtr( "Listen Again" );
+    if( key == "folders" )  return qtr( "Frequently Visited Folders" );
+    if( key == "streams" )  return qtr( "Latest Streams" );
+    return key;
+}
+
 QString LibraryBrowser::segmentTitle( int i ) const
 {
     const QString s = loc.value( i );
+    if( i == 1 && section() == "home" )
+        return shelfTitle( s );
     return i == 0 || s == "shows" ? sectionTitle( s ) : s;
 }
 
@@ -124,7 +138,8 @@ int LibraryBrowser::itemCount() const
     int n = 0;
     /* Figma counts every row but the "Add..." one ("Network: 2 items") */
     foreach( const LibraryEntry &e, current )
-        if( e.type != LibraryEntry::ACTION || e.icon != "add" )
+        if( e.type != LibraryEntry::HEADER
+            && ( e.type != LibraryEntry::ACTION || e.icon != "add" ) )
             n++;
     return n;
 }
@@ -137,7 +152,9 @@ QString LibraryBrowser::sourceLabel() const
 void LibraryBrowser::rebuild()
 {
     current = collect();
-    sortEntries( current );
+    /* Home and Recent keep their own order: most recent first */
+    if( !( ( section() == "home" || section() == "recent" ) && needle.isEmpty() ) )
+        sortEntries( current );
     emit entriesChanged();
 }
 
@@ -172,9 +189,14 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
         if( sec == "videos" ) return it.kind == LibraryItem::VIDEO;
         if( sec == "music" )  return it.kind == LibraryItem::AUDIO;
         if( sec == "recent" ) return it.lastPlayed > 0;
-        if( sec == "home" )   return it.lastPlayed > 0 && !it.watched && it.progress > 0;
+        if( sec == "home" )   return it.lastPlayed > 0 || it.progress > 0;
         return false;
     };
+
+    if( search.isEmpty() && sec == "home" )
+        return homeEntries( loc.value( 1 ) );
+    if( search.isEmpty() && sec == "recent" )
+        return recentEntries();
 
     /* Components "Network" panel: the sources of VLC 3's discovery */
     if( sec == "network" )
@@ -315,6 +337,220 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
     return out;
 }
 
+/* Recency: the position in VLC's recent list (0 = last played), then the
+ * library's own last-played time for what fell off that list */
+static QHash<QString, int> recentRanks( intf_thread_t *p_intf )
+{
+    QHash<QString, int> rank;
+    const QStringList mrls = RecentsMRL::getInstance( p_intf )->recentList();
+    for( int i = 0; i < mrls.size(); i++ )
+    {
+        const QUrl url( mrls[i] );
+        if( url.isLocalFile() )
+            rank.insert( QDir::cleanPath( url.toLocalFile() ), i );
+    }
+    return rank;
+}
+
+static QString streamTitle( const QString &mrl )
+{
+    const QUrl url( mrl );
+    QString name = url.isLocalFile() ? QFileInfo( url.toLocalFile() ).fileName()
+                                     : url.toDisplayString( QUrl::RemoveUserInfo );
+    return name.isEmpty() ? mrl : name;
+}
+
+/* Home (Figma row 2 #7, Components "Home"): Continue Watching, Listen
+ * Again, Frequently Visited Folders, Latest Streams; each shelf behind its
+ * heading. With a shelf key: that shelf's whole list. */
+QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
+{
+    const QVector<LibraryItem> &items = lib->items();
+    const QHash<QString, int> rank = recentRanks( p_intf );
+    QStringList roots;
+    foreach( const QString &r, lib->roots() )
+        roots << ( r.endsWith( '/' ) ? r : r + '/' );
+
+    /* played library items, most recent first */
+    QVector<int> played;
+    for( int i = 0; i < items.size(); i++ )
+        if( items[i].lastPlayed > 0 || rank.contains( items[i].path ) )
+            played << i;
+    std::stable_sort( played.begin(), played.end(), [&]( int a, int b ) {
+        const int ra = rank.value( items[a].path, INT_MAX );
+        const int rb = rank.value( items[b].path, INT_MAX );
+        if( ra != rb )
+            return ra < rb;
+        return items[a].lastPlayed > items[b].lastPlayed;
+    } );
+
+    QVector<LibraryEntry> cont, listen, folders, streams;
+    QHash<QString, int> folderAt;
+    QVector<int> folderScore;
+    foreach( int i, played )
+    {
+        const LibraryItem &it = items[i];
+        LibraryEntry e;
+        e.type = LibraryEntry::ITEM;
+        e.index = i;
+        e.thumbFrom = it.path;
+        e.watched = it.watched;
+        e.progress = it.progressRatio();
+        e.date = it.mtime;
+        if( it.kind == LibraryItem::VIDEO && !it.watched && it.progress > 0 )
+        {
+            e.title = it.name();
+            e.tile = LibraryEntry::TILE_WIDE;
+            cont << e;
+        }
+        else if( it.kind == LibraryItem::AUDIO )
+        {
+            /* until P5c reads tags: the album / artist folder */
+            e.title = QFileInfo( it.path ).completeBaseName();
+            const QString dir = it.folder();
+            if( !roots.contains( dir + '/' ) )
+                e.subtitle = QFileInfo( dir ).fileName();
+            e.tile = LibraryEntry::TILE_SQUARE;
+            e.watched = false;
+            e.progress = 0;
+            listen << e;
+        }
+
+        /* folders: the Shows folder or a root's top-level folder */
+        const QString sec = it.kind == LibraryItem::AUDIO ? "music" : "videos";
+        const QString folder = it.category == "shows" ? QString( "shows" )
+                                                      : topFolder( roots, it.path );
+        if( folder.isEmpty() )
+            continue;
+        const QString key = sec + '/' + folder;
+        int f = folderAt.value( key, -1 );
+        if( f < 0 )
+        {
+            LibraryEntry g;
+            g.type = LibraryEntry::ACTION;
+            g.segment = "open:" + key;
+            g.title = folder == "shows" ? sectionTitle( "shows" ) : folder;
+            g.icon = "folder";
+            g.tile = LibraryEntry::TILE_GLYPH;
+            f = folders.size();
+            folderAt.insert( key, f );
+            folders << g;
+            folderScore << 0;
+        }
+        folderScore[f] += qMax( 1, it.playCount );
+    }
+    {
+        /* most visited first, ties in recency order */
+        QVector<int> order( folders.size() );
+        for( int k = 0; k < order.size(); k++ )
+            order[k] = k;
+        std::stable_sort( order.begin(), order.end(), [&]( int a, int b ) {
+            return folderScore[a] > folderScore[b];
+        } );
+        QVector<LibraryEntry> sorted;
+        foreach( int k, order )
+            sorted << folders[k];
+        folders = sorted;
+    }
+
+    /* network streams from VLC's recent list */
+    foreach( const QString &mrl, RecentsMRL::getInstance( p_intf )->recentList() )
+    {
+        if( QUrl( mrl ).isLocalFile() || mrl.startsWith( "file:" ) )
+            continue;
+        LibraryEntry s;
+        s.type = LibraryEntry::ACTION;
+        s.segment = "mrl:" + mrl;
+        s.title = streamTitle( mrl );
+        s.icon = "network";
+        s.tile = LibraryEntry::TILE_GLYPH;
+        streams << s;
+    }
+
+    if( !shelf.isEmpty() )
+    {
+        if( shelf == "continue" ) return cont;
+        if( shelf == "listen" )   return listen;
+        if( shelf == "folders" )  return folders;
+        if( shelf == "streams" )  return streams;
+        return QVector<LibraryEntry>();
+    }
+
+    QVector<LibraryEntry> out;
+    auto add = [&out]( const QString &key, const QVector<LibraryEntry> &list ) {
+        if( list.isEmpty() )
+            return;
+        LibraryEntry h;
+        h.type = LibraryEntry::HEADER;
+        h.segment = key;
+        h.title = shelfTitle( key );
+        h.count = list.size();
+        out << h;
+        /* a shelf is one row of tiles: the view shows what fits */
+        out << list.mid( 0, 12 );
+    };
+    add( "continue", cont );
+    add( "listen", listen );
+    add( "folders", folders );
+    add( "streams", streams );
+    return out;
+}
+
+/* Recent: VLC's recent list in its order; library files get their
+ * thumbnail and progress, anything else a glyph row that plays the MRL */
+QVector<LibraryEntry> LibraryBrowser::recentEntries() const
+{
+    QVector<LibraryEntry> out;
+    const QVector<LibraryItem> &items = lib->items();
+    QSet<int> seen;
+    foreach( const QString &mrl, RecentsMRL::getInstance( p_intf )->recentList() )
+    {
+        const QUrl url( mrl );
+        const int i = url.isLocalFile() ? lib->indexOf( QDir::cleanPath( url.toLocalFile() ) ) : -1;
+        LibraryEntry e;
+        if( i >= 0 )
+        {
+            e.type = LibraryEntry::ITEM;
+            e.index = i;
+            e.title = items[i].name();
+            e.thumbFrom = items[i].path;
+            e.watched = items[i].watched;
+            e.progress = items[i].progressRatio();
+            e.date = items[i].mtime;
+            seen.insert( i );
+        }
+        else
+        {
+            e.type = LibraryEntry::ACTION;
+            e.segment = "mrl:" + mrl;
+            e.title = streamTitle( mrl );
+            e.icon = url.isLocalFile() ? "file" : "network";
+        }
+        out << e;
+    }
+    /* library items played before they reached the recent list */
+    QVector<int> rest;
+    for( int i = 0; i < items.size(); i++ )
+        if( items[i].lastPlayed > 0 && !seen.contains( i ) )
+            rest << i;
+    std::stable_sort( rest.begin(), rest.end(), [&items]( int a, int b ) {
+        return items[a].lastPlayed > items[b].lastPlayed;
+    } );
+    foreach( int i, rest )
+    {
+        LibraryEntry e;
+        e.type = LibraryEntry::ITEM;
+        e.index = i;
+        e.title = items[i].name();
+        e.thumbFrom = items[i].path;
+        e.watched = items[i].watched;
+        e.progress = items[i].progressRatio();
+        e.date = items[i].mtime;
+        out << e;
+    }
+    return out;
+}
+
 /* the first folder under the library root holding the path, or empty for
  * a file lying in a root itself */
 QString LibraryBrowser::topFolder( const QStringList &roots, const QString &path )
@@ -388,9 +624,18 @@ void LibraryBrowser::activate( int i )
     if( i < 0 || i >= current.size() )
         return;
     const LibraryEntry e = current[i];
+    if( e.type == LibraryEntry::HEADER )
+    {
+        setLocation( QStringList() << "home" << e.segment );
+        return;
+    }
     if( e.type == LibraryEntry::ACTION )
     {
-        if( e.segment == "add" )
+        if( e.segment.startsWith( "open:" ) )
+            setLocation( e.segment.mid( 5 ).split( '/' ) );
+        else if( e.segment.startsWith( "mrl:" ) )
+            Open::openMRL( p_intf, e.segment.mid( 4 ), true, true );
+        else if( e.segment == "add" )
             addFolder( p_intf, NULL );
         else if( e.segment == "netstream" )
             THEDP->openNetDialog();
@@ -431,7 +676,8 @@ void LibraryBrowser::play( const QStringList &paths )
 
 void LibraryBrowser::showEntryMenu( int i, const QPoint &pos, QWidget *parent )
 {
-    if( i < 0 || i >= current.size() || current[i].type == LibraryEntry::ACTION )
+    if( i < 0 || i >= current.size() || current[i].type == LibraryEntry::ACTION
+        || current[i].type == LibraryEntry::HEADER )
         return;
     const LibraryEntry e = current[i];
     QMenu menu( parent );

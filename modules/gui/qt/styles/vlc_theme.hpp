@@ -121,6 +121,8 @@ QColor accentPressed();
 QColor seekFill();    /* filled part of the seek bar */
 
 /* Monochrome icon from :/redesign/<name>.svg, tinted for every state. */
+/* "<name>-active" when the Figma active variant exists, else name */
+QString activeName( const QString &name );
 QIcon icon( const QString &name, int size = BAR_GLYPH );
 QPixmap pixmap( const QString &name, int size, const QColor &color );
 

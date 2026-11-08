@@ -83,6 +83,12 @@ private:
     int tileGap() const;
     int labelHeight() const;
     void relayout();
+    /* Home shelves (headings, fixed tiles, one row each) and the tile
+     * pages behind them; in the sidebar, headed sections of rows */
+    bool shelfLayout() const { return hasHeaders || ( !compact && hasTiles ); }
+    void layoutShelves();
+    QSize tileSize( const LibraryEntry & ) const;
+    void paintShelfEntry( QPainter &, int i, const QRect &r, const QFontMetrics & );
     QRect entryRect( int i ) const;   /* in content coordinates */
     int entryAt( const QPoint &viewportPos ) const;
     QPixmap thumbnail( const LibraryEntry &, const QSize & );
@@ -95,6 +101,8 @@ private:
     bool compact = false;
     int columns = 1;
     QSize cell;           /* tile, or row */
+    bool hasHeaders = false, hasTiles = false;
+    QVector<QRect> rects; /* shelf layout: per entry, empty when hidden */
     int hovered = -1, pressed = -1;
     QString playingPath;
     QHash<QString, QPixmap> pixmaps;   /* thumbnail file -> scaled pixmap */

@@ -41,6 +41,7 @@
 #include "components/controller.hpp"            // controllers
 #include "components/playlist/playlist.hpp"     // plWidget
 #include "components/header_bar.hpp"            // Redesign header
+#include "components/resume_card.hpp"
 #include "components/nav_rail.hpp"              // Redesign rail
 #include "components/sidebar_panel.hpp"
 #include "library/media_library.hpp"
@@ -705,6 +706,18 @@ void MainInterface::showResumePanel( int64_t _time ) {
 
     if( setting == 2)
         resumePlayback();
+    else if( Theme::redesign() )
+    {
+        /* Figma "continue": a card over the video, not a bar */
+        if( !resumeCard )
+        {
+            resumeCard = new ResumeCard( this, controls );
+            connect( resumeCard, &ResumeCard::continueRequested, this, &MainInterface::resumePlayback );
+            connect( resumeCard, &ResumeCard::dismissed, this, &MainInterface::hideResumePanel );
+        }
+        resumeCard->showFor( _time );
+        resumeTimer->start();
+    }
     else
     {
         if( !isFullScreen() && !isMaximized() && !b_isWindowTiled )
@@ -716,6 +729,11 @@ void MainInterface::showResumePanel( int64_t _time ) {
 
 void MainInterface::hideResumePanel()
 {
+    if( resumeCard && resumeCard->isVisible() )
+    {
+        resumeCard->hide();
+        resumeTimer->stop();
+    }
     if( resumePanel->isVisible() )
     {
         if( !isFullScreen() && !isMaximized() && !b_isWindowTiled )

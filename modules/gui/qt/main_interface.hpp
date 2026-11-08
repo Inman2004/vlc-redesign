@@ -184,6 +184,7 @@ protected:
 
     /* resume panel */
     QWidget             *resumePanel;
+    class ResumeCard    *resumeCard = NULL;  /* redesign: replaces the panel */
     QTimer              *resumeTimer;
     int64_t             i_resumeTime;
 

@@ -191,14 +191,22 @@ QPixmap pixmap( const QString &name, int size, const QColor &color )
     return pix;
 }
 
+QString activeName( const QString &name )
+{
+    /* Figma's "state=active" variant (filled, or a 2px stroke) */
+    const QString a = name + "-active";
+    return QFile::exists( QString( ":/redesign/%1.svg" ).arg( a ) ) ? a : name;
+}
+
 QIcon icon( const QString &name, int size )
 {
     QIcon ic;
+    const QString on = activeName( name );
     ic.addPixmap( pixmap( name, size, g_pal.icon ), QIcon::Normal, QIcon::Off );
     ic.addPixmap( pixmap( name, size, g_pal.iconHover ), QIcon::Active, QIcon::Off );
     ic.addPixmap( pixmap( name, size, g_pal.iconDisabled ), QIcon::Disabled, QIcon::Off );
-    ic.addPixmap( pixmap( name, size, g_accent ), QIcon::Normal, QIcon::On );
-    ic.addPixmap( pixmap( name, size, accentHover() ), QIcon::Active, QIcon::On );
+    ic.addPixmap( pixmap( on, size, g_accent ), QIcon::Normal, QIcon::On );
+    ic.addPixmap( pixmap( on, size, accentHover() ), QIcon::Active, QIcon::On );
     ic.addPixmap( pixmap( name, size, g_pal.iconDisabled ), QIcon::Disabled, QIcon::On );
     return ic;
 }
@@ -435,7 +443,6 @@ static QString buildStyleSheet()
     "#VLCSidebar QLineEdit { background: @track; color: @text; border: 1px solid @border;"
     "  border-radius: 6px; padding: 5px 8px; font-size: 13px; }\n"
     "#VLCSidebar QLineEdit:focus { border-color: @accent; }\n"
-    "#VLCSidebar QListWidget#RecentsList::item { padding: 8px 6px; }\n"
 
     /* Splitter between sidebar and content */
     "#VLCBody QSplitter::handle { background: @titlebar; }\n"
@@ -454,11 +461,20 @@ static QString buildStyleSheet()
     "#VLCLibrary QToolButton#CrumbLink { background: transparent; border: none; color: @muted;"
     "  font-size: 16px; padding: 0; }\n"
     "#VLCLibrary QToolButton#CrumbLink:hover { color: @text; }\n"
-    "#VLCLibrary QToolButton#CrumbCurrent { background: transparent; border: none; color: @text;"
+    "#VLCLibrary QToolButton#CrumbCurrent { background: transparent; border: none; color: #969696;"
     "  font-size: 16px; font-weight: 600; padding: 0; }\n"
+    "#VLCLibrary QToolButton#CrumbOnly { background: transparent; border: none; color: @muted;"
+    "  font-size: 16px; padding: 0; }\n"
     "#VLCLibrary QLineEdit#LibrarySearch { background: #151515; border: none; border-radius: 6px;"
     "  color: @text; font-size: 15px; padding: 0 8px; selection-background-color: @accentSoft; }\n"
     "#VLCLibrary QFrame#MiniPlayer { background: #1B1B1B; border-radius: 10px; }\n"
+    /* Figma "continue" card */
+    "QWidget#ResumeCard QLabel#ResumeText { color: #C6C6C6; font-size: 16px; background: transparent; }\n"
+    "QWidget#ResumeCard QPushButton#ResumeContinue { background: @accent; color: #161616; border: none;"
+    "  border-radius: 6px; padding: 4px 8px; font-size: 14px; font-weight: 600; }\n"
+    "QWidget#ResumeCard QPushButton#ResumeContinue:hover { background: @accentHov; }\n"
+    "QWidget#ResumeCard QToolButton#ResumeClose { background: #222222; border: none; border-radius: 6px; }\n"
+    "QWidget#ResumeCard QToolButton#ResumeClose:hover { background: #2C2C2C; }\n"
     "#VLCLibrary QWidget#MiniPicture { background: #0B0B0B; border-radius: 4px; }\n"
     "#VLCLibrary QLabel#MiniTitle { color: @muted; font-size: 16px; }\n"
     "#VLCLibrary QLabel#MiniChip { color: @muted; font-size: 15px; }\n"

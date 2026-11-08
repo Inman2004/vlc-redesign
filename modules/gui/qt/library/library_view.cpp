@@ -78,6 +78,34 @@ static const QColor LABEL_DIM  ( 0x6B, 0x6B, 0x6B );
 static const QColor TILE_EMPTY ( 0x00, 0x00, 0x00 );
 static const QColor DIVIDER    ( 0x18, 0x18, 0x18 );
 
+/* Figma row 2 #7 (Home) and Components "Home": logical px at 1920 */
+enum
+{
+    SHELF_TOP        = 37,    /* rule to the first heading */
+    SHELF_HEAD_H     = 24,
+    SHELF_HEAD_FONT  = 20,
+    SHELF_CHEVRON_GAP = 5,
+    SHELF_TILES_Y    = 44,    /* heading top to the tiles */
+    SHELF_LABEL_Y    = 20,    /* tile bottom to the title */
+    SHELF_LINE       = 19,
+    SHELF_SUB_Y      = 29,    /* title top to the artist line */
+    SHELF_NEXT       = 77,    /* label bottom to the next heading */
+    SHELF_WRAP       = 39,    /* label bottom to the next row (no headings) */
+    SHELF_RADIUS     = 12,
+    SHELF_WIDE_W     = 316,
+    SHELF_WIDE_H     = 178,
+    SHELF_SQUARE     = 200,
+    SHELF_GLYPH      = 48,
+    SHELF_BAR_H      = 4,
+    SIDE_HEAD_Y      = 1,     /* rows: grid top to the first heading row */
+    SIDE_HEAD_H      = 47,    /* heading row to the first item row */
+    SIDE_SHELF_GAP   = 20,
+    SIDE_SHELF_ROWS  = 3,
+};
+static const QColor SHELF_TILE  ( 0x17, 0x17, 0x17 );
+static const QColor SHELF_GLYPH_BG( 0x1E, 0x1E, 0x1E );
+static const QColor SIDE_THUMB_BG( 0x30, 0x30, 0x30 );
+
 /* Components sidebar panels (S01 list, Videos, Network): 42px rows, a
  * 32px square thumbnail 4px in or a 20px glyph 10px in, the name 46px in */
 enum
@@ -147,6 +175,12 @@ void LibraryGrid::setCompact( bool b )
 void LibraryGrid::setEntries( const QVector<LibraryEntry> &e )
 {
     entries = e;
+    hasHeaders = hasTiles = false;
+    foreach( const LibraryEntry &x, entries )
+    {
+        hasHeaders = hasHeaders || x.type == LibraryEntry::HEADER;
+        hasTiles = hasTiles || x.tile != LibraryEntry::TILE_AUTO;
+    }
     hovered = pressed = -1;
     relayout();
     verticalScrollBar()->setValue( 0 );
@@ -190,8 +224,100 @@ int LibraryGrid::topOffset() const
 int LibraryGrid::tileGap() const { return compact ? SIDE_TILE_GAP : TILE_GAP; }
 int LibraryGrid::labelHeight() const { return compact ? SIDE_LABEL_H : TILE_LABEL_H; }
 
+QSize LibraryGrid::tileSize( const LibraryEntry &e ) const
+{
+    if( e.tile == LibraryEntry::TILE_WIDE || e.tile == LibraryEntry::TILE_AUTO )
+        return QSize( SHELF_WIDE_W, SHELF_WIDE_H );
+    return QSize( SHELF_SQUARE, SHELF_SQUARE );
+}
+
+void LibraryGrid::layoutShelves()
+{
+    rects.fill( QRect(), entries.size() );
+    const int w = viewport()->width() - marginLeft() - marginRight();
+    int bottom = 0;
+    if( compact )
+    {
+        /* Components "Home": heading rows, then up to three 42px rows */
+        int y = SIDE_HEAD_Y, inShelf = 0;
+        bool first = true;
+        for( int i = 0; i < entries.size(); i++ )
+        {
+            if( entries[i].type == LibraryEntry::HEADER )
+            {
+                if( !first )
+                    y += SIDE_SHELF_GAP;
+                first = false;
+                rects[i] = QRect( 0, y, w, SIDE_ROW_H );
+                y += SIDE_HEAD_H;
+                inShelf = 0;
+                continue;
+            }
+            if( hasHeaders && inShelf >= SIDE_SHELF_ROWS )
+                continue;
+            rects[i] = QRect( 0, y, w, SIDE_ROW_H );
+            y += SIDE_ROW_H;
+            inShelf++;
+        }
+        bottom = y;
+    }
+    else
+    {
+        /* Figma row 2 #7: a heading, then one row of fixed tiles; without
+         * headings (a shelf's whole list) the tiles wrap */
+        QFont hf = font();
+        hf.setPixelSize( SHELF_HEAD_FONT );
+        const QFontMetrics hfm( hf );
+        const int x0 = marginLeft(), right = marginLeft() + w;
+        int x = x0, rowTop = hasHeaders ? SHELF_TOP : GRID_TOP, rowBottom = rowTop;
+        bool rowFull = false, first = true;
+        for( int i = 0; i < entries.size(); i++ )
+        {
+            const LibraryEntry &e = entries[i];
+            if( e.type == LibraryEntry::HEADER )
+            {
+                const int y = first ? SHELF_TOP : rowBottom + SHELF_NEXT;
+                first = false;
+                rects[i] = QRect( x0, y, hfm.horizontalAdvance( e.title ) + SHELF_CHEVRON_GAP + 24,
+                                  SHELF_HEAD_H );
+                rowTop = rowBottom = y + SHELF_TILES_Y;
+                x = x0;
+                rowFull = false;
+                continue;
+            }
+            const QSize t = tileSize( e );
+            const int h = t.height() + SHELF_LABEL_Y + SHELF_LINE
+                          + ( e.subtitle.isEmpty() ? 0 : SHELF_SUB_Y );
+            if( x > x0 && x + t.width() > right )
+            {
+                if( hasHeaders )
+                    rowFull = true;
+                else
+                {
+                    rowTop = rowBottom + SHELF_WRAP;
+                    x = x0;
+                }
+            }
+            if( rowFull )
+                continue;
+            rects[i] = QRect( x, rowTop, t.width(), h );
+            x += t.width() + TILE_GAP;
+            rowBottom = qMax( rowBottom, rowTop + h );
+        }
+        bottom = rowBottom + SHELF_WRAP;
+    }
+    verticalScrollBar()->setPageStep( viewport()->height() );
+    verticalScrollBar()->setRange( 0, qMax( 0, bottom - viewport()->height() ) );
+}
+
 void LibraryGrid::relayout()
 {
+    if( shelfLayout() )
+    {
+        layoutShelves();
+        return;
+    }
+    rects.clear();
     const int w = viewport()->width() - marginLeft() - marginRight();
     if( viewMode == GRID )
     {
@@ -214,6 +340,8 @@ void LibraryGrid::relayout()
 
 QRect LibraryGrid::entryRect( int i ) const
 {
+    if( !rects.isEmpty() )
+        return rects.value( i );
     const int row = i / columns, col = i % columns;
     if( viewMode == GRID )
         return QRect( marginLeft() + col * ( cell.width() + tileGap() ),
@@ -282,7 +410,8 @@ void LibraryGrid::paintEvent( QPaintEvent * )
     const int dy = verticalScrollBar()->value();
     const QRect visible( 0, dy, viewport()->width(), viewport()->height() );
     QFont labelFont = font();
-    labelFont.setPixelSize( viewMode == GRID ? ( compact ? 14 : 16 ) : 15 );
+    labelFont.setPixelSize( shelfLayout() && !compact ? 16
+                            : viewMode == GRID ? ( compact ? 14 : 16 ) : 15 );
     p.setFont( labelFont );
     const QFontMetrics fm( labelFont );
     const QColor accent = Theme::accent();
@@ -294,6 +423,12 @@ void LibraryGrid::paintEvent( QPaintEvent * )
             continue;
         const LibraryEntry &e = entries[i];
         const QRect rr = r.translated( 0, -dy );
+        if( shelfLayout() )
+        {
+            paintShelfEntry( p, i, rr, fm );
+            p.setFont( labelFont );
+            continue;
+        }
         const bool playing = e.type == LibraryEntry::ITEM && !playingPath.isEmpty()
                              && e.thumbFrom == playingPath;
         QColor text = playing ? accent : ( e.watched ? LABEL_DIM : LABEL );
@@ -309,7 +444,8 @@ void LibraryGrid::paintEvent( QPaintEvent * )
             p.setBrush( Theme::colors().hover );
             p.drawRoundedRect( QRectF( rr ).adjusted( 0, 1, -2, -1 ), 6, 6 );
         }
-        if( glyphRow || e.type == LibraryEntry::ACTION )
+        /* on the page an action (a recent stream) is a tile with its glyph */
+        if( glyphRow || ( e.type == LibraryEntry::ACTION && compact ) )
         {
             const QColor fg = i == hovered ? Theme::colors().text : Theme::colors().icon;
             p.drawPixmap( QRect( rr.left() + SIDE_ICON_X, rr.center().y() - SIDE_ICON / 2 + 1,
@@ -356,7 +492,8 @@ void LibraryGrid::paintEvent( QPaintEvent * )
         {
             const int k = lib->indexOf( e.thumbFrom );
             const bool audio = k >= 0 && lib->items()[k].kind == LibraryItem::AUDIO;
-            const QString glyph = e.type == LibraryEntry::GROUP ? "folder"
+            const QString glyph = e.type == LibraryEntry::ACTION ? e.icon
+                                : e.type == LibraryEntry::GROUP ? "folder"
                                 : ( audio ? "music" : "video" );
             const int g = viewMode == GRID ? 32 : 18;
             p.drawPixmap( QRect( thumbRect.center() - QPoint( g / 2, g / 2 ), QSize( g, g ) ),
@@ -410,6 +547,137 @@ void LibraryGrid::paintEvent( QPaintEvent * )
 
     /* ask for the visible thumbnails once painting settles */
     QTimer::singleShot( 120, this, &LibraryGrid::requestVisibleThumbnails );
+}
+
+/* Home shelves, their tile pages, and the sidebar's headed rows */
+void LibraryGrid::paintShelfEntry( QPainter &p, int i, const QRect &rr, const QFontMetrics &fm )
+{
+    const LibraryEntry &e = entries[i];
+    const bool hover = i == hovered;
+    const QColor accent = Theme::accent();
+    const bool playing = e.type == LibraryEntry::ITEM && !playingPath.isEmpty()
+                         && e.thumbFrom == playingPath;
+    const int k = e.index >= 0 ? e.index : lib->indexOf( e.thumbFrom );
+    const bool audio = k >= 0 && lib->items()[k].kind == LibraryItem::AUDIO;
+
+    if( e.type == LibraryEntry::HEADER )
+    {
+        QFont f = font();
+        f.setPixelSize( compact ? 16 : SHELF_HEAD_FONT );
+        p.setFont( f );
+        const QColor fg = hover ? Theme::colors().text : LABEL;
+        p.setPen( fg );
+        const QPixmap chev = Theme::pixmap( "chevron", 24, hover ? Theme::colors().text
+                                                                  : Theme::colors().icon );
+        if( compact )
+        {
+            /* the name from the row's left, the chevron at its right */
+            const QRect tr = rr.adjusted( SIDE_THUMB_X, 0, -32, 0 );
+            p.drawText( tr, Qt::AlignLeft | Qt::AlignVCenter,
+                        QFontMetrics( f ).elidedText( e.title, Qt::ElideRight, tr.width() ) );
+            p.drawPixmap( rr.right() - 24 + 1, rr.center().y() - 12 + 1, chev );
+        }
+        else
+        {
+            const int tw = QFontMetrics( f ).horizontalAdvance( e.title );
+            p.drawText( QRect( rr.left(), rr.top(), tw + 2, rr.height() ),
+                        Qt::AlignLeft | Qt::AlignVCenter, e.title );
+            p.drawPixmap( rr.left() + tw + SHELF_CHEVRON_GAP, rr.top(), chev );
+        }
+        return;
+    }
+
+    if( compact )
+    {
+        /* Components "Home": dim 14px names; a 32px picture or a glyph */
+        QFont f = font();
+        f.setPixelSize( hasHeaders ? 14 : 15 );
+        p.setFont( f );
+        const QFontMetrics rfm( f );
+        if( hover )
+        {
+            p.setPen( Qt::NoPen );
+            p.setBrush( Theme::colors().hover );
+            p.drawRoundedRect( QRectF( rr ).adjusted( 0, 1, -2, -1 ), 6, 6 );
+        }
+        QColor text = playing ? accent : ( hasHeaders ? LABEL_DIM : ( e.watched ? LABEL_DIM : LABEL ) );
+        if( hover && !playing )
+            text = Theme::colors().text;
+        const QRect tr = rr.adjusted( SIDE_TEXT_X, 0, -8, 0 );
+        if( e.type == LibraryEntry::ACTION )
+        {
+            /* Home rows: a 32px glyph in the picture's place */
+            const QColor fg = hover ? Theme::colors().text : Theme::colors().icon;
+            const int g = hasHeaders ? LIST_THUMB : SIDE_ICON;
+            const int gx = hasHeaders ? SIDE_THUMB_X : SIDE_ICON_X;
+            p.drawPixmap( QRect( rr.left() + gx, rr.center().y() - g / 2 + 1, g, g ),
+                          Theme::pixmap( e.icon.isEmpty() ? QString( "folder" ) : e.icon, g, fg ) );
+        }
+        else
+        {
+            const QRect thumbRect( rr.left() + SIDE_THUMB_X, rr.top() + ( rr.height() - LIST_THUMB ) / 2,
+                                   LIST_THUMB, LIST_THUMB );
+            QPainterPath clip;
+            clip.addRoundedRect( QRectF( thumbRect ), 2, 2 );
+            p.save();
+            p.setClipPath( clip );
+            p.fillRect( thumbRect, SIDE_THUMB_BG );
+            const QPixmap pm = thumbnail( e, thumbRect.size() );
+            if( !pm.isNull() )
+                p.drawPixmap( thumbRect, pm );
+            else
+                p.drawPixmap( QRect( thumbRect.center() - QPoint( 9, 9 ), QSize( 18, 18 ) ),
+                              Theme::pixmap( audio ? "music" : "video", 18, Theme::colors().icon ) );
+            if( e.progress > 0.01 )
+                p.fillRect( QRect( thumbRect.left(), thumbRect.bottom() - 2,
+                                   qMax( 2, int( thumbRect.width() * e.progress ) ), 3 ), accent );
+            p.restore();
+        }
+        p.setPen( text );
+        const QString label = e.subtitle.isEmpty() ? e.title
+                                                   : QString( "%1 - %2" ).arg( e.title, e.subtitle );
+        p.drawText( tr, Qt::AlignLeft | Qt::AlignVCenter, rfm.elidedText( label, Qt::ElideRight, tr.width() ) );
+        return;
+    }
+
+    /* page tiles: 16:9 video or a square, radius 12 (Figma row 2 #7) */
+    const QSize t = tileSize( e );
+    const QRect thumbRect( rr.topLeft(), t );
+    QPainterPath clip;
+    clip.addRoundedRect( QRectF( thumbRect ), SHELF_RADIUS, SHELF_RADIUS );
+    p.save();
+    p.setClipPath( clip );
+    p.fillRect( thumbRect, e.type == LibraryEntry::ACTION ? SHELF_GLYPH_BG : SHELF_TILE );
+    const QPixmap pm = e.type == LibraryEntry::ITEM ? thumbnail( e, thumbRect.size() ) : QPixmap();
+    if( !pm.isNull() )
+        p.drawPixmap( thumbRect, pm );
+    else
+    {
+        const QString glyph = e.type == LibraryEntry::ACTION ? e.icon : ( audio ? "music" : "video" );
+        const QColor gc = e.type == LibraryEntry::ACTION ? Theme::colors().icon : QColor( 0x3A, 0x3A, 0x3A );
+        p.drawPixmap( QRect( thumbRect.center() - QPoint( SHELF_GLYPH / 2 - 1, SHELF_GLYPH / 2 - 1 ),
+                             QSize( SHELF_GLYPH, SHELF_GLYPH ) ),
+                      Theme::pixmap( glyph, SHELF_GLYPH, gc ) );
+    }
+    if( hover )
+        p.fillRect( thumbRect, QColor( 255, 255, 255, 18 ) );
+    if( e.type == LibraryEntry::ITEM && e.progress > 0.01 && !e.watched )
+        p.fillRect( QRect( thumbRect.left(), thumbRect.bottom() - SHELF_BAR_H + 1,
+                           qMax( 4, int( thumbRect.width() * e.progress ) ), SHELF_BAR_H ), accent );
+    p.restore();
+
+    QColor text = playing ? accent : LABEL;
+    if( hover && !playing )
+        text = text.lighter( 130 );
+    p.setPen( text );
+    const QRect title( rr.left(), thumbRect.bottom() + 1 + SHELF_LABEL_Y, rr.width(), SHELF_LINE );
+    p.drawText( title, Qt::AlignLeft | Qt::AlignVCenter, fm.elidedText( e.title, Qt::ElideMiddle, title.width() ) );
+    if( !e.subtitle.isEmpty() )
+    {
+        p.setPen( LABEL_DIM );
+        const QRect sub = title.translated( 0, SHELF_SUB_Y );
+        p.drawText( sub, Qt::AlignLeft | Qt::AlignVCenter, fm.elidedText( e.subtitle, Qt::ElideRight, sub.width() ) );
+    }
 }
 
 void LibraryGrid::resizeEvent( QResizeEvent *e )
@@ -564,7 +832,10 @@ protected:
             p.drawRoundedRect( QRectF( rect() ).adjusted( 6, 3, -6, -3 ), 6, 6 );
         }
         const QColor fg = ( on || hover ) ? Theme::colors().text : Theme::colors().icon;
-        p.drawPixmap( 18, ( height() - 24 ) / 2, Theme::pixmap( iconName, 24, fg ) );
+        /* Figma row 2 #7: the open section's glyph is the filled accent one */
+        p.drawPixmap( 18, ( height() - 24 ) / 2,
+                      on ? Theme::pixmap( Theme::activeName( iconName ), 24, Theme::accent() )
+                         : Theme::pixmap( iconName, 24, fg ) );
         QFont f = font();
         f.setPixelSize( 15 );
         p.setFont( f );
@@ -703,6 +974,11 @@ void LibraryView::locationChanged()
         navButtons[k]->setChecked( k == browser->section() );
     backBtn->setEnabled( browser->canGoBack() );
     fwdBtn->setEnabled( browser->canGoForward() );
+    /* Home and Recent keep the order things were played in; Home's
+     * shelves are tiles in either view */
+    const QString sec = browser->section();
+    sortBtn->setEnabled( sec != "home" && sec != "recent" );
+    viewBtn->setEnabled( !( sec == "home" && browser->location().size() == 1 ) );
     rebuildCrumb();
 }
 
@@ -726,7 +1002,10 @@ void LibraryView::rebuildCrumb()
     {
         const bool last = i == location.size() - 1;
         QToolButton *seg = new QToolButton( crumb );
-        seg->setObjectName( last ? "CrumbCurrent" : "CrumbLink" );
+        /* Figma: a lone segment is plain ("Home"); the last of several
+         * is semibold ("Videos ▶ Shows ▶ S01") */
+        seg->setObjectName( !last ? "CrumbLink"
+                                  : location.size() > 1 ? "CrumbCurrent" : "CrumbOnly" );
         seg->setText( browser->segmentTitle( i ) );
         seg->setCursor( last ? Qt::ArrowCursor : Qt::PointingHandCursor );
         const QStringList target = location.mid( 0, i + 1 );

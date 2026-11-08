@@ -217,18 +217,12 @@ SidebarPanel::SidebarPanel( intf_thread_t *_p_intf, QWidget *parent )
     layout->addLayout( ruleRow );
     layout->addSpacing( 13 );
 
-    /* Pages: browsing view, recents */
+    /* Pages: the playlist view; the library rows */
     pages = new QStackedWidget( this );
     plPage = new QWidget( pages );
     plLayout = new QVBoxLayout( plPage );
     plLayout->setContentsMargins( 0, 0, 0, 0 );
     pages->addWidget( plPage );
-
-    recents = new QListWidget( pages );
-    recents->setObjectName( "RecentsList" );
-    recents->setFrameShape( QFrame::NoFrame );
-    recents->setIconSize( QSize( 18, 18 ) );
-    pages->addWidget( recents );
 
     /* Videos, Music, Network: the library's rows, one column */
     browser = new LibraryBrowser( p_intf, "Sidebar/librarySort", this );
@@ -264,9 +258,6 @@ SidebarPanel::SidebarPanel( intf_thread_t *_p_intf, QWidget *parent )
     connect( moreBtn, &QToolButton::clicked, this, &SidebarPanel::showMoreMenu );
     connect( popBtn, &QToolButton::clicked, this, &SidebarPanel::popOutRequested );
     connect( viewBtn, &QToolButton::clicked, this, &SidebarPanel::showViewMenu );
-    connect( recents, &QListWidget::itemActivated, this, [this]( QListWidgetItem *item ) {
-        Open::openMRL( p_intf, item->data( Qt::UserRole ).toString(), true, true );
-    } );
 
     backBtn->setEnabled( false );
     fwdBtn->setEnabled( false );
@@ -378,7 +369,8 @@ void SidebarPanel::showSection( const QString &key )
     sdFromNetwork.clear();
     setTitleCrumb( QStringList( NavRail::titleFor( key ) ), 0 );
 
-    const bool library = key == "videos" || key == "music" || key == "network";
+    const bool library = key == "videos" || key == "music" || key == "network"
+                         || key == "home" || key == "recents";
     searchBtn->blockSignals( true );
     searchBtn->setChecked( false );
     searchBtn->blockSignals( false );
@@ -392,25 +384,16 @@ void SidebarPanel::showSection( const QString &key )
     {
         pages->setCurrentWidget( libGrid );
         const bool browse = key != "network";
-        sortBtn->setEnabled( browse );
-        viewBtn->setEnabled( browse );
+        /* Home and Recent: in the order things were played */
+        const bool ordered = key == "home" || key == "recents";
+        sortBtn->setEnabled( browse && !ordered );
+        viewBtn->setEnabled( browse && key != "home" );
         searchBtn->setEnabled( browse );
-        browser->openSection( key );
+        browser->openSection( key == "recents" ? QString( "recent" ) : key );
         return;
     }
 
     setSortDot( false );
-    if( key == "recents" )
-    {
-        refreshRecents();
-        pages->setCurrentWidget( recents );
-        sortBtn->setEnabled( false );
-        viewBtn->setEnabled( false );
-        searchBtn->setEnabled( false );
-        backBtn->setEnabled( false );
-        fwdBtn->setEnabled( false );
-        return;
-    }
 
     pages->setCurrentWidget( plPage );
     sortBtn->setEnabled( true );
@@ -421,8 +404,7 @@ void SidebarPanel::showSection( const QString &key )
 
     /* Rail section -> existing playlist node */
     QStringList candidates;
-    if( key == "home" )            candidates << "library" << "playlist";
-    else                           candidates << "playlist";
+    candidates << "playlist";
 
     history.clear();
     historyPos = -1;
@@ -491,12 +473,6 @@ void SidebarPanel::updateCount()
     {
         const int n = browser->itemCount();
         count->setText( n == 1 ? qtr( "1 item" ) : qtr( "%1 items" ).arg( n ) );
-        return;
-    }
-    if( section == "recents" )
-    {
-        const int r = recents->count();
-        count->setText( r == 1 ? qtr( "1 item" ) : qtr( "%1 items" ).arg( r ) );
         return;
     }
     QAbstractItemModel *model = PLModel::getPLModel( p_intf );
@@ -657,25 +633,6 @@ void SidebarPanel::showMoreMenu()
                - QPoint( menu.sizeHint().width(), 0 ) );
 }
 
-void SidebarPanel::refreshRecents()
-{
-    recents->clear();
-    const QStringList list = RecentsMRL::getInstance( p_intf )->recentList();
-    foreach( const QString &mrl, list )
-    {
-        const QUrl url( mrl );
-        QString name = url.isLocalFile() ? QFileInfo( url.toLocalFile() ).fileName()
-                                         : url.toDisplayString();
-        if( name.isEmpty() )
-            name = mrl;
-        QListWidgetItem *item = new QListWidgetItem( name, recents );
-        item->setIcon( Theme::icon( url.isLocalFile() ? "video" : "network", 18 ) );
-        item->setToolTip( url.toDisplayString() );
-        item->setData( Qt::UserRole, mrl );
-    }
-    updateCount();
-}
-
 void SidebarPanel::libraryLocationChanged()
 {
     QStringList segments;
@@ -704,7 +661,8 @@ void SidebarPanel::libraryEntriesChanged()
     std::sort( sorted.begin(), sorted.end(), [&coll]( const QString &a, const QString &b ) {
         return coll.compare( a, b ) < 0;
     } );
-    setSortDot( titles != sorted );
+    const QString sec = browser->section();
+    setSortDot( titles != sorted && sec != "home" && sec != "recent" );
 }
 
 void SidebarPanel::setSortDot( bool on )

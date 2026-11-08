@@ -72,7 +72,6 @@ private slots:
     void showSortMenu();
     void showViewMenu();
     void showMoreMenu();
-    void refreshRecents();
     void libraryLocationChanged();
     void libraryEntriesChanged();
     void libraryAction( const QString & );
@@ -96,7 +95,6 @@ private:
     QStackedWidget *pages;
     QWidget *plPage;
     QVBoxLayout *plLayout;
-    QListWidget *recents;
     LibraryBrowser *browser;
     LibraryGrid *libGrid;
     QLineEdit *libSearch;

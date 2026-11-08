@@ -35,15 +35,21 @@ class QWidget;
 class MediaLibrary;
 
 /* One tile or row: a library item, a group (a show, a season, the
- * "Shows" folder) that opens a deeper level, or an action row of the
- * sidebar ("Add", "Add Network Stream", "Podcasts"). */
+ * "Shows" folder) that opens a deeper level, an action row of the
+ * sidebar ("Add", "Add Network Stream", "Podcasts", a recent stream), or
+ * the heading of a Home shelf ("Continue Watching ›"). */
 struct LibraryEntry
 {
-    enum Type { ITEM, GROUP, ACTION };
+    enum Type { ITEM, GROUP, ACTION, HEADER };
+    /* Home tiles (Figma row 2 #7): 16:9 video, square art, square glyph */
+    enum Tile { TILE_AUTO, TILE_WIDE, TILE_SQUARE, TILE_GLYPH };
     Type type = ITEM;
+    Tile tile = TILE_AUTO;
     QString title;
+    QString subtitle;       /* the second label line (the artist) */
     QString segment;        /* GROUP: the location segment it opens;
-                               ACTION: the action key */
+                               ACTION: the action key ("open:videos/Films",
+                               "mrl:<uri>"); HEADER: the shelf key */
     QString icon;           /* ACTION, and GROUP rows in the sidebar */
     int index = -1;         /* ITEM: index in MediaLibrary::items() */
     QString thumbFrom;      /* the item whose thumbnail stands for it */
@@ -85,7 +91,7 @@ public:
     int sortKey() const { return sort; }
 
     const QVector<LibraryEntry> &entries() const { return current; }
-    /* rows that count as items (not the "Add..." rows) */
+    /* rows that count as items (not the "Add..." rows nor headings) */
     int itemCount() const;
     /* the chip of the mini player: where playback was started from */
     QString sourceLabel() const;
@@ -109,6 +115,9 @@ signals:
 
 private:
     QVector<LibraryEntry> collect() const;
+    QVector<LibraryEntry> homeEntries( const QString &shelf ) const;
+    QVector<LibraryEntry> recentEntries() const;
+    static QString shelfTitle( const QString &key );
     static QString topFolder( const QStringList &roots, const QString &path );
     void sortEntries( QVector<LibraryEntry> & ) const;
     void play( const QStringList &paths );

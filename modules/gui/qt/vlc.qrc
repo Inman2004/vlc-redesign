@@ -99,6 +99,11 @@
         <file alias="songs.svg">pixmaps/redesign/songs.svg</file>
         <file alias="videos.svg">pixmaps/redesign/videos.svg</file>
         <file alias="vlc.svg">pixmaps/redesign/vlc.svg</file>
+        <file alias="home-active.svg">pixmaps/redesign/home-active.svg</file>
+        <file alias="videos-active.svg">pixmaps/redesign/videos-active.svg</file>
+        <file alias="songs-active.svg">pixmaps/redesign/songs-active.svg</file>
+        <file alias="network-active.svg">pixmaps/redesign/network-active.svg</file>
+        <file alias="playlist-active.svg">pixmaps/redesign/playlist-active.svg</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="faster.svg">pixmaps/faster.svg</file>
