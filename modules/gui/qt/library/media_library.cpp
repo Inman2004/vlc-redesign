@@ -595,7 +595,7 @@ QByteArray MediaLibrary::peaks( const QString &path )
     if( !fi.isFile() )
         return QByteArray();
     QFile f( thumbDir + "/" + fileKey( path, fi.size(), fi.lastModified().toSecsSinceEpoch() )
-             + ".peaks" );
+             + ".wave" );
     if( f.open( QIODevice::ReadOnly ) )
     {
         const QByteArray p = f.readAll();
@@ -616,7 +616,7 @@ void MediaLibrary::songDone( const QString &path, const AudioScan &r, qint64 ela
     const QString key = fileKey( path, fi.size(), fi.lastModified().toSecsSinceEpoch() );
     if( !r.peaks.isEmpty() )
     {
-        QSaveFile f( thumbDir + "/" + key + ".peaks" );
+        QSaveFile f( thumbDir + "/" + key + ".wave" );
         if( f.open( QIODevice::WriteOnly ) )
         {
             f.write( r.peaks );

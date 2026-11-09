@@ -33,6 +33,7 @@
 #include <QFile>
 #include <QPointer>
 #include <QUrl>
+#include <cmath>
 #include <thread>
 #include <vector>
 
@@ -182,8 +183,10 @@ static QString itemMeta( input_item_t *item, vlc_meta_type_t type )
     return out;
 }
 
-/* The loudest sample of each of PEAK_COUNT slices, scaled to the song's
- * loudest one so quiet recordings still draw */
+/* The loudness (RMS) of each of PEAK_COUNT slices, relative to the
+ * song's loudest slice, with a 1.6 curve. The loudest sample alone sits
+ * near full scale all through a mastered track and draws a flat bar;
+ * loudness shows the intro, the drops and the breaks. */
 static QByteArray readPeaks( const QString &pcm )
 {
     QFile f( pcm );
@@ -195,20 +198,24 @@ static QByteArray readPeaks( const QString &pcm )
     if( n < AudioScanner::PEAK_COUNT )
         return QByteArray();
     const qint16 *s = reinterpret_cast<const qint16 *>( raw.constData() );
-    std::vector<int> peak( AudioScanner::PEAK_COUNT, 0 );
-    int loudest = 1;
+    std::vector<double> sum( AudioScanner::PEAK_COUNT, 0.0 );
+    std::vector<qint64> count( AudioScanner::PEAK_COUNT, 0 );
     for( qint64 i = 0; i < n; i++ )
     {
         const int slice = int( i * AudioScanner::PEAK_COUNT / n );
-        const int v = qAbs( int( s[i] ) );
-        if( v > peak[slice] )
-            peak[slice] = v;
+        sum[slice] += double( s[i] ) * s[i];
+        count[slice]++;
     }
-    for( int v : peak )
-        loudest = qMax( loudest, v );
+    std::vector<double> rms( AudioScanner::PEAK_COUNT, 0.0 );
+    double loudest = 1e-9;
+    for( int k = 0; k < AudioScanner::PEAK_COUNT; k++ )
+    {
+        rms[k] = count[k] > 0 ? std::sqrt( sum[k] / count[k] ) : 0.0;
+        loudest = qMax( loudest, rms[k] );
+    }
     QByteArray out( AudioScanner::PEAK_COUNT, 0 );
     for( int k = 0; k < AudioScanner::PEAK_COUNT; k++ )
-        out[k] = char( qBound( 0, peak[k] * 255 / loudest, 255 ) );
+        out[k] = char( qBound( 0, int( std::pow( rms[k] / loudest, 1.6 ) * 255 + 0.5 ), 255 ) );
     return out;
 }
 
