@@ -104,6 +104,8 @@ private:
     bool hasHeaders = false, hasTiles = false;
     QVector<QRect> rects; /* shelf layout: per entry, empty when hidden */
     int hovered = -1, pressed = -1;
+    QPoint pressPos;          /* a drag to the queue starts from here */
+    void startDrag( int entry );
     QString playingPath;
     QHash<QString, QPixmap> pixmaps;   /* thumbnail file -> scaled pixmap */
     QTimer indicatorTimer;

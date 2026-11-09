@@ -34,6 +34,7 @@ class QStackedLayout;
 class QToolButton;
 class QVBoxLayout;
 class MiniProgress;
+class QueueList;
 
 /* Figma row 2 #3-5: a 390x339 card over the library, bottom right
  * (floating) or bottom left (docked under the nav). The playing video is
@@ -55,11 +56,15 @@ public:
     void setDocked( bool );
     /* the playlist chip: where playback was started from */
     void setSourceLabel( const QString & );
+    /* Components "Miniplayer" queue variant: the queue above the card */
+    bool isQueueOpen() const { return queueOpen; }
+    void setQueueOpen( bool );
 
 signals:
     void expandRequested();     /* back to the player */
     void queueRequested();
     void dockChanged( bool );
+    void sizeChanged();
 
 protected:
     bool eventFilter( QObject *, QEvent * ) override;
@@ -73,6 +78,8 @@ private:
     void setOverlayVisible( bool );
     void placeOverlay();
     void layoutText();
+    void layoutBody();
+    QWidget *buildQueueBox();
 
     intf_thread_t *p_intf;
     QWidget *picture;           /* the 16:9 area */
@@ -81,13 +88,18 @@ private:
     QWidget *videoHost;
     QVBoxLayout *videoLayout;
     QPointer<QWidget> videoWidget;
-    QWidget *overlay;
+    QWidget *overlay = NULL;
     QToolButton *playBtn;
     MiniProgress *progress;
     QLabel *title, *folderChip, *sourceChip;
     QWidget *chipRow;
     bool docked = false;
     QTimer hoverPoll;
+    bool queueOpen = false;
+    QWidget *queueBox = NULL;
+    QueueList *queueList = NULL;
+    QLabel *queueCount = NULL;
+    QToolButton *queueBtn = NULL;
 };
 
 #endif

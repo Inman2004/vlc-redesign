@@ -32,6 +32,9 @@
 #include <vlc_input.h>
 
 #include <QButtonGroup>
+#include <QDragEnterEvent>
+#include <QMimeData>
+#include <QUrl>
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -85,7 +88,8 @@ static QString span( qint64 us )
 class QueueDelegate : public QStyledItemDelegate
 {
 public:
-    QueueDelegate( PLModel *m, QObject *parent ) : QStyledItemDelegate( parent ), model( m ) {}
+    QueueDelegate( int hx, int nx, int ri, QObject *parent )
+        : QStyledItemDelegate( parent ), handleX( hx ), nameX( nx ), rightInset( ri ) {}
 
     QSize sizeHint( const QStyleOptionViewItem &, const QModelIndex & ) const override
     {
@@ -112,8 +116,8 @@ public:
         /* Figma "move": two short lines */
         p->setPen( QPen( current ? Theme::accent() : Theme::colors().icon, 1.5, Qt::SolidLine, Qt::RoundCap ) );
         const qreal cy = r.center().y() + 0.5;
-        p->drawLine( QPointF( r.left() + INSET, cy - 2.5 ), QPointF( r.left() + INSET + 10, cy - 2.5 ) );
-        p->drawLine( QPointF( r.left() + INSET, cy + 2.5 ), QPointF( r.left() + INSET + 10, cy + 2.5 ) );
+        p->drawLine( QPointF( r.left() + handleX, cy - 2.5 ), QPointF( r.left() + handleX + 10, cy - 2.5 ) );
+        p->drawLine( QPointF( r.left() + handleX, cy + 2.5 ), QPointF( r.left() + handleX + 10, cy + 2.5 ) );
 
         QFont f = opt.font;
         f.setPixelSize( 14 );
@@ -125,18 +129,121 @@ public:
             d.clear();
         const int dw = d.isEmpty() ? 0 : fm.horizontalAdvance( d );
         p->setPen( current ? Theme::accent() : QColor( 0x6B, 0x6B, 0x6B ) );
-        p->drawText( QRect( r.right() - RIGHT_INSET - dw, r.top(), dw + 1, r.height() ),
+        p->drawText( QRect( r.right() - rightInset - dw, r.top(), dw + 1, r.height() ),
                      Qt::AlignRight | Qt::AlignVCenter, d );
         p->setPen( fg );
-        const QRect name( r.left() + NAME_X, r.top(), r.width() - NAME_X - RIGHT_INSET - dw - 16, r.height() );
+        const QRect name( r.left() + nameX, r.top(), r.width() - nameX - rightInset - dw - 16, r.height() );
         p->drawText( name, Qt::AlignLeft | Qt::AlignVCenter,
                      fm.elidedText( index.data( Qt::DisplayRole ).toString(), Qt::ElideMiddle, name.width() ) );
         p->restore();
     }
 
 private:
-    PLModel *model;
+    int handleX, nameX, rightInset;
 };
+
+/**********************************************************************
+ * QueueList
+ **********************************************************************/
+QueueList::QueueList( intf_thread_t *_p_intf, QWidget *parent, int handleX, int nameX, int rightInset )
+    : QListView( parent ), p_intf( _p_intf )
+{
+    setObjectName( "QueueList" );
+    playlist_Lock( THEPL );
+    playlist_item_t *root = THEPL->p_playing;
+    playlist_Unlock( THEPL );
+    model = new PLModel( THEPL, p_intf, root, this );
+    setFrameShape( QFrame::NoFrame );
+    setModel( model );
+    setModelColumn( VLCModel::columnFromMeta( COLUMN_TITLE ) );
+    setItemDelegate( new QueueDelegate( handleX, nameX, rightInset, this ) );
+    setUniformItemSizes( true );
+    setMouseTracking( true );
+    setSelectionMode( QAbstractItemView::ExtendedSelection );
+    setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
+    setDragEnabled( true );
+    setAcceptDrops( true );
+    setDropIndicatorShown( true );
+    setDragDropMode( QAbstractItemView::DragDrop );
+    setDefaultDropAction( Qt::MoveAction );
+    connect( this, &QListView::activated, this, [this]( const QModelIndex &i ) {
+        model->activateItem( i );
+    } );
+    connect( model, &QAbstractItemModel::rowsInserted, this, &QueueList::changed );
+    connect( model, &QAbstractItemModel::rowsRemoved, this, &QueueList::changed );
+    connect( model, &QAbstractItemModel::modelReset, this, &QueueList::changed );
+    connect( model, &QAbstractItemModel::dataChanged, this, &QueueList::changed );
+    connect( model, &PLModel::currentIndexChanged, viewport(), QOverload<>::of( &QWidget::update ) );
+}
+
+void QueueList::removeSelected()
+{
+    model->doDelete( selectionModel()->selectedIndexes() );
+}
+
+/* files from outside the queue (the library, a file manager) */
+bool QueueList::external( const QMimeData *m ) const
+{
+    return m->hasUrls() && !qobject_cast<const PlMimeData *>( m );
+}
+
+void QueueList::dragEnterEvent( QDragEnterEvent *e )
+{
+    if( external( e->mimeData() ) )
+    {
+        e->setDropAction( Qt::CopyAction );
+        e->accept();
+        return;
+    }
+    QListView::dragEnterEvent( e );
+}
+
+void QueueList::dragMoveEvent( QDragMoveEvent *e )
+{
+    if( external( e->mimeData() ) )
+    {
+        e->setDropAction( Qt::CopyAction );
+        e->accept();
+        return;
+    }
+    QListView::dragMoveEvent( e );
+}
+
+void QueueList::dropEvent( QDropEvent *e )
+{
+    if( !external( e->mimeData() ) )
+    {
+        QListView::dropEvent( e );
+        return;
+    }
+    /* before the row under the pointer, after it in its lower half */
+    const QModelIndex at = indexAt( e->pos() );
+    int row = -1;
+    if( at.isValid() )
+        row = at.row() + ( e->pos().y() > visualRect( at ).center().y() ? 1 : 0 );
+    playlist_Lock( THEPL );
+    foreach( const QUrl &url, e->mimeData()->urls() )
+    {
+        input_item_t *in = input_item_New( qtu( url.toString( QUrl::FullyEncoded ) ), NULL );
+        if( !in )
+            continue;
+        playlist_NodeAddInput( THEPL, in, THEPL->p_playing, row < 0 ? PLAYLIST_END : row++ );
+        input_item_Release( in );
+    }
+    playlist_Unlock( THEPL );
+    e->setDropAction( Qt::CopyAction );
+    e->accept();
+}
+
+void QueueList::keyPressEvent( QKeyEvent *e )
+{
+    if( e->key() == Qt::Key_Delete || e->key() == Qt::Key_Backspace )
+    {
+        removeSelected();
+        return;
+    }
+    QListView::keyPressEvent( e );
+}
 
 /**********************************************************************
  * Panel
@@ -261,47 +368,17 @@ QWidget *QueuePanel::buildQueuePage()
         h->addWidget( b );
     v->addWidget( header );
 
-    playlist_Lock( THEPL );
-    playlist_item_t *root = THEPL->p_playing;
-    playlist_Unlock( THEPL );
-    model = new PLModel( THEPL, p_intf, root, this );
-
-    queueView = new QListView( page );
-    queueView->setObjectName( "QueueList" );
-    queueView->setFrameShape( QFrame::NoFrame );
-    queueView->setModel( model );
-    queueView->setModelColumn( VLCModel::columnFromMeta( COLUMN_TITLE ) );
-    queueView->setItemDelegate( new QueueDelegate( model, queueView ) );
-    queueView->setUniformItemSizes( true );
-    queueView->setMouseTracking( true );
-    queueView->setSelectionMode( QAbstractItemView::ExtendedSelection );
-    queueView->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
-    /* drag rows to reorder the queue (the model moves the items) */
-    queueView->setDragEnabled( true );
-    queueView->setAcceptDrops( true );
-    queueView->setDropIndicatorShown( true );
-    queueView->setDragDropMode( QAbstractItemView::DragDrop );
-    queueView->setDefaultDropAction( Qt::MoveAction );
-    queueView->installEventFilter( this );
+    queueView = new QueueList( p_intf, page, INSET, NAME_X, RIGHT_INSET );
+    model = queueView->plModel();
     v->addWidget( queueView, 1 );
 
-    connect( queueView, &QListView::activated, this, [this]( const QModelIndex &i ) {
-        model->activateItem( i );
-    } );
-    connect( removeBtn, &QToolButton::clicked, this, [this]() {
-        model->doDelete( queueView->selectionModel()->selectedIndexes() );
-    } );
+    connect( removeBtn, &QToolButton::clicked, queueView, &QueueList::removeSelected );
     connect( addBtn, &QToolButton::clicked, this, [this]() { THEDP->PLAppendDialog(); } );
     connect( sortBtn, &QToolButton::clicked, this, &QueuePanel::showSortMenu );
     connect( shuffleBtn, &QToolButton::clicked, this, [this]() { THEMIM->toggleRandom(); } );
     connect( repeatBtn, &QToolButton::clicked, this, [this]() { THEMIM->loopRepeatLoopStatus(); } );
 
-    connect( model, &QAbstractItemModel::rowsInserted, this, &QueuePanel::updateQueueHeader );
-    connect( model, &QAbstractItemModel::rowsRemoved, this, &QueuePanel::updateQueueHeader );
-    connect( model, &QAbstractItemModel::modelReset, this, &QueuePanel::updateQueueHeader );
-    connect( model, &QAbstractItemModel::dataChanged, this, &QueuePanel::updateQueueHeader );
-    connect( model, &PLModel::currentIndexChanged, queueView->viewport(),
-             QOverload<>::of( &QWidget::update ) );
+    connect( queueView, &QueueList::changed, this, &QueuePanel::updateQueueHeader );
     updateQueueHeader();
     return page;
 }
@@ -324,7 +401,7 @@ static void sumItems( playlist_item_t *node, int &count, qint64 &length )
     }
 }
 
-void QueuePanel::updateQueueHeader()
+QString QueueList::summary( intf_thread_t *p_intf )
 {
     int count = 0;
     qint64 length = 0;
@@ -334,7 +411,12 @@ void QueuePanel::updateQueueHeader()
     QString text = count == 1 ? qtr( "1 item" ) : qtr( "%1 items" ).arg( count );
     if( length > 0 )
         text += " - " + span( length );
-    queueCount->setText( text );
+    return text;
+}
+
+void QueuePanel::updateQueueHeader()
+{
+    queueCount->setText( QueueList::summary( p_intf ) );
 }
 
 void QueuePanel::updateModes()
@@ -349,6 +431,11 @@ void QueuePanel::updateModes()
 }
 
 void QueuePanel::showSortMenu()
+{
+    queueView->showSortMenu( sortBtn->mapToGlobal( QPoint( 0, sortBtn->height() + 4 ) ) );
+}
+
+void QueueList::showSortMenu( const QPoint &globalPos )
 {
     struct { int meta; Qt::SortOrder order; const char *label; } keys[] = {
         { COLUMN_TITLE, Qt::AscendingOrder, N_( "Title A–Z" ) },
@@ -369,7 +456,7 @@ void QueuePanel::showSortMenu()
             model->sort( column, order );
         } );
     }
-    menu.exec( sortBtn->mapToGlobal( QPoint( 0, sortBtn->height() + 4 ) ) );
+    menu.exec( globalPos );
 }
 
 /**********************************************************************
@@ -560,15 +647,6 @@ bool QueuePanel::eventFilter( QObject *o, QEvent *e )
 {
     if( o == tabBar && ( e->type() == QEvent::Resize || e->type() == QEvent::Show ) )
         placeUnderline( false );
-    if( o == queueView && e->type() == QEvent::KeyPress )
-    {
-        QKeyEvent *k = static_cast<QKeyEvent *>( e );
-        if( k->key() == Qt::Key_Delete || k->key() == Qt::Key_Backspace )
-        {
-            model->doDelete( queueView->selectionModel()->selectedIndexes() );
-            return true;
-        }
-    }
     return QWidget::eventFilter( o, e );
 }
 

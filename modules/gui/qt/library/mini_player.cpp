@@ -23,7 +23,9 @@
 #include "library/mini_player.hpp"
 #include "components/redesign_menus.hpp"
 #include "styles/vlc_theme.hpp"
+#include "components/queue_panel.hpp"
 #include "input_manager.hpp"
+#include "dialogs_provider.hpp"
 
 #include <vlc_input.h>
 #include <vlc_url.h>
@@ -56,6 +58,14 @@ enum
     TITLE_CAP_Y  = 265,  /* top of the title's capitals */
     CHIPS_MID_Y  = 309,  /* centre line of the chip row */
     QUEUE_RIGHT  = 14,   /* card edge to the queue button */
+    /* the queue variant (Components "Miniplayer", canvas x1.43): the card
+     * grows 350 upward; a 56px #151515 "Queue" bar, the count row centred
+     * at 89, 44px rows from 117; handle 43, name 70, duration 32 from the
+     * right; sort / - / + centred at 262, 307, 350 */
+    QUEUE_H      = 350,
+    QUEUE_TITLE_H = 56,
+    QUEUE_HEAD_MID = 89,
+    QUEUE_ROWS_Y = 117,
 };
 
 /* the thin seek bar under the picture: #090909 track, seek fill, click
@@ -162,7 +172,7 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_intf, QWidget *parent )
     picture = new QWidget( this );
     picture->setObjectName( "MiniPicture" );
     picture->setAttribute( Qt::WA_StyledBackground, true );
-    picture->setGeometry( PAD, PAD, CARD_W - 2 * PAD, PICTURE_H );
+    /* placed by layoutBody() */
     pictureStack = new QStackedLayout( picture );
     pictureStack->setStackingMode( QStackedLayout::StackOne );
     art = new QLabel( picture );
@@ -174,7 +184,7 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_intf, QWidget *parent )
     pictureStack->addWidget( videoHost );
 
     progress = new MiniProgress( p_intf, this );
-    progress->setGeometry( PAD, PROGRESS_Y, CARD_W - 2 * PAD, PROGRESS_H );
+
 
     /* placed by its capitals in layoutText(), once the style sheet font
      * is known */
@@ -197,7 +207,9 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_intf, QWidget *parent )
     QToolButton *queue = new QToolButton( this );
     Theme::setupIconButton( queue, "lists", 32, 20 );
     queue->setToolTip( qtr( "Queue" ) );
-    connect( queue, &QToolButton::clicked, this, &MiniPlayer::queueRequested );
+    queue->setCheckable( true );    /* accent while the queue is open (Figma) */
+    queueBtn = queue;
+    connect( queue, &QToolButton::clicked, this, [this]() { setQueueOpen( !queueOpen ); } );
     /* glyph to text 16, text to the next glyph 30 (Figma) */
     chips->addWidget( folderIcon );
     chips->addSpacing( 13 );
@@ -208,8 +220,7 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_intf, QWidget *parent )
     chips->addWidget( sourceChip );
     chips->addStretch( 1 );
     chips->addWidget( queue );
-    chipRow->setGeometry( TEXT_INSET, CHIPS_MID_Y - 16,
-                          CARD_W - TEXT_INSET - QUEUE_RIGHT, 32 );
+    layoutBody();
 
     /* Hover controls over the picture (Components: dimmed video, close
      * top left, expand top right, previous / play / next). The video is a
@@ -363,8 +374,77 @@ void MiniPlayer::layoutText()
 {
     title->ensurePolished();
     const QFontMetrics fm( title->font() );
-    title->setGeometry( TEXT_INSET, TITLE_CAP_Y - ( fm.ascent() - fm.capHeight() ),
+    const int top = queueOpen ? int( QUEUE_H ) : 0;
+    title->setGeometry( TEXT_INSET, top + TITLE_CAP_Y - ( fm.ascent() - fm.capHeight() ),
                         CARD_W - 2 * TEXT_INSET, fm.height() );
+}
+
+/* the card's own parts, under the queue when it is open */
+void MiniPlayer::layoutBody()
+{
+    const int top = queueOpen ? int( QUEUE_H ) : 0;
+    setFixedSize( CARD_W, CARD_H + top );
+    picture->setGeometry( PAD, top + PAD, CARD_W - 2 * PAD, PICTURE_H );
+    progress->setGeometry( PAD, top + PROGRESS_Y, CARD_W - 2 * PAD, PROGRESS_H );
+    chipRow->setGeometry( TEXT_INSET, top + CHIPS_MID_Y - 16,
+                          CARD_W - TEXT_INSET - QUEUE_RIGHT, 32 );
+    layoutText();
+    if( overlay && overlay->isVisible() )
+        placeOverlay();
+}
+
+QWidget *MiniPlayer::buildQueueBox()
+{
+    QWidget *box = new QWidget( this );
+    box->setGeometry( 0, 0, CARD_W, QUEUE_H );
+
+    QLabel *bar = new QLabel( qtr( "Queue" ), box );
+    bar->setObjectName( "MiniQueueTitle" );
+    bar->setAlignment( Qt::AlignCenter );
+    bar->setGeometry( 0, 0, CARD_W, QUEUE_TITLE_H );
+
+    queueCount = new QLabel( box );
+    queueCount->setObjectName( "MiniQueueCount" );
+    queueCount->setGeometry( 36, QUEUE_HEAD_MID - 12, 200, 24 );
+    struct { const char *icon; int centre; const char *tip; } buttons[] = {
+        { "sort", 262, N_( "Sort" ) }, { "remove", 307, N_( "Remove from the queue" ) },
+        { "add", 350, N_( "Add to the queue" ) },
+    };
+    QToolButton *b[3];
+    for( int i = 0; i < 3; i++ )
+    {
+        b[i] = new QToolButton( box );
+        Theme::setupIconButton( b[i], buttons[i].icon, 32, 24 );
+        b[i]->setToolTip( qtr( buttons[i].tip ) );
+        b[i]->move( buttons[i].centre - 16, QUEUE_HEAD_MID - 16 );
+    }
+
+    queueList = new QueueList( p_intf, box, 43, 70, 32 );
+    queueList->setGeometry( 0, QUEUE_ROWS_Y, CARD_W, QUEUE_H - QUEUE_ROWS_Y - PAD );
+    connect( b[0], &QToolButton::clicked, this, [this, b]() {
+        queueList->showSortMenu( b[0]->mapToGlobal( QPoint( 0, b[0]->height() + 4 ) ) );
+    } );
+    connect( b[1], &QToolButton::clicked, queueList, &QueueList::removeSelected );
+    connect( b[2], &QToolButton::clicked, this, [this]() { THEDP->PLAppendDialog(); } );
+    connect( queueList, &QueueList::changed, this, [this]() {
+        queueCount->setText( QueueList::summary( p_intf ) );
+    } );
+    queueCount->setText( QueueList::summary( p_intf ) );
+    return box;
+}
+
+void MiniPlayer::setQueueOpen( bool b )
+{
+    if( b == queueOpen )
+        return;
+    queueOpen = b;
+    if( b && !queueBox )
+        queueBox = buildQueueBox();
+    if( queueBox )
+        queueBox->setVisible( b );
+    queueBtn->setChecked( b );
+    layoutBody();
+    emit sizeChanged();
 }
 
 void MiniPlayer::showEvent( QShowEvent *e )

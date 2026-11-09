@@ -468,6 +468,10 @@ static QString buildStyleSheet()
     "#VLCLibrary QLineEdit#LibrarySearch { background: #151515; border: none; border-radius: 6px;"
     "  color: @text; font-size: 15px; padding: 0 8px; selection-background-color: @accentSoft; }\n"
     "#VLCLibrary QFrame#MiniPlayer { background: #1B1B1B; border-radius: 10px; }\n"
+    "#VLCLibrary QFrame#MiniPlayer QLabel#MiniQueueTitle { background: #151515; color: #8F8F8F;"
+    "  font-size: 15px; border-top-left-radius: 10px; border-top-right-radius: 10px; }\n"
+    "#VLCLibrary QFrame#MiniPlayer QLabel#MiniQueueCount { color: #6B6B6B; font-size: 14px; }\n"
+    "#VLCLibrary QFrame#MiniPlayer QListView#QueueList { background: transparent; border: none; outline: 0; }\n"
     /* Figma "continue" card */
     "QWidget#ResumeCard QLabel#ResumeText { color: #C6C6C6; font-size: 16px; background: transparent; }\n"
     "QWidget#ResumeCard QPushButton#ResumeContinue { background: @accent; color: #161616; border: none;"

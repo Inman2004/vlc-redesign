@@ -25,6 +25,7 @@
 
 #include "qt.hpp"
 
+#include <QListView>
 #include <QWidget>
 
 class QButtonGroup;
@@ -36,6 +37,38 @@ class QToolButton;
 class QVariantAnimation;
 class PLModel;
 class SeekPoints;
+
+/* The play queue as Figma's rows (drag handle, name, duration; the
+ * playing one in the accent), on its own playlist model of VLC's playing
+ * node so the sidebar's browsing never moves it. Rows drag to reorder;
+ * files dragged in from the library (or anywhere) are inserted where
+ * they are dropped. Used by the Queue panel and the mini player. */
+class QueueList : public QListView
+{
+    Q_OBJECT
+public:
+    QueueList( intf_thread_t *, QWidget *parent,
+               int handleX, int nameX, int rightInset );
+    PLModel *plModel() const { return model; }
+    void removeSelected();
+    void showSortMenu( const QPoint &globalPos );
+    /* "4 items - 2h 3m" */
+    static QString summary( intf_thread_t * );
+
+signals:
+    void changed();
+
+protected:
+    void dragEnterEvent( QDragEnterEvent * ) override;
+    void dragMoveEvent( QDragMoveEvent * ) override;
+    void dropEvent( QDropEvent * ) override;
+    void keyPressEvent( QKeyEvent * ) override;
+
+private:
+    bool external( const QMimeData * ) const;
+    intf_thread_t *p_intf;
+    PLModel *model;
+};
 
 /* Components "Queue" panel: tabs Queue | Bookmarks | Chapters over the
  * play queue (its own playlist model on VLC's playing node, so the
@@ -79,7 +112,7 @@ private:
     QStackedWidget *stack;
 
     PLModel *model;
-    QListView *queueView;
+    QueueList *queueView;
     QLabel *queueCount, *bookmarkCount, *chapterCount;
     QToolButton *sortBtn, *repeatBtn, *shuffleBtn;
     QListWidget *bookmarkList, *chapterList;

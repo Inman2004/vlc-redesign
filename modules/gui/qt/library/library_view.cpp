@@ -34,7 +34,10 @@
 
 #include <QCollator>
 #include <QDateTime>
+#include <QApplication>
 #include <QDesktopServices>
+#include <QDrag>
+#include <QMimeData>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -698,6 +701,15 @@ void LibraryGrid::scrollContentsBy( int, int )
 
 void LibraryGrid::mouseMoveEvent( QMouseEvent *e )
 {
+    /* drag an item onto the queue (P5d) */
+    if( ( e->buttons() & Qt::LeftButton ) && pressed >= 0
+        && ( e->pos() - pressPos ).manhattanLength() >= QApplication::startDragDistance() )
+    {
+        const int i = pressed;
+        pressed = -1;
+        startDrag( i );
+        return;
+    }
     const int h = entryAt( e->pos() );
     if( h != hovered )
     {
@@ -710,7 +722,10 @@ void LibraryGrid::mouseMoveEvent( QMouseEvent *e )
 void LibraryGrid::mousePressEvent( QMouseEvent *e )
 {
     if( e->button() == Qt::LeftButton )
+    {
         pressed = entryAt( e->pos() );
+        pressPos = e->pos();
+    }
 }
 
 void LibraryGrid::mouseReleaseEvent( QMouseEvent *e )
@@ -718,6 +733,31 @@ void LibraryGrid::mouseReleaseEvent( QMouseEvent *e )
     if( e->button() == Qt::LeftButton && pressed >= 0 && entryAt( e->pos() ) == pressed )
         emit activated( pressed );
     pressed = -1;
+}
+
+/* a library file, or a stream in a playlist, as a URL with its picture */
+void LibraryGrid::startDrag( int i )
+{
+    if( i < 0 || i >= entries.size() )
+        return;
+    const LibraryEntry &e = entries[i];
+    QString uri;
+    if( e.type == LibraryEntry::ITEM && e.index >= 0 )
+        uri = lib->items()[e.index].uri();
+    else if( e.type == LibraryEntry::ACTION && e.segment.startsWith( "mrl:" ) )
+        uri = e.segment.mid( 4 );
+    if( uri.isEmpty() )
+        return;
+    QMimeData *mime = new QMimeData;
+    mime->setUrls( QList<QUrl>() << QUrl( uri ) );
+    QDrag *drag = new QDrag( this );
+    drag->setMimeData( mime );
+    QPixmap pm = thumbnail( e, QSize( 64, 36 ) );
+    if( pm.isNull() )
+        pm = Theme::pixmap( e.icon.isEmpty() ? QString( "video" ) : e.icon, 24, Theme::colors().text );
+    drag->setPixmap( pm );
+    drag->setHotSpot( QPoint( pm.width() / pm.devicePixelRatio() / 2, pm.height() / pm.devicePixelRatio() / 2 ) );
+    drag->exec( Qt::CopyAction );
 }
 
 void LibraryGrid::leaveEvent( QEvent * )
@@ -800,6 +840,7 @@ LibraryView::LibraryView( intf_thread_t *_p_intf, QWidget *parent )
         placeMini();
     } );
     connect( THEMIM, &MainInputManager::inputChanged, this, &LibraryView::placeMini );
+    connect( mini, &MiniPlayer::sizeChanged, this, &LibraryView::placeMini );
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this, &LibraryView::placeMini );
     placeMini();
 
@@ -1043,7 +1084,7 @@ void LibraryView::placeMini()
         return;
     }
     const int x = mini->isDocked() ? PAGE_INSET : width() - MiniPlayer::CARD_W - 9;
-    mini->move( x, height() - MiniPlayer::CARD_H - 6 );
+    mini->move( x, height() - mini->height() - 6 );
     mini->show();
     mini->raise();
 }
