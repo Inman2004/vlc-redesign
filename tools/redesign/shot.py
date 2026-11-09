@@ -33,9 +33,14 @@ def find():
             name = win.get_wm_name() or ''
         except Exception:
             continue
-        if 'vlc' in [c.lower() for c in cls] and 'VLC' in str(name):
-            if PID and not pid_matches(win):
-                continue
+        if 'vlc' not in [c.lower() for c in cls]:
+            continue
+        # with VLC_PID: that process's window, whatever it is titled
+        # (the playing file's name while something plays)
+        if PID:
+            if pid_matches(win):
+                return win
+        elif 'VLC' in str(name):
             return win
     return None
 

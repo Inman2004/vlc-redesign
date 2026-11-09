@@ -58,6 +58,7 @@ class HeaderBar;
 class NavRail;
 class SidebarPanel;
 class AdjustDock;
+class QueueDock;
 class ChromeAutoHider;
 class LibraryView;
 class QSplitter;
@@ -164,6 +165,7 @@ protected:
     NavRail             *rail;
     SidebarPanel        *sidebar;
     AdjustDock          *adjustDock;
+    QueueDock           *queueDock = NULL;   /* P5d: Queue / Bookmarks / Chapters */
     /* redesign: windowed auto-hide ("Always") and the I-key peek in Hide UI */
     ChromeAutoHider     *autoHider = NULL;
     /* redesign: the library window state (P5a) */
@@ -232,6 +234,7 @@ public slots:
      * opens it there, or closes it if it is already showing that tab */
     void toggleAdjustPanel( int tab = -1 );
     void setAdjustPanelVisible( bool );
+    void setQueuePanelVisible( bool );
     /* open (never close) the adjustment sidebar on a tab */
     void showAdjustPanel( int tab );
     void activateSection( const QString & );

@@ -43,6 +43,7 @@
 #include "components/header_bar.hpp"            // Redesign header
 #include "components/resume_card.hpp"
 #include "components/music_view.hpp"
+#include "components/queue_panel.hpp"
 #include "components/nav_rail.hpp"              // Redesign rail
 #include "components/sidebar_panel.hpp"
 #include "library/media_library.hpp"
@@ -399,6 +400,11 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     {
         menuBar()->setFixedHeight( 0 ); /* stays "visible" so its shortcuts keep working */
         /* Hide UI, as in the design's context menu */
+        /* Q: the Queue panel (onboarding step 3); VLC binds no plain q */
+        QShortcut *queueKey = new QShortcut( QKeySequence( Qt::Key_Q ), this );
+        connect( queueKey, &QShortcut::activated, this, [this]() {
+            setQueuePanelVisible( !( queueDock && queueDock->isOpen() ) );
+        } );
         QShortcut *hideUi = new QShortcut( QKeySequence( "Ctrl+\\" ), this );
         connect( hideUi, &QShortcut::activated, this, [this]() {
             /* in fullscreen there is no window chrome: keep the
@@ -1510,6 +1516,37 @@ void MainInterface::setSidebarVisible( bool b_visible )
     playlistVisible = b_visible;
 }
 
+/* The Queue panel takes the adjustment panel's place right of the
+ * content; the bar's queue button is accent while it is open */
+void MainInterface::setQueuePanelVisible( bool b )
+{
+    if( !body )
+        return;
+    if( !queueDock )
+    {
+        if( !b )
+            return;
+        queueDock = new QueueDock( p_intf, body );
+        static_cast<QHBoxLayout *>( body->layout() )->addWidget( queueDock );
+        connect( queueDock->panel(), &QueuePanel::closeRequested, this,
+                 [this]() { setQueuePanelVisible( false ); } );
+    }
+    if( b && adjustDock && adjustDock->isOpen() )
+        setAdjustPanelVisible( false );
+    queueDock->setOpen( b, !b_minimalView && !isFullScreen() );
+    if( b )
+        queueDock->panel()->setFocus( Qt::OtherFocusReason );
+    foreach( QToolButton *btn, findChildren<QToolButton *>( "PLAYLISTButton" ) )
+    {
+        if( !btn->property( "vlcIcon" ).isValid() )
+            btn->setProperty( "vlcIcon", btn->icon() );
+        btn->setIcon( b ? QIcon( Theme::pixmap( "lists", Theme::BAR_GLYPH, Theme::accent() ) )
+                        : btn->property( "vlcIcon" ).value<QIcon>() );
+    }
+    if( !b && queueDock->panel()->isAncestorOf( QApplication::focusWidget() ) )
+        setFocus();
+}
+
 /* Slide the sidebar open or closed (180ms) by animating the splitter */
 void MainInterface::setAdjustPanelVisible( bool b )
 {
@@ -1525,6 +1562,8 @@ void MainInterface::setAdjustPanelVisible( bool b )
         connect( adjustDock->panel(), &AdjustPanel::closeRequested, this,
                  [this]() { setAdjustPanelVisible( false ); } );
     }
+    if( b && queueDock && queueDock->isOpen() )
+        setQueuePanelVisible( false );
     adjustDock->setOpen( b, !b_minimalView && !isFullScreen() );
 
     /* the bar's settings button shows the panel state */
@@ -1631,12 +1670,8 @@ void MainInterface::togglePlaylist()
 {
     if( sidebar )
     {
-        /* Queue button: show the current playlist, or hide the sidebar
-         * when it is already showing it */
-        if( sidebar->isVisible() && rail->current() == "playlists" )
-            setSidebarVisible( false );
-        else
-            activateSection( "playlists" );
+        /* the bar's queue button: the Queue panel (Components "Queue") */
+        setQueuePanelVisible( !( queueDock && queueDock->isOpen() ) );
         return;
     }
 
