@@ -185,7 +185,21 @@ HeaderBar::HeaderBar( intf_thread_t *_p_intf, MainInterface *_mi )
 
 void HeaderBar::setTitle( const QString &name )
 {
-    title->setText( name.isEmpty() ? qtr( "VLC Media Player" ) : name );
+    /* Figma music mode titles the window with the song ("untangle"), not
+     * VLC's "artist - title" */
+    QString text = name;
+    input_thread_t *p_input = THEMIM->getInput();
+    input_item_t *item = p_input ? input_GetItem( p_input ) : NULL;
+    if( item )
+    {
+        char *t = input_item_GetTitle( item );
+        char *a = input_item_GetArtist( item );
+        if( t && *t && a && *a )
+            text = qfu( t );
+        free( t );
+        free( a );
+    }
+    title->setText( text.isEmpty() ? qtr( "VLC Media Player" ) : text );
     placeTitle();
 }
 

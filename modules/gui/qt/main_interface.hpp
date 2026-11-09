@@ -185,6 +185,8 @@ protected:
     /* resume panel */
     QWidget             *resumePanel;
     class ResumeCard    *resumeCard = NULL;  /* redesign: replaces the panel */
+    class MusicView     *musicView = NULL;   /* redesign: audio without video */
+    bool                 b_musicMode = false;
     QTimer              *resumeTimer;
     int64_t             i_resumeTime;
 

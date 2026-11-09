@@ -138,9 +138,11 @@ void installHoverFade( QAbstractButton *, int radius = RADIUS );
 QString tooltipWithKey( intf_thread_t *, const QString &text, const char *keyOption );
 
 /* Custom painters for the two self-painted widgets. */
+/* peaks (music mode): the song's waveform drawn as the track */
 void paintSeekBar( QPainter *, const QRectF &groove, qreal position,
                    qreal buffering, const QList<qreal> &chapters,
-                   bool enabled, qreal hover, int hoverX = -1 );
+                   bool enabled, qreal hover, int hoverX = -1,
+                   const QByteArray &peaks = QByteArray() );
 void paintVolumeWedge( QPainter *, const QRectF &rect, qreal fraction,
                        bool muted, bool hovered );
 

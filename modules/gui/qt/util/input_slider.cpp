@@ -30,6 +30,7 @@
 #include "qt.hpp"
 
 #include "util/input_slider.hpp"
+#include "library/media_library.hpp"
 #include "util/seek_preview.hpp"
 #include "util/timetooltip.hpp"
 #include "adapters/seekpoints.hpp"
@@ -563,7 +564,8 @@ void SeekSlider::paintEvent( QPaintEvent *ev )
             ( QTime::currentTime() > bufferingStart.addSecs( 1 ) ) ? f_buffering : 0.0;
         QPainter painter( this );
         Theme::paintSeekBar( &painter, QRectF( rect() ), pos, buffering, marks,
-                             isEnabled(), isEnabled() ? hoverAmount : 0.0, hoverX );
+                             isEnabled(), isEnabled() ? hoverAmount : 0.0, hoverX,
+                             waveform ? peaks : QByteArray() );
         return;
     }
     if ( alternativeStyle )
@@ -590,6 +592,41 @@ void SeekSlider::paintEvent( QPaintEvent *ev )
     }
     else
         QSlider::paintEvent( ev );
+}
+
+void SeekSlider::setWaveform( bool b )
+{
+    if( waveform == b )
+        return;
+    waveform = b;
+    if( !b )
+        return;
+    MediaLibrary *lib = MediaLibrary::instance( p_intf );
+    connect( THEMIM, &MainInputManager::inputChanged, this, &SeekSlider::refreshPeaks );
+    connect( lib, &MediaLibrary::peaksReady, this, [this]( const QString &p ) {
+        if( p == peaksPath )
+            refreshPeaks();
+    } );
+    refreshPeaks();
+}
+
+/* the playing local file's peaks; asks for them when not read yet */
+void SeekSlider::refreshPeaks()
+{
+    QString path;
+    input_thread_t *input = THEMIM->getInput();
+    input_item_t *item = input ? input_GetItem( input ) : NULL;
+    char *uri = item ? input_item_GetURI( item ) : NULL;
+    if( uri )
+    {
+        const QUrl url( qfu( uri ) );
+        if( url.isLocalFile() )
+            path = url.toLocalFile();
+        free( uri );
+    }
+    peaksPath = path;
+    peaks = path.isEmpty() ? QByteArray() : MediaLibrary::instance( p_intf )->peaks( path );
+    update();
 }
 
 void SeekSlider::hideEvent( QHideEvent * )

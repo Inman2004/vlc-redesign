@@ -790,7 +790,7 @@ void apply()
  *********************************************************************/
 void paintSeekBar( QPainter *p, const QRectF &groove, qreal position,
                    qreal buffering, const QList<qreal> &chapters,
-                   bool enabled, qreal hover, int hoverX )
+                   bool enabled, qreal hover, int hoverX, const QByteArray &peaks )
 {
     p->save();
     p->setRenderHint( QPainter::Antialiasing );
@@ -817,8 +817,31 @@ void paintSeekBar( QPainter *p, const QRectF &groove, qreal position,
     const qreal handleX = groove.left() + SEEK_HANDLE_W / 2.0
                         + position * ( groove.width() - SEEK_HANDLE_W );
 
+    /* Figma row 2 #8-9: the waveform, 2px bars on a 5px pitch, 2 to 16px
+     * tall in the 28px track; accent up to the handle, grey after */
+    if( !peaks.isEmpty() )
+    {
+        const qreal inset = 6.0, pitch = 5.0, barW = 2.0;
+        const qreal maxH = groove.height() * 16.0 / 28.0, minH = 2.0;
+        const int bars = qMax( 1, int( ( groove.width() - 2 * inset + pitch - barW ) / pitch ) );
+        const QColor played = mix( g_accent, accentHover(), hover );
+        const QColor rest( 0x48, 0x48, 0x48 );
+        for( int k = 0; k < bars; k++ )
+        {
+            /* the loudest peak under the bar */
+            const int a = k * peaks.size() / bars;
+            const int b = qMax( a + 1, ( k + 1 ) * peaks.size() / bars );
+            int v = 0;
+            for( int i = a; i < b && i < peaks.size(); i++ )
+                v = qMax( v, int( quint8( peaks[i] ) ) );
+            const qreal h = qRound( minH + ( maxH - minH ) * v / 255.0 );
+            const qreal x = groove.left() + inset + k * pitch;
+            p->setBrush( enabled && position >= 0.0 && x + barW / 2 < handleX ? played : rest );
+            p->drawRect( QRectF( x, qRound( groove.center().y() - h / 2 ), barW, h ) );
+        }
+    }
     /* Played part */
-    if( enabled && position >= 0.0 )
+    else if( enabled && position >= 0.0 )
     {
         QColor fill = mix( seekFill(), seekFill().lighter( 125 ), hover );
         p->setBrush( fill );

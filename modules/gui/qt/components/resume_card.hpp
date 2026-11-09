@@ -42,6 +42,7 @@ public:
 
     void showFor( int64_t time );   /* the saved position, in microseconds */
     void place();
+    void setBar( QWidget *b ) { bar = b; }   /* the bar is rebuilt in music mode */
 
 signals:
     void continueRequested();

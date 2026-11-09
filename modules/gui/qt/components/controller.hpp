@@ -50,6 +50,10 @@
 /* earlier defaults, migrated to the current ones when found unchanged */
 #define REDESIGN_TB2_DEFAULT_V1 "22;0;23;64;43;33-4;44;64;35-4;64;26;27;9;64;10"
 #define REDESIGN_INPT_TB_DEFAULT ""
+/* Figma row 2 #8-9 (music mode): prev, -15s, play, +15s, next, time,
+ * seek, total, volume, audio tracks, queue; used while the bar is the
+ * default one */
+#define REDESIGN_MUSIC_TB2 "22;16;0;17;23;64;43;33-4;44;64;35-4;64;26;10"
 #define REDESIGN_FSC_TB_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;20;28;26;27;8"
 #define REDESIGN_FSC_TB_DEFAULT_V1 "22;0;23;64;43;33-4;44;64;35-4;64;26;27;8"
 
@@ -180,6 +184,8 @@ public:
     AbstractController( intf_thread_t  *_p_i, QWidget *_parent = 0 );
 
 protected:
+    bool musicBar = false;   /* redesign music mode: waveform seek bar */
+
     intf_thread_t       *p_intf;
 
     QSignalMapper       *toolbarActionsMapper;
@@ -236,7 +242,7 @@ class ControlsWidget : public AbstractController
 public:
     /* p_intf, advanced control visible or not, blingbling or not */
     ControlsWidget( intf_thread_t *_p_i, bool b_advControls,
-                    QWidget *_parent = 0 );
+                    QWidget *_parent = 0, bool music = false );
 
     void setGripVisible( bool b_visible )
     { if( grip ) grip->setVisible( b_visible ); }

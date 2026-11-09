@@ -103,6 +103,8 @@ public:
     /* waveform peaks of a song (PEAK_COUNT bytes), empty until scanned;
      * any local file, in the library or not: asks for it when missing */
     QByteArray peaks( const QString &path );
+    /* a song's cover art, by the file (in the library or not) */
+    QString artFile( const QString &path ) const;
 
     /* "S01E04", "1x04" and "Season 1" folders make a show episode */
     static void classify( LibraryItem & );

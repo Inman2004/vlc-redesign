@@ -62,6 +62,8 @@ public:
                 bool _classic = false );
     virtual ~SeekSlider();
     void setChapters( SeekPoints * );
+    /* music mode: draw the playing song's waveform */
+    void setWaveform( bool );
 
 protected:
     void mouseMoveEvent( QMouseEvent *event ) Q_DECL_OVERRIDE;
@@ -92,6 +94,11 @@ protected:
     int   getValueFromXPos( int );
 
 private:
+    void refreshPeaks();
+    bool waveform = false;
+    QString peaksPath;
+    QByteArray peaks;
+
     SeekPreview *preview = NULL;
     float previewTime = -1;
     intf_thread_t *p_intf;

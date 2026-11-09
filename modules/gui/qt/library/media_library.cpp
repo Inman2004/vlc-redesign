@@ -576,6 +576,16 @@ void MediaLibrary::pumpSongs()
     }
 }
 
+QString MediaLibrary::artFile( const QString &path ) const
+{
+    const QFileInfo fi( path );
+    if( path.isEmpty() || !fi.isFile() )
+        return QString();
+    const QString f = thumbDir + "/" + fileKey( path, fi.size(), fi.lastModified().toSecsSinceEpoch() )
+                      + ".jpg";
+    return QFileInfo::exists( f ) ? f : QString();
+}
+
 QByteArray MediaLibrary::peaks( const QString &path )
 {
     QHash<QString, QByteArray>::const_iterator c = peakCache.constFind( path );

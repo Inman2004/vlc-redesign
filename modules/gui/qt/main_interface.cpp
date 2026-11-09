@@ -42,6 +42,7 @@
 #include "components/playlist/playlist.hpp"     // plWidget
 #include "components/header_bar.hpp"            // Redesign header
 #include "components/resume_card.hpp"
+#include "components/music_view.hpp"
 #include "components/nav_rail.hpp"              // Redesign rail
 #include "components/sidebar_panel.hpp"
 #include "library/media_library.hpp"
@@ -622,8 +623,10 @@ void MainInterface::recreateToolbars()
     delete controls;
     delete inputC;
 
-    controls = new ControlsWidget( p_intf, b_adv, this );
+    controls = new ControlsWidget( p_intf, b_adv, this, b_musicMode );
     inputC = new InputControlsWidget( p_intf, this );
+    if( resumeCard )
+        resumeCard->setBar( controls );
     if( Theme::redesign() )
     {
         mainLayout->addWidget( inputC );
@@ -874,6 +877,14 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     {
         /* let the rounded content panel show through */
         bgWidget->setAutoFillBackground( false );
+        /* music mode (Figma row 2 #8-9): its own picture and bar */
+        musicView = new MusicView( p_intf, bgWidget );
+        connect( musicView, &MusicView::activeChanged, this, [this]( bool on ) {
+            if( on == b_musicMode )
+                return;
+            b_musicMode = on;
+            recreateToolbars();
+        } );
     }
     if ( !var_InheritBool( p_intf, "qt-bgcone" ) )
         bgWidget->setWithArt( false );

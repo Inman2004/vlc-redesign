@@ -169,6 +169,8 @@ static QString redesignIconName( int button )
     case AUDIO_TRACKS_BUTTON:   return "audio";
     case LOOP_BUTTON:           return "repeat";
     case ROTATE_BUTTON:         return "rotate";
+    case SKIP_BACK_BUTTON:      return "back-15";
+    case SKIP_FW_BUTTON:        return "forward-15";
     default:                    return QString();
     }
 }
@@ -430,7 +432,8 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
             {
                 buttonGroupLayout = new QHBoxLayout;
                 if( Theme::redesign() )
-                    buttonGroupLayout->setSpacing( Theme::BAR_GROUP_SPACING );
+                    /* Figma's music bar packs prev/-15/play/+15/next tighter */
+                    buttonGroupLayout->setSpacing( musicBar ? 8 : Theme::BAR_GROUP_SPACING );
             }
             buttonGroupLayout->addWidget( widg );
         }
@@ -626,6 +629,8 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         /* Give hint to disable slider's interactivity when useless */
         connect( THEMIM->getIM(), &InputManager::inputCanSeek,
                  slider, &SeekSlider::setSeekable );
+        if( musicBar )
+            slider->setWaveform( true );
         widget = slider;
         }
         break;
@@ -973,7 +978,7 @@ QFrame *AbstractController::telexFrame()
  *****************************/
 ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
                                 bool b_advControls,
-                                QWidget *_parent ) :
+                                QWidget *_parent, bool music ) :
                                 AbstractController( _p_i, _parent )
 {
     RTL_UNAFFECTED_WIDGET
@@ -994,7 +999,12 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
         controlLayout->setSpacing( 0 );
         parseAndCreate( getSettings()->value( toolbarKey( TOOLBAR_MAIN1 ),
                             toolbarDefault( TOOLBAR_MAIN1 ) ).toString(), controlLayout );
-        parseAndCreate( toolbarLine( getSettings(), TOOLBAR_MAIN2 ), controlLayout );
+        QString line = toolbarLine( getSettings(), TOOLBAR_MAIN2 );
+        /* music mode swaps the default bar only: a customised one stays */
+        if( music && line == REDESIGN_TB2_DEFAULT )
+            line = REDESIGN_MUSIC_TB2;
+        musicBar = music;
+        parseAndCreate( line, controlLayout );
         if( !b_advancedVisible && advControls ) advControls->hide();
         return;
     }

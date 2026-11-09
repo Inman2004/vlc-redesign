@@ -35,6 +35,7 @@
 #include "input_manager.hpp"         /* THEMIM */
 #include "main_interface.hpp"        /* Show playlist */
 #include "components/controller.hpp" /* Toggle FSC controller width */
+#include "styles/vlc_theme.hpp"
 #include "components/extended_panels.hpp"
 #include "menus.hpp"
 
@@ -213,17 +214,22 @@ void ActionsManager::AudioDown()
     playlist_VolumeDown( THEPL, 1, NULL );
 }
 
+/* the redesign's buttons are drawn "15": they jump 15 s (Figma music bar) */
 void ActionsManager::skipForward()
 {
     input_thread_t *p_input = THEMIM->getInput();
-    if( p_input )
+    if( p_input && Theme::redesign() )
+        var_SetInteger( p_input, "time-offset", 15 * CLOCK_FREQ );
+    else if( p_input )
         THEMIM->getIM()->jumpFwd();
 }
 
 void ActionsManager::skipBackward()
 {
     input_thread_t *p_input = THEMIM->getInput();
-    if( p_input )
+    if( p_input && Theme::redesign() )
+        var_SetInteger( p_input, "time-offset", -15 * CLOCK_FREQ );
+    else if( p_input )
         THEMIM->getIM()->jumpBwd();
 }
 
