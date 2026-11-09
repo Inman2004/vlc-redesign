@@ -32,6 +32,7 @@
 #include <QVector>
 
 class QWidget;
+class QMenu;
 class MediaLibrary;
 
 /* One tile or row: a library item, a group (a show, a season, the
@@ -57,6 +58,7 @@ struct LibraryEntry
     bool watched = false;
     qreal progress = 0.0;
     qint64 date = 0;        /* newest file date, for sorting */
+    int track = -1;         /* inside a named playlist: its position */
 };
 
 /* Where we are (videos > shows > The Wand > S01), the history, the search
@@ -118,6 +120,9 @@ private:
     QVector<LibraryEntry> homeEntries( const QString &shelf ) const;
     QVector<LibraryEntry> recentEntries() const;
     QVector<LibraryEntry> musicEntries() const;
+    QVector<LibraryEntry> playlistEntries() const;
+    void showPlaylistMenu( const QString &file, const QPoint &, QWidget *parent );
+    void addToPlaylistMenu( QMenu *, const QStringList &uris, QWidget *parent );
     static QString shelfTitle( const QString &key );
     static QString topFolder( const QStringList &roots, const QString &path );
     void sortEntries( QVector<LibraryEntry> & ) const;

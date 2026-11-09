@@ -1473,7 +1473,8 @@ void MainInterface::createPlaylist()
         connect( sidebar, &SidebarPanel::popOutRequested, this, [this]() {
             const QString sec = lastSection == "music" ? "music"
                               : lastSection == "recents" ? "recent"
-                              : lastSection == "home" ? "home" : "videos";
+                              : lastSection == "home" ? "home"
+                              : lastSection == "playlists" ? "playlists" : "videos";
             setLibraryMode( true, sec );
         } );
         Q_UNUSED( dialog );

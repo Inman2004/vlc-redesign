@@ -370,7 +370,7 @@ void SidebarPanel::showSection( const QString &key )
     setTitleCrumb( QStringList( NavRail::titleFor( key ) ), 0 );
 
     const bool library = key == "videos" || key == "music" || key == "network"
-                         || key == "home" || key == "recents";
+                         || key == "home" || key == "recents" || key == "playlists";
     searchBtn->blockSignals( true );
     searchBtn->setChecked( false );
     searchBtn->blockSignals( false );

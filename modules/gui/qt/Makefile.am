@@ -161,6 +161,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/library/media_library.cpp gui/qt/library/media_library.hpp \
 	gui/qt/library/library_view.cpp gui/qt/library/library_view.hpp \
 	gui/qt/library/mini_player.cpp gui/qt/library/mini_player.hpp \
+	gui/qt/library/playlist_store.cpp gui/qt/library/playlist_store.hpp \
 	gui/qt/components/resume_card.cpp gui/qt/components/resume_card.hpp \
 	gui/qt/components/music_view.cpp gui/qt/components/music_view.hpp \
 	gui/qt/library/library_browser.cpp gui/qt/library/library_browser.hpp \
@@ -204,6 +205,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/library/media_library.moc.cpp \
 	gui/qt/library/library_view.moc.cpp \
 	gui/qt/library/mini_player.moc.cpp \
+	gui/qt/library/playlist_store.moc.cpp \
 	gui/qt/components/resume_card.moc.cpp \
 	gui/qt/components/music_view.moc.cpp \
 	gui/qt/library/library_browser.moc.cpp \

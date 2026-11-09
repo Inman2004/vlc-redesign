@@ -23,6 +23,8 @@
 
 #include "library/library_browser.hpp"
 #include "library/media_library.hpp"
+#include "library/playlist_store.hpp"
+#include "dialogs/redesign_dialogs.hpp"
 #include "components/redesign_menus.hpp"
 #include "dialogs_provider.hpp"
 #include "recents.hpp"
@@ -36,7 +38,9 @@
 #include <QFileInfo>
 #include <QSet>
 #include <QHash>
+#include <QInputDialog>
 #include <QMenu>
+#include <QMessageBox>
 #include <QUrl>
 
 #include <algorithm>
@@ -58,6 +62,10 @@ LibraryBrowser::LibraryBrowser( intf_thread_t *_p_intf, const QString &key, QObj
         if( !refresh.isActive() )
             refresh.start();
     } );
+    connect( PlaylistStore::instance( p_intf ), &PlaylistStore::changed, this, [this]() {
+        if( section() == "playlists" || section() == "home" )
+            rebuild();
+    } );
 }
 
 QString LibraryBrowser::sectionTitle( const QString &key )
@@ -72,6 +80,7 @@ QString LibraryBrowser::sectionTitle( const QString &key )
     if( key == "albums" )  return qtr( "Albums" );
     if( key == "artists" ) return qtr( "Artists" );
     if( key == "genres" )  return qtr( "Genres" );
+    if( key == "playlists" ) return qtr( "Playlists" );
     return key;
 }
 
@@ -82,6 +91,7 @@ QString LibraryBrowser::shelfTitle( const QString &key )
     if( key == "folders" )  return qtr( "Frequently Visited Folders" );
     if( key == "streams" )  return qtr( "Latest Streams" );
     if( key == "artists" )  return qtr( "Frequently Listened Artists" );
+    if( key == "playlists" ) return qtr( "Frequently Visited Playlists" );
     return key;
 }
 
@@ -92,6 +102,12 @@ QString LibraryBrowser::segmentTitle( int i ) const
         return shelfTitle( s );
     if( i == 1 && section() == "music" )
         return sectionTitle( s );
+    if( i == 1 && section() == "playlists" )
+    {
+        PlaylistStore *store = PlaylistStore::instance( p_intf );
+        const int k = store->indexOf( s );
+        return k >= 0 ? store->playlists()[k].title : QFileInfo( s ).completeBaseName();
+    }
     return i == 0 || s == "shows" ? sectionTitle( s ) : s;
 }
 
@@ -163,6 +179,7 @@ void LibraryBrowser::rebuild()
     /* Home and Recent keep their own order (most recent first); Music's
      * categories keep Figma's order, an album its track order */
     const bool ordered = section() == "home" || section() == "recent"
+                         || ( section() == "playlists" && loc.size() == 2 )
                          || ( section() == "music" && ( loc.size() == 1
                               || ( loc.size() == 3 && loc[1] == "albums" ) ) );
     if( !( ordered && needle.isEmpty() ) )
@@ -214,6 +231,8 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
 
     if( search.isEmpty() && sec == "home" )
         return homeEntries( loc.value( 1 ) );
+    if( sec == "playlists" )
+        return playlistEntries();
     if( search.isEmpty() && sec == "recent" )
         return recentEntries();
 
@@ -570,8 +589,30 @@ QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
         streams << s;
     }
 
+    /* named playlists that were played, most played first */
+    QVector<LibraryEntry> lists;
+    {
+        QVector<SavedPlaylist> pl = PlaylistStore::instance( p_intf )->playlists();
+        std::stable_sort( pl.begin(), pl.end(), []( const SavedPlaylist &a, const SavedPlaylist &b ) {
+            return a.plays != b.plays ? a.plays > b.plays : a.lastPlayed > b.lastPlayed;
+        } );
+        foreach( const SavedPlaylist &p, pl )
+        {
+            if( p.plays <= 0 )
+                continue;
+            LibraryEntry g;
+            g.type = LibraryEntry::ACTION;
+            g.segment = "open:" + QStringList( { "playlists", p.file } ).join( QChar( 0x1F ) );
+            g.title = p.title;
+            g.icon = "playlist";
+            g.tile = LibraryEntry::TILE_GLYPH;
+            lists << g;
+        }
+    }
+
     if( !shelf.isEmpty() )
     {
+        if( shelf == "playlists" ) return lists;
         if( shelf == "continue" ) return cont;
         if( shelf == "listen" )   return listen;
         if( shelf == "folders" )  return folders;
@@ -596,7 +637,8 @@ QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
     add( "continue", cont );
     add( "listen", listen );
     add( "folders", folders );
-    add( "artists", artists );   /* Components "Home" order */
+    add( "playlists", lists );   /* Components "Home" order */
+    add( "artists", artists );
     add( "streams", streams );
     return out;
 }
@@ -682,6 +724,78 @@ QVector<LibraryEntry> LibraryBrowser::musicEntries() const
         if( cat == "albums" && lib->thumbnailFile( items[lib->indexOf( e.thumbFrom )] ).isEmpty()
             && !lib->thumbnailFile( it ).isEmpty() )
             e.thumbFrom = it.path;
+    }
+    return out;
+}
+
+/* Components "Playlists": Create playlist, then each playlist; inside
+ * one, its tracks in order (library files with their thumbnails) */
+QVector<LibraryEntry> LibraryBrowser::playlistEntries() const
+{
+    PlaylistStore *store = PlaylistStore::instance( p_intf );
+    QVector<LibraryEntry> out;
+    if( loc.size() == 1 )
+    {
+        if( actionRows )
+        {
+            LibraryEntry a;
+            a.type = LibraryEntry::ACTION;
+            a.segment = "newplaylist";
+            a.title = qtr( "Create playlist" );
+            a.icon = "add";
+            out << a;
+        }
+        foreach( const SavedPlaylist &p, store->playlists() )
+        {
+            if( !needle.isEmpty() && !p.title.contains( needle, Qt::CaseInsensitive ) )
+                continue;
+            LibraryEntry g;
+            g.type = LibraryEntry::GROUP;
+            g.title = p.title;
+            g.segment = p.file;
+            g.icon = "playlist";
+            g.count = p.uris.size();
+            g.date = p.lastPlayed;
+            g.tile = LibraryEntry::TILE_GLYPH;
+            out << g;
+        }
+        return out;
+    }
+    const int k = store->indexOf( loc[1] );
+    if( k < 0 )
+        return out;
+    const QStringList uris = store->playlists()[k].uris;
+    const QVector<LibraryItem> &items = lib->items();
+    for( int t = 0; t < uris.size(); t++ )
+    {
+        const QUrl url( uris[t] );
+        const int i = url.isLocalFile() ? lib->indexOf( QDir::cleanPath( url.toLocalFile() ) ) : -1;
+        LibraryEntry e;
+        e.track = t;
+        if( i >= 0 )
+        {
+            e.type = LibraryEntry::ITEM;
+            e.index = i;
+            e.title = items[i].kind == LibraryItem::AUDIO ? items[i].songTitle() : items[i].name();
+            if( items[i].kind == LibraryItem::AUDIO )
+            {
+                e.subtitle = items[i].artist;
+                e.tile = LibraryEntry::TILE_SQUARE;
+            }
+            e.thumbFrom = items[i].path;
+            e.watched = items[i].watched;
+            e.progress = items[i].progressRatio();
+        }
+        else
+        {
+            e.type = LibraryEntry::ACTION;
+            e.segment = "mrl:" + uris[t];
+            e.title = streamTitle( uris[t] );
+            e.icon = url.isLocalFile() ? "file" : "network";
+        }
+        if( !needle.isEmpty() && !e.title.contains( needle, Qt::CaseInsensitive ) )
+            continue;
+        out << e;
     }
     return out;
 }
@@ -821,7 +935,15 @@ void LibraryBrowser::activate( int i )
     }
     if( e.type == LibraryEntry::ACTION )
     {
-        if( e.segment.startsWith( "open:" ) )
+        if( e.track >= 0 && section() == "playlists" && loc.size() == 2 )
+        {
+            /* a stream in a playlist: the playlist from there */
+            PlaylistStore::instance( p_intf )->play( loc[1], e.track );
+            return;
+        }
+        if( e.segment == "newplaylist" )
+            THEDP->newPlaylistDialog();
+        else if( e.segment.startsWith( "open:" ) )
             setLocation( e.segment.mid( 5 ).split( QChar( 0x1F ) ) );
         else if( e.segment.startsWith( "mrl:" ) )
             Open::openMRL( p_intf, e.segment.mid( 4 ), true, true );
@@ -836,6 +958,13 @@ void LibraryBrowser::activate( int i )
     if( e.type == LibraryEntry::GROUP )
     {
         setLocation( loc + QStringList( e.segment ) );
+        return;
+    }
+    /* inside a named playlist: the playlist from this track */
+    if( e.track >= 0 && section() == "playlists" && loc.size() == 2 )
+    {
+        PlaylistStore::instance( p_intf )->play( loc[1], e.track );
+        emit played( lib->items()[e.index].path );
         return;
     }
     /* play it, with the rest of this view after it */
@@ -866,11 +995,30 @@ void LibraryBrowser::play( const QStringList &paths )
 
 void LibraryBrowser::showEntryMenu( int i, const QPoint &pos, QWidget *parent )
 {
-    if( i < 0 || i >= current.size() || current[i].type == LibraryEntry::ACTION
-        || current[i].type == LibraryEntry::HEADER )
+    if( i < 0 || i >= current.size() || current[i].type == LibraryEntry::HEADER )
         return;
     const LibraryEntry e = current[i];
+    const bool inPlaylist = section() == "playlists" && loc.size() == 2 && e.track >= 0;
+    if( section() == "playlists" && loc.size() == 1 && e.type == LibraryEntry::GROUP )
+    {
+        showPlaylistMenu( e.segment, pos, parent );
+        return;
+    }
+    if( e.type == LibraryEntry::ACTION && !inPlaylist )
+        return;
     QMenu menu( parent );
+    if( e.type == LibraryEntry::ACTION )
+    {
+        /* a stream in a playlist */
+        menu.addAction( RedesignMenus::menuIcon( "play", 20 ), qtr( "Play" ), this, [this, i]() { activate( i ); } );
+        menu.addSeparator();
+        const QString file = loc[1];
+        const int track = e.track;
+        menu.addAction( RedesignMenus::menuIcon( "win-close", 20 ), qtr( "Remove from Playlist" ), this,
+                        [this, file, track]() { PlaylistStore::instance( p_intf )->removeTrack( file, track ); } );
+        menu.exec( pos );
+        return;
+    }
     menu.addAction( RedesignMenus::menuIcon( "play", 20 ),
                     e.type == LibraryEntry::GROUP ? qtr( "Open" ) : qtr( "Play" ),
                     this, [this, i]() { activate( i ); } );
@@ -880,6 +1028,15 @@ void LibraryBrowser::showEntryMenu( int i, const QPoint &pos, QWidget *parent )
         menu.addAction( RedesignMenus::menuIcon( "queue", 20 ), qtr( "Add to Queue" ), this, [this, it]() {
             Open::openMRL( p_intf, it.uri(), false, true );
         } );
+        QMenu *to = menu.addMenu( RedesignMenus::menuIcon( "playlist", 20 ), qtr( "Add to Playlist" ) );
+        addToPlaylistMenu( to, QStringList( it.uri() ), parent );
+        if( inPlaylist )
+        {
+            const QString file = loc[1];
+            const int track = e.track;
+            menu.addAction( RedesignMenus::menuIcon( "win-close", 20 ), qtr( "Remove from Playlist" ), this,
+                            [this, file, track]() { PlaylistStore::instance( p_intf )->removeTrack( file, track ); } );
+        }
         menu.addSeparator();
         menu.addAction( RedesignMenus::menuIcon( "watched", 20 ),
                         it.watched ? qtr( "Mark as Unwatched" ) : qtr( "Mark as Watched" ),
@@ -892,6 +1049,65 @@ void LibraryBrowser::showEntryMenu( int i, const QPoint &pos, QWidget *parent )
             QDesktopServices::openUrl( QUrl::fromLocalFile( it.folder() ) );
         } );
     }
+    menu.exec( pos );
+}
+
+/* "Add to Playlist ▸": every playlist, then a new one with these */
+void LibraryBrowser::addToPlaylistMenu( QMenu *to, const QStringList &uris, QWidget *parent )
+{
+    PlaylistStore *store = PlaylistStore::instance( p_intf );
+    foreach( const SavedPlaylist &p, store->playlists() )
+    {
+        const QString file = p.file;
+        to->addAction( RedesignMenus::menuIcon( "playlist", 20 ), p.title, this,
+                       [store, file, uris]() { store->append( file, uris ); } );
+    }
+    if( !store->playlists().isEmpty() )
+        to->addSeparator();
+    intf_thread_t *intf = p_intf;
+    to->addAction( RedesignMenus::menuIcon( "add", 20 ), qtr( "New Playlist…" ), this, [intf, parent, uris]() {
+        ( new NewPlaylistDialog( intf, parent ? parent->window() : NULL, uris ) )->show();
+    } );
+}
+
+/* Components "Playlists" row menu: Play, Rename, Export Playlist, Delete */
+void LibraryBrowser::showPlaylistMenu( const QString &file, const QPoint &pos, QWidget *parent )
+{
+    PlaylistStore *store = PlaylistStore::instance( p_intf );
+    const int k = store->indexOf( file );
+    if( k < 0 )
+        return;
+    const QString title = store->playlists()[k].title;
+    QMenu menu( parent );
+    menu.addAction( RedesignMenus::menuIcon( "play", 20 ), qtr( "Play" ), this, [store, file]() {
+        store->play( file );
+    } );
+    menu.addAction( RedesignMenus::menuIcon( "folder", 20 ), qtr( "Open" ), this, [this, file]() {
+        setLocation( QStringList() << "playlists" << file );
+    } );
+    menu.addSeparator();
+    menu.addAction( RedesignMenus::menuIcon( "edit", 20 ), qtr( "Rename…" ), this, [store, file, title, parent]() {
+        bool ok = false;
+        const QString name = QInputDialog::getText( parent, qtr( "Rename Playlist" ), qtr( "Name" ),
+                                                    QLineEdit::Normal, title, &ok );
+        if( ok && !name.trimmed().isEmpty() )
+            store->rename( file, name );
+    } );
+    menu.addAction( RedesignMenus::menuIcon( "save", 20 ), qtr( "Export Playlist…" ), this, [store, file, title, parent]() {
+        QString filter;
+        const QString dest = QFileDialog::getSaveFileName( parent, qtr( "Export Playlist" ),
+                QDir::homePath() + "/" + QString( title ).replace( '/', '-' ) + ".xspf",
+                qtr( "XSPF playlist (*.xspf);;M3U8 playlist (*.m3u8)" ), &filter );
+        if( !dest.isEmpty() )
+            store->exportTo( file, dest );
+    } );
+    menu.addSeparator();
+    menu.addAction( RedesignMenus::menuIcon( "win-close", 20 ), qtr( "Delete" ), this, [store, file, title, parent]() {
+        if( QMessageBox::question( parent, qtr( "Delete Playlist" ),
+                qtr( "Move the playlist \"%1\" to the trash? Its files stay where they are." ).arg( title ) )
+            == QMessageBox::Yes )
+            store->remove( file );
+    } );
     menu.exec( pos );
 }
 

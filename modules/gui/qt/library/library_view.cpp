@@ -875,7 +875,7 @@ QWidget *LibraryView::buildNav()
         b->setCheckable( strcmp( it.key, "add" ) != 0 );
         const QString key = it.key;
         connect( b, &QAbstractButton::clicked, this, [this, key]() {
-            if( key == "network" || key == "playlists" )
+            if( key == "network" )
                 emit playerSectionRequested( key );
             else if( key == "add" )
                 /* a folder for the library to watch */
