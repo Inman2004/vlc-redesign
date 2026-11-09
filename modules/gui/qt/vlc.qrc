@@ -99,6 +99,10 @@
         <file alias="songs.svg">pixmaps/redesign/songs.svg</file>
         <file alias="videos.svg">pixmaps/redesign/videos.svg</file>
         <file alias="vlc.svg">pixmaps/redesign/vlc.svg</file>
+        <file alias="album.svg">pixmaps/redesign/album.svg</file>
+        <file alias="genre.svg">pixmaps/redesign/genre.svg</file>
+        <file alias="back-15.svg">pixmaps/redesign/back-15.svg</file>
+        <file alias="forward-15.svg">pixmaps/redesign/forward-15.svg</file>
         <file alias="home-active.svg">pixmaps/redesign/home-active.svg</file>
         <file alias="videos-active.svg">pixmaps/redesign/videos-active.svg</file>
         <file alias="songs-active.svg">pixmaps/redesign/songs-active.svg</file>

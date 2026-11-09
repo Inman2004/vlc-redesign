@@ -35,6 +35,8 @@
 
 class QThread;
 class FrameGrabber;
+class AudioScanner;
+struct AudioScan;
 
 /* One file in the library. Times are milliseconds, dates seconds since the
  * epoch. The user's data (progress, watched, favourite, play count, last
@@ -56,9 +58,15 @@ struct LibraryItem
     int playCount = 0;
     qint64 lastPlayed = 0;
     QString subtitle;
+    /* songs (P5c): tags read by AudioScanner; scanned once per file */
+    QString title, artist, album, genre;
+    int track = 0;
+    bool scanned = false;
 
     QString uri() const;
     QString name() const;    /* file name */
+    /* songs: the tag title, else the file name without its extension */
+    QString songTitle() const;
     QString folder() const;  /* absolute directory */
     /* progress as 0..1 for the grid underline, 0 when unknown */
     qreal progressRatio() const;
@@ -92,6 +100,10 @@ public:
     /* ask for a thumbnail now (visible tiles go first) */
     void requestThumbnail( const QString &path );
 
+    /* waveform peaks of a song (PEAK_COUNT bytes), empty until scanned;
+     * any local file, in the library or not: asks for it when missing */
+    QByteArray peaks( const QString &path );
+
     /* "S01E04", "1x04" and "Season 1" folders make a show episode */
     static void classify( LibraryItem & );
 
@@ -104,6 +116,7 @@ signals:
     void itemsChanged();               /* added, removed or reordered */
     void itemChanged( int index );     /* data of one item */
     void thumbnailReady( const QString &path );
+    void peaksReady( const QString &path );
 
 private:
     MediaLibrary( intf_thread_t *, QObject *parent );
@@ -121,6 +134,12 @@ private:
     void thumbnailDone( FrameGrabber *, const QString &uri, const QImage &,
                         qint64 length, qint64 elapsedMs );
     QString thumbnailKey( const LibraryItem & ) const;
+    static QString fileKey( const QString &path, qint64 size, qint64 mtime );
+
+    void queueSongs();
+    void requestSong( const QString &path, bool front );
+    void pumpSongs();
+    void songDone( const QString &path, const AudioScan &, qint64 elapsedMs );
 
     intf_thread_t *p_intf;
     QVector<LibraryItem> list;
@@ -140,6 +159,12 @@ private:
     QHash<QString, int> thumbFailures;
     int thumbsMade = 0;
     qint64 thumbsStart = 0;
+
+    AudioScanner *scanner = NULL;
+    QString scanning;                          /* the song being read */
+    QStringList songQueue;
+    QHash<QString, int> songFailures;
+    QHash<QString, QByteArray> peakCache;      /* path -> peaks */
 };
 
 #endif

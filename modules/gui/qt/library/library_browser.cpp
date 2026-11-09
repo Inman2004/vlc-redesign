@@ -68,6 +68,10 @@ QString LibraryBrowser::sectionTitle( const QString &key )
     if( key == "recent" )  return qtr( "Recent" );
     if( key == "shows" )   return qtr( "Shows" );
     if( key == "network" ) return qtr( "Network" );
+    if( key == "songs" )   return qtr( "Songs" );
+    if( key == "albums" )  return qtr( "Albums" );
+    if( key == "artists" ) return qtr( "Artists" );
+    if( key == "genres" )  return qtr( "Genres" );
     return key;
 }
 
@@ -77,6 +81,7 @@ QString LibraryBrowser::shelfTitle( const QString &key )
     if( key == "listen" )   return qtr( "Listen Again" );
     if( key == "folders" )  return qtr( "Frequently Visited Folders" );
     if( key == "streams" )  return qtr( "Latest Streams" );
+    if( key == "artists" )  return qtr( "Frequently Listened Artists" );
     return key;
 }
 
@@ -85,6 +90,8 @@ QString LibraryBrowser::segmentTitle( int i ) const
     const QString s = loc.value( i );
     if( i == 1 && section() == "home" )
         return shelfTitle( s );
+    if( i == 1 && section() == "music" )
+        return sectionTitle( s );
     return i == 0 || s == "shows" ? sectionTitle( s ) : s;
 }
 
@@ -153,7 +160,12 @@ void LibraryBrowser::rebuild()
 {
     current = collect();
     /* Home and Recent keep their own order: most recent first */
-    if( !( ( section() == "home" || section() == "recent" ) && needle.isEmpty() ) )
+    /* Home and Recent keep their own order (most recent first); Music's
+     * categories keep Figma's order, an album its track order */
+    const bool ordered = section() == "home" || section() == "recent"
+                         || ( section() == "music" && ( loc.size() == 1
+                              || ( loc.size() == 3 && loc[1] == "albums" ) ) );
+    if( !( ordered && needle.isEmpty() ) )
         sortEntries( current );
     emit entriesChanged();
 }
@@ -179,6 +191,13 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
         e.type = LibraryEntry::ITEM;
         e.index = i;
         e.title = items[i].name();
+        if( items[i].kind == LibraryItem::AUDIO )
+        {
+            /* songs: "untangle - juxtopposed" rows, square art tiles */
+            e.title = items[i].songTitle();
+            e.subtitle = items[i].artist;
+            e.tile = LibraryEntry::TILE_SQUARE;
+        }
         e.thumbFrom = items[i].path;
         e.watched = items[i].watched;
         e.progress = items[i].progressRatio();
@@ -211,13 +230,58 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
     {
         /* search: every item of the section whose name matches */
         for( int i = 0; i < items.size(); i++ )
-            if( inSection( items[i] ) && items[i].name().contains( search, Qt::CaseInsensitive ) )
+        {
+            const LibraryItem &it = items[i];
+            if( inSection( it ) && ( it.name().contains( search, Qt::CaseInsensitive )
+                                     || it.title.contains( search, Qt::CaseInsensitive )
+                                     || it.artist.contains( search, Qt::CaseInsensitive )
+                                     || it.album.contains( search, Qt::CaseInsensitive ) ) )
                 out << itemEntry( i );
+        }
         return out;
     }
 
-    /* Components "Videos" / "Music" panels start with "Add" */
-    if( actionRows && loc.size() == 1 && ( sec == "videos" || sec == "music" ) )
+    /* Components "Music": Add, then Songs, Albums, Artists, Genres */
+    if( sec == "music" && loc.size() == 1 )
+    {
+        if( actionRows )
+            out << action( "add", qtr( "Add" ), "add" );
+        int songs = 0;
+        QSet<QString> albums, artists, genres;
+        for( int i = 0; i < items.size(); i++ )
+        {
+            if( items[i].kind != LibraryItem::AUDIO )
+                continue;
+            songs++;
+            albums.insert( items[i].album );
+            artists.insert( items[i].artist );
+            genres.insert( items[i].genre );
+        }
+        struct { const char *key, *icon; int count; } cats[] = {
+            { "songs", "music", songs }, { "albums", "album", albums.size() },
+            { "artists", "artist", artists.size() }, { "genres", "genre", genres.size() },
+        };
+        for( const auto &c : cats )
+        {
+            LibraryEntry g;
+            g.type = LibraryEntry::GROUP;
+            g.segment = c.key;
+            g.title = sectionTitle( c.key );
+            g.icon = c.icon;
+            g.count = songs > 0 ? c.count : 0;
+            g.tile = LibraryEntry::TILE_GLYPH;
+            out << g;
+        }
+        return out;
+    }
+    if( sec == "music" && loc.size() >= 2 && loc[1] != "songs" )
+        return musicEntries();
+
+    /* Videos lists folders at its root; Music at Songs (one level down) */
+    const int base = sec == "music" ? 2 : 1;
+
+    /* Components "Videos" / "Music ▸ Songs" panels start with "Add" */
+    if( actionRows && loc.size() == base && ( sec == "videos" || sec == "music" ) )
         out << action( "add", qtr( "Add" ), "add" );
 
     /* Videos and Music: the Shows folder (videos), one folder per
@@ -227,7 +291,7 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
     QStringList roots;
     foreach( const QString &r, lib->roots() )
         roots << ( r.endsWith( '/' ) ? r : r + '/' );
-    if( media && loc.size() == 1 )
+    if( media && loc.size() == base )
     {
         LibraryEntry shows;
         shows.type = LibraryEntry::GROUP;
@@ -261,6 +325,8 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
                 e.type = LibraryEntry::GROUP;
                 e.title = e.segment = folder;
                 e.icon = "folder";
+                if( sec == "music" )
+                    e.tile = LibraryEntry::TILE_GLYPH;  /* beside square song tiles */
                 e.thumbFrom = it.path;
                 e.watched = true;
                 g = folders.size();
@@ -277,12 +343,14 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
         out << folders << files;
         return out;
     }
-    if( media && loc.size() == 2 && loc[1] != "shows" )
+    if( media && loc.size() == base + 1 && loc[base] != "shows" )
     {
-        /* a folder: everything under it */
+        /* a folder: everything under it (Components "My Songs" keeps Add) */
+        if( actionRows && sec == "music" )
+            out << action( "add", qtr( "Add" ), "add" );
         for( int i = 0; i < items.size(); i++ )
             if( inSection( items[i] ) && items[i].category != "shows"
-                && topFolder( roots, items[i].path ) == loc[1] )
+                && topFolder( roots, items[i].path ) == loc[base] )
                 out << itemEntry( i );
         return out;
     }
@@ -384,7 +452,9 @@ QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
         return items[a].lastPlayed > items[b].lastPlayed;
     } );
 
-    QVector<LibraryEntry> cont, listen, folders, streams;
+    QVector<LibraryEntry> cont, listen, folders, streams, artists;
+    QHash<QString, int> artistAt;
+    QVector<int> artistScore;
     QHash<QString, int> folderAt;
     QVector<int> folderScore;
     foreach( int i, played )
@@ -405,15 +475,34 @@ QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
         }
         else if( it.kind == LibraryItem::AUDIO )
         {
-            /* until P5c reads tags: the album / artist folder */
-            e.title = QFileInfo( it.path ).completeBaseName();
+            e.title = it.songTitle();
+            e.subtitle = it.artist;
             const QString dir = it.folder();
-            if( !roots.contains( dir + '/' ) )
-                e.subtitle = QFileInfo( dir ).fileName();
+            if( e.subtitle.isEmpty() && !roots.contains( dir + '/' ) )
+                e.subtitle = QFileInfo( dir ).fileName();   /* untagged: the folder */
             e.tile = LibraryEntry::TILE_SQUARE;
             e.watched = false;
             e.progress = 0;
             listen << e;
+        }
+
+        if( it.kind == LibraryItem::AUDIO && !it.artist.isEmpty() )
+        {
+            int a = artistAt.value( it.artist, -1 );
+            if( a < 0 )
+            {
+                LibraryEntry g;
+                g.type = LibraryEntry::ACTION;
+                g.segment = "open:" + QStringList( { "music", "artists", it.artist } ).join( QChar( 0x1F ) );
+                g.title = it.artist;
+                g.icon = "artist";
+                g.tile = LibraryEntry::TILE_GLYPH;
+                a = artists.size();
+                artistAt.insert( it.artist, a );
+                artists << g;
+                artistScore << 0;
+            }
+            artistScore[a] += qMax( 1, it.playCount );
         }
 
         /* folders: the Shows folder or a root's top-level folder */
@@ -422,7 +511,8 @@ QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
                                                       : topFolder( roots, it.path );
         if( folder.isEmpty() )
             continue;
-        const QString key = sec + '/' + folder;
+        const QString key = sec + QChar( 0x1F ) + ( sec == "music" ? "songs" + QString( QChar( 0x1F ) ) : QString() )
+                            + folder;
         int f = folderAt.value( key, -1 );
         if( f < 0 )
         {
@@ -453,6 +543,19 @@ QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
         folders = sorted;
     }
 
+    {
+        QVector<int> order( artists.size() );
+        for( int k = 0; k < order.size(); k++ )
+            order[k] = k;
+        std::stable_sort( order.begin(), order.end(), [&]( int a, int b ) {
+            return artistScore[a] > artistScore[b];
+        } );
+        QVector<LibraryEntry> sorted;
+        foreach( int k, order )
+            sorted << artists[k];
+        artists = sorted;
+    }
+
     /* network streams from VLC's recent list */
     foreach( const QString &mrl, RecentsMRL::getInstance( p_intf )->recentList() )
     {
@@ -473,6 +576,7 @@ QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
         if( shelf == "listen" )   return listen;
         if( shelf == "folders" )  return folders;
         if( shelf == "streams" )  return streams;
+        if( shelf == "artists" )  return artists;
         return QVector<LibraryEntry>();
     }
 
@@ -492,7 +596,93 @@ QVector<LibraryEntry> LibraryBrowser::homeEntries( const QString &shelf ) const
     add( "continue", cont );
     add( "listen", listen );
     add( "folders", folders );
+    add( "artists", artists );   /* Components "Home" order */
     add( "streams", streams );
+    return out;
+}
+
+/* Music ▸ Albums / Artists / Genres (Components "Music"): one group per
+ * tag value, then that value's songs */
+QVector<LibraryEntry> LibraryBrowser::musicEntries() const
+{
+    const QVector<LibraryItem> &items = lib->items();
+    const QString cat = loc.value( 1 );
+    auto tagOf = [&cat]( const LibraryItem &it ) {
+        if( cat == "albums" )  return it.album.isEmpty() ? qtr( "Unknown Album" ) : it.album;
+        if( cat == "artists" ) return it.artist.isEmpty() ? qtr( "Unknown Artist" ) : it.artist;
+        return it.genre.isEmpty() ? qtr( "Unknown Genre" ) : it.genre;
+    };
+    QVector<int> songs;
+    for( int i = 0; i < items.size(); i++ )
+        if( items[i].kind == LibraryItem::AUDIO )
+            songs << i;
+    /* album, then track: an album's own order, an artist's discography */
+    QCollator coll;
+    coll.setNumericMode( true );
+    coll.setCaseSensitivity( Qt::CaseInsensitive );
+    std::stable_sort( songs.begin(), songs.end(), [&]( int a, int b ) {
+        const LibraryItem &x = items[a], &y = items[b];
+        if( x.album != y.album )
+            return coll.compare( x.album, y.album ) < 0;
+        if( x.track != y.track )
+            return x.track < y.track;
+        return coll.compare( x.songTitle(), y.songTitle() ) < 0;
+    } );
+
+    QVector<LibraryEntry> out;
+    if( loc.size() >= 3 )
+    {
+        foreach( int i, songs )
+        {
+            if( tagOf( items[i] ) != loc[2] )
+                continue;
+            LibraryEntry e;
+            e.type = LibraryEntry::ITEM;
+            e.index = i;
+            e.title = items[i].songTitle();
+            e.subtitle = items[i].artist;
+            e.thumbFrom = items[i].path;
+            e.date = items[i].mtime;
+            e.tile = LibraryEntry::TILE_SQUARE;
+            out << e;
+        }
+        return out;
+    }
+
+    QHash<QString, int> at;
+    foreach( int i, songs )
+    {
+        const LibraryItem &it = items[i];
+        const QString key = tagOf( it );
+        int g = at.value( key, -1 );
+        if( g < 0 )
+        {
+            LibraryEntry e;
+            e.type = LibraryEntry::GROUP;
+            e.title = e.segment = key;
+            e.thumbFrom = it.path;
+            if( cat == "albums" )
+            {
+                e.subtitle = it.artist;               /* album tiles: art + artist */
+                e.tile = LibraryEntry::TILE_SQUARE;
+            }
+            else
+            {
+                e.icon = cat == "artists" ? "artist" : "genre";
+                e.tile = LibraryEntry::TILE_GLYPH;
+            }
+            g = out.size();
+            at.insert( key, g );
+            out << e;
+        }
+        LibraryEntry &e = out[g];
+        e.count++;
+        e.date = qMax( e.date, it.mtime );
+        /* the album's picture: its first track that has art */
+        if( cat == "albums" && lib->thumbnailFile( items[lib->indexOf( e.thumbFrom )] ).isEmpty()
+            && !lib->thumbnailFile( it ).isEmpty() )
+            e.thumbFrom = it.path;
+    }
     return out;
 }
 
@@ -632,7 +822,7 @@ void LibraryBrowser::activate( int i )
     if( e.type == LibraryEntry::ACTION )
     {
         if( e.segment.startsWith( "open:" ) )
-            setLocation( e.segment.mid( 5 ).split( '/' ) );
+            setLocation( e.segment.mid( 5 ).split( QChar( 0x1F ) ) );
         else if( e.segment.startsWith( "mrl:" ) )
             Open::openMRL( p_intf, e.segment.mid( 4 ), true, true );
         else if( e.segment == "add" )

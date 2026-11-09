@@ -493,7 +493,8 @@ void LibraryGrid::paintEvent( QPaintEvent * )
             const int k = lib->indexOf( e.thumbFrom );
             const bool audio = k >= 0 && lib->items()[k].kind == LibraryItem::AUDIO;
             const QString glyph = e.type == LibraryEntry::ACTION ? e.icon
-                                : e.type == LibraryEntry::GROUP ? "folder"
+                                : e.type == LibraryEntry::GROUP
+                                  ? ( e.tile == LibraryEntry::TILE_SQUARE ? "album" : "folder" )
                                 : ( audio ? "music" : "video" );
             const int g = viewMode == GRID ? 32 : 18;
             p.drawPixmap( QRect( thumbRect.center() - QPoint( g / 2, g / 2 ), QSize( g, g ) ),
@@ -517,7 +518,8 @@ void LibraryGrid::paintEvent( QPaintEvent * )
 
         /* label */
         p.setPen( text );
-        QString label = e.title;
+        QString label = e.subtitle.isEmpty() ? e.title
+                                             : QString( "%1 - %2" ).arg( e.title, e.subtitle );
         if( e.type == LibraryEntry::GROUP && e.count > 0 && !compact )
             label = QString( "%1  ·  %2" ).arg( e.title ).arg( e.count );
         p.drawText( textRect, Qt::AlignLeft | Qt::AlignVCenter,
@@ -647,14 +649,16 @@ void LibraryGrid::paintShelfEntry( QPainter &p, int i, const QRect &rr, const QF
     clip.addRoundedRect( QRectF( thumbRect ), SHELF_RADIUS, SHELF_RADIUS );
     p.save();
     p.setClipPath( clip );
-    p.fillRect( thumbRect, e.type == LibraryEntry::ACTION ? SHELF_GLYPH_BG : SHELF_TILE );
-    const QPixmap pm = e.type == LibraryEntry::ITEM ? thumbnail( e, thumbRect.size() ) : QPixmap();
+    const bool glyphTile = e.tile == LibraryEntry::TILE_GLYPH;
+    p.fillRect( thumbRect, glyphTile ? SHELF_GLYPH_BG : SHELF_TILE );
+    const QPixmap pm = glyphTile ? QPixmap() : thumbnail( e, thumbRect.size() );
     if( !pm.isNull() )
         p.drawPixmap( thumbRect, pm );
     else
     {
-        const QString glyph = e.type == LibraryEntry::ACTION ? e.icon : ( audio ? "music" : "video" );
-        const QColor gc = e.type == LibraryEntry::ACTION ? Theme::colors().icon : QColor( 0x3A, 0x3A, 0x3A );
+        const QString glyph = glyphTile ? e.icon
+                            : e.type == LibraryEntry::GROUP ? "album" : ( audio ? "music" : "video" );
+        const QColor gc = glyphTile ? Theme::colors().icon : QColor( 0x3A, 0x3A, 0x3A );
         p.drawPixmap( QRect( thumbRect.center() - QPoint( SHELF_GLYPH / 2 - 1, SHELF_GLYPH / 2 - 1 ),
                              QSize( SHELF_GLYPH, SHELF_GLYPH ) ),
                       Theme::pixmap( glyph, SHELF_GLYPH, gc ) );

@@ -117,6 +117,7 @@ private:
     QVector<LibraryEntry> collect() const;
     QVector<LibraryEntry> homeEntries( const QString &shelf ) const;
     QVector<LibraryEntry> recentEntries() const;
+    QVector<LibraryEntry> musicEntries() const;
     static QString shelfTitle( const QString &key );
     static QString topFolder( const QStringList &roots, const QString &path );
     void sortEntries( QVector<LibraryEntry> & ) const;

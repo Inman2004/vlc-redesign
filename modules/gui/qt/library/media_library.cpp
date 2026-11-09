@@ -26,6 +26,7 @@
 
 #include "library/media_library.hpp"
 #include "util/frame_grabber.hpp"
+#include "util/audio_scanner.hpp"
 #include "input_manager.hpp"
 #include "recents.hpp"
 
@@ -40,6 +41,8 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
+#include <QImageReader>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -94,6 +97,11 @@ QString LibraryItem::uri() const
 QString LibraryItem::name() const
 {
     return QFileInfo( path ).fileName();
+}
+
+QString LibraryItem::songTitle() const
+{
+    return title.isEmpty() ? QFileInfo( path ).completeBaseName() : title;
 }
 
 QString LibraryItem::folder() const
@@ -189,6 +197,9 @@ MediaLibrary::MediaLibrary( intf_thread_t *_p_intf, QObject *parent )
         } );
         grabbers << g;
     }
+
+    scanner = new AudioScanner( p_intf, this );
+    connect( scanner, &AudioScanner::finished, this, &MediaLibrary::songDone );
 
     connect( THEMIM, &MainInputManager::inputChanged, this, &MediaLibrary::trackInput );
     connect( THEMIM->getIM(), &InputManager::positionUpdated, this, &MediaLibrary::trackPosition );
@@ -302,7 +313,10 @@ void MediaLibrary::merge( const QVector<ScanEntry> &found )
         LibraryItem it = old.value( e.path );
         const bool known = !it.path.isEmpty();
         if( known && ( it.size != e.size || it.mtime != e.mtime ) )
+        {
             it.duration = 0;   /* the file changed: length and thumbnail too */
+            it.scanned = false;
+        }
         it.path = e.path;
         it.kind = e.audio ? LibraryItem::AUDIO : LibraryItem::VIDEO;
         it.size = e.size;
@@ -326,6 +340,7 @@ void MediaLibrary::merge( const QVector<ScanEntry> &found )
     emit scanFinished( list.size(), ms );
     scheduleSave();
     queueThumbnails();
+    queueSongs();
 }
 
 void MediaLibrary::reindex()
@@ -420,16 +435,20 @@ void MediaLibrary::trackPosition( float pos, int64_t time, int length )
 /**********************************************************************
  * Thumbnails
  **********************************************************************/
-QString MediaLibrary::thumbnailKey( const LibraryItem &it ) const
+QString MediaLibrary::fileKey( const QString &path, qint64 size, qint64 mtime )
 {
-    const QByteArray key = QString( "%1|%2|%3" ).arg( it.path ).arg( it.size ).arg( it.mtime ).toUtf8();
+    const QByteArray key = QString( "%1|%2|%3" ).arg( path ).arg( size ).arg( mtime ).toUtf8();
     return QString::fromLatin1( QCryptographicHash::hash( key, QCryptographicHash::Sha1 ).toHex() );
 }
 
+QString MediaLibrary::thumbnailKey( const LibraryItem &it ) const
+{
+    return fileKey( it.path, it.size, it.mtime );
+}
+
+/* a video's frame, or a song's cover art (both by the file's key) */
 QString MediaLibrary::thumbnailFile( const LibraryItem &it ) const
 {
-    if( it.kind != LibraryItem::VIDEO )
-        return QString();
     const QString f = thumbDir + "/" + thumbnailKey( it ) + ".jpg";
     return QFileInfo::exists( f ) ? f : QString();
 }
@@ -451,6 +470,13 @@ void MediaLibrary::queueThumbnails()
 void MediaLibrary::requestThumbnail( const QString &path )
 {
     const int i = indexOf( path );
+    if( i >= 0 && list[i].kind == LibraryItem::AUDIO )
+    {
+        /* a song's picture comes with its tags */
+        if( !list[i].scanned )
+            requestSong( path, true );
+        return;
+    }
     if( i < 0 || list[i].kind != LibraryItem::VIDEO || !thumbnailFile( list[i] ).isEmpty() )
         return;
     if( grabbing.values().contains( path ) )
@@ -513,6 +539,123 @@ void MediaLibrary::thumbnailDone( FrameGrabber *g, const QString &, const QImage
 }
 
 /**********************************************************************
+ * Songs: tags, cover art and waveform peaks (AudioScanner)
+ **********************************************************************/
+void MediaLibrary::queueSongs()
+{
+    foreach( const LibraryItem &it, list )
+        if( it.kind == LibraryItem::AUDIO && !it.scanned && !songQueue.contains( it.path )
+            && songFailures.value( it.path ) < THUMB_MAX_TRIES && it.path != scanning )
+            songQueue << it.path;
+    if( !songQueue.isEmpty() )
+        msg_Dbg( p_intf, "library: %d songs to read", songQueue.size() );
+    pumpSongs();
+}
+
+void MediaLibrary::requestSong( const QString &path, bool front )
+{
+    if( path == scanning || songFailures.value( path ) >= THUMB_MAX_TRIES )
+        return;
+    songQueue.removeAll( path );
+    if( front )
+        songQueue.prepend( path );
+    else
+        songQueue.append( path );
+    pumpSongs();
+}
+
+void MediaLibrary::pumpSongs()
+{
+    while( !scanner->isBusy() && !songQueue.isEmpty() )
+    {
+        const QString path = songQueue.takeFirst();
+        if( scanner->scan( path ) )
+            scanning = path;
+        else
+            songFailures[path]++;
+    }
+}
+
+QByteArray MediaLibrary::peaks( const QString &path )
+{
+    QHash<QString, QByteArray>::const_iterator c = peakCache.constFind( path );
+    if( c != peakCache.constEnd() )
+        return c.value();
+    const QFileInfo fi( path );
+    if( !fi.isFile() )
+        return QByteArray();
+    QFile f( thumbDir + "/" + fileKey( path, fi.size(), fi.lastModified().toSecsSinceEpoch() )
+             + ".peaks" );
+    if( f.open( QIODevice::ReadOnly ) )
+    {
+        const QByteArray p = f.readAll();
+        if( p.size() == AudioScanner::PEAK_COUNT )
+        {
+            peakCache.insert( path, p );
+            return p;
+        }
+    }
+    requestSong( path, true );
+    return QByteArray();
+}
+
+void MediaLibrary::songDone( const QString &path, const AudioScan &r, qint64 elapsedMs )
+{
+    scanning.clear();
+    const QFileInfo fi( path );
+    const QString key = fileKey( path, fi.size(), fi.lastModified().toSecsSinceEpoch() );
+    if( !r.peaks.isEmpty() )
+    {
+        QSaveFile f( thumbDir + "/" + key + ".peaks" );
+        if( f.open( QIODevice::WriteOnly ) )
+        {
+            f.write( r.peaks );
+            f.commit();
+        }
+        peakCache.insert( path, r.peaks );
+    }
+    bool art = false;
+    if( !r.art.isEmpty() )
+    {
+        /* covers can be huge: keep a 600px copy beside the thumbnails */
+        QImage img = QImage::fromData( r.art );
+        if( !img.isNull() )
+        {
+            if( img.width() > 600 || img.height() > 600 )
+                img = img.scaled( 600, 600, Qt::KeepAspectRatio, Qt::SmoothTransformation );
+            art = img.convertToFormat( QImage::Format_RGB32 ).save( thumbDir + "/" + key + ".jpg", "JPG", 90 );
+        }
+    }
+
+    const int i = indexOf( path );
+    if( i >= 0 )
+    {
+        LibraryItem &it = list[i];
+        if( r.ok || songFailures.value( path ) + 1 >= THUMB_MAX_TRIES )
+            it.scanned = true;
+        if( !r.ok )
+            songFailures[path]++;
+        it.title = r.title;
+        it.artist = r.artist;
+        it.album = r.album;
+        it.genre = r.genre;
+        it.track = r.track;
+        if( r.length > 0 )
+            it.duration = r.length / 1000;
+        emit itemChanged( i );
+        scheduleSave();
+    }
+    msg_Dbg( p_intf, "library: song %s read in %lld ms (tags %s, art %s, peaks %s)",
+             qtu( fi.fileName() ), (long long)elapsedMs, r.title.isEmpty() ? "no" : "yes",
+             art ? "yes" : "no", r.peaks.isEmpty() ? "no" : "yes" );
+    if( art )
+        emit thumbnailReady( path );
+    if( !r.peaks.isEmpty() )
+        emit peaksReady( path );
+    pumpSongs();
+}
+
+/**********************************************************************
  * Storage
  **********************************************************************/
 void MediaLibrary::scheduleSave()
@@ -545,6 +688,12 @@ void MediaLibrary::load()
         it.playCount = o.value( "plays" ).toInt();
         it.lastPlayed = qint64( o.value( "lastPlayed" ).toDouble() );
         it.subtitle = o.value( "subtitle" ).toString();
+        it.title = o.value( "title" ).toString();
+        it.artist = o.value( "artist" ).toString();
+        it.album = o.value( "album" ).toString();
+        it.genre = o.value( "genre" ).toString();
+        it.track = o.value( "track" ).toInt();
+        it.scanned = o.value( "scanned" ).toBool();
         classify( it );
         list.append( it );
     }
@@ -569,6 +718,12 @@ void MediaLibrary::save()
         if( it.playCount > 0 )  o.insert( "plays", it.playCount );
         if( it.lastPlayed > 0 ) o.insert( "lastPlayed", double( it.lastPlayed ) );
         if( !it.subtitle.isEmpty() ) o.insert( "subtitle", it.subtitle );
+        if( !it.title.isEmpty() )  o.insert( "title", it.title );
+        if( !it.artist.isEmpty() ) o.insert( "artist", it.artist );
+        if( !it.album.isEmpty() )  o.insert( "album", it.album );
+        if( !it.genre.isEmpty() )  o.insert( "genre", it.genre );
+        if( it.track > 0 )         o.insert( "track", it.track );
+        if( it.scanned )           o.insert( "scanned", true );
         items.append( o );
     }
     QJsonObject root;

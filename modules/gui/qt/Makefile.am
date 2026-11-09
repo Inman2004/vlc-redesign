@@ -157,6 +157,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/redesign_widgets.cpp gui/qt/util/redesign_widgets.hpp \
 	gui/qt/util/seek_preview.cpp gui/qt/util/seek_preview.hpp \
 	gui/qt/util/frame_grabber.cpp gui/qt/util/frame_grabber.hpp \
+	gui/qt/util/audio_scanner.cpp gui/qt/util/audio_scanner.hpp \
 	gui/qt/library/media_library.cpp gui/qt/library/media_library.hpp \
 	gui/qt/library/library_view.cpp gui/qt/library/library_view.hpp \
 	gui/qt/library/mini_player.cpp gui/qt/library/mini_player.hpp \
@@ -198,6 +199,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/redesign_widgets.moc.cpp \
 	gui/qt/util/seek_preview.moc.cpp \
 	gui/qt/util/frame_grabber.moc.cpp \
+	gui/qt/util/audio_scanner.moc.cpp \
 	gui/qt/library/media_library.moc.cpp \
 	gui/qt/library/library_view.moc.cpp \
 	gui/qt/library/mini_player.moc.cpp \
@@ -521,6 +523,10 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/songs.svg \
 	gui/qt/pixmaps/redesign/videos.svg \
 	gui/qt/pixmaps/redesign/vlc.svg \
+	gui/qt/pixmaps/redesign/album.svg \
+	gui/qt/pixmaps/redesign/genre.svg \
+	gui/qt/pixmaps/redesign/back-15.svg \
+	gui/qt/pixmaps/redesign/forward-15.svg \
 	gui/qt/pixmaps/redesign/home-active.svg \
 	gui/qt/pixmaps/redesign/videos-active.svg \
 	gui/qt/pixmaps/redesign/songs-active.svg \
