@@ -44,6 +44,11 @@
         <file alias="artist.svg">pixmaps/redesign/artist.svg</file>
         <file alias="customize.svg">pixmaps/redesign/customize.svg</file>
         <file alias="info.svg">pixmaps/redesign/info.svg</file>
+        <file alias="cursor.svg">pixmaps/redesign/cursor.svg</file>
+        <file alias="shield.svg">pixmaps/redesign/shield.svg</file>
+        <file alias="puzzle.svg">pixmaps/redesign/puzzle.svg</file>
+        <file alias="sliders.svg">pixmaps/redesign/sliders.svg</file>
+        <file alias="video-defaults.svg">pixmaps/redesign/video-defaults.svg</file>
         <file alias="heart.svg">pixmaps/redesign/heart.svg</file>
         <file alias="shuffle.svg">pixmaps/redesign/shuffle.svg</file>
         <file alias="save.svg">pixmaps/redesign/save.svg</file>

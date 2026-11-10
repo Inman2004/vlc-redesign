@@ -44,6 +44,7 @@
 #include "dialogs/playlist.hpp"
 #include "dialogs/bookmarks.hpp"
 #include "dialogs/preferences.hpp"
+#include "dialogs/settings_dialog.hpp"
 #include "dialogs/mediainfo.hpp"
 #include "dialogs/messages.hpp"
 #include "dialogs/extended.hpp"
@@ -95,6 +96,7 @@ DialogsProvider::DialogsProvider( intf_thread_t *_p_intf ) :
 DialogsProvider::~DialogsProvider()
 {
     PlaylistDialog::killInstance();
+    SettingsDialog::killInstance();
     MediaInfoDialog::killInstance();
     MessagesDialog::killInstance();
     BookmarksDialog::killInstance();
@@ -252,6 +254,14 @@ void DialogsProvider::playlistDialog()
 
 void DialogsProvider::prefsDialog()
 {
+    if( Theme::redesign() )
+    {
+        SettingsDialog *s = SettingsDialog::getInstance( p_intf );
+        s->show();
+        s->raise();
+        s->activateWindow();
+        return;
+    }
     PrefsDialog *p = new PrefsDialog( (QWidget *)p_intf->p_sys->p_mi, p_intf );
     p->toggleVisible();
 }

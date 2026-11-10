@@ -77,6 +77,8 @@
 #include <QVariantAnimation>
 #include <QHBoxLayout>
 #include <QScreen>
+#include <QGuiApplication>
+#include <vlc_modules.h>
 #ifdef _WIN32
 #include <QFileInfo>
 #endif
@@ -541,7 +543,26 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     else if( settings->value( "MainWindow/playlist-visible", false ).toBool() )
         togglePlaylist();
 
-    QVLCTools::restoreWidgetPosition( settings, this, QSize(600, 420) );
+    /* Settings > Interface > Remember window size and position */
+    if( !Theme::redesign() || settings->value( "Settings/rememberGeometry", true ).toBool() )
+        QVLCTools::restoreWidgetPosition( settings, this, QSize(600, 420) );
+    else if( QScreen *scr = QGuiApplication::primaryScreen() )
+    {
+        QRect avail = scr->availableGeometry();
+        resize( avail.size() * 3 / 4 );
+        move( avail.center() - rect().center() );
+    }
+
+    if( Theme::redesign() )
+    {
+        /* Settings > Audio > Startup volume: "Always starts at" */
+        const int startVol = settings->value( "Settings/startupVolume", -1 ).toInt();
+        if( startVol >= 0 )
+            playlist_VolumeSet( THEPL, startVol / 100.f );
+        /* Settings > Recording > Discover cast devices */
+        if( settings->value( "Settings/castDiscovery", false ).toBool() && module_exists( "microdns" ) )
+            ActionsManager::getInstance( p_intf )->StartRendererScan();
+    }
 
     b_interfaceFullScreen = isFullScreen();
 

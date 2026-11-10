@@ -43,17 +43,19 @@
 #include <QStyleFactory>
 #include <QVariantAnimation>
 #include <QEvent>
+#include <QIconEngine>
+#include <QApplication>
 
 namespace Theme
 {
 
 const char *const ACCENT_VALUES[] = {
     "#D37918", "#A03B26", "#8C721B", "#147528", "#147A97",
-    "#144497", "#6631B5", "#AB3C80", "#7E9E13",
+    "#144497", "#6631B5", "#AB3C80", "#7E7E7E",
 };
 const char *const ACCENT_NAMES[] = {
     N_("Amber"), N_("Rust"), N_("Olive"), N_("Green"), N_("Teal"),
-    N_("Blue"), N_("Violet"), N_("Magenta"), N_("Lime"),
+    N_("Blue"), N_("Violet"), N_("Magenta"), N_("Grey"),
 };
 const int ACCENT_COUNT = sizeof( ACCENT_VALUES ) / sizeof( ACCENT_VALUES[0] );
 
@@ -145,6 +147,19 @@ const Palette &colors() { return g_pal; }
 QColor accent()  { return g_accent; }
 QColor accentHover()   { return g_accent.lighter( 112 ); }
 QColor accentPressed() { return g_accent.darker( 118 ); }
+/* Settings controls: the accent at 26% (selected segment, slider fill) and
+ * at 81% (toggle knob, slider handle), both measured on #D37918 */
+static QColor mix( const QColor &a, const QColor &b, qreal t );
+static QColor scaled( const QColor &c, qreal f )
+{
+    return QColor::fromRgbF( c.redF() * f, c.greenF() * f, c.blueF() * f );
+}
+QColor accentDim()
+{
+    /* light: a pale tint of the accent instead of a dark one */
+    return g_dark ? scaled( g_accent, 0.26 ) : mix( QColor( "#FFFFFF" ), g_accent, 0.22 );
+}
+QColor accentKnob() { return scaled( g_accent, 0.81 ); }
 
 static QColor mix( const QColor &a, const QColor &b, qreal t )
 {
@@ -198,17 +213,43 @@ QString activeName( const QString &name )
     return QFile::exists( QString( ":/redesign/%1.svg" ).arg( a ) ) ? a : name;
 }
 
+namespace {
+/* Draws the tinted SVG with the palette and accent current at paint time,
+ * so every icon follows a theme or accent change made in Settings without
+ * the widgets that hold it being rebuilt. */
+class TintedIconEngine : public QIconEngine
+{
+public:
+    TintedIconEngine( const QString &n, int s ) : name( n ), size( s ) {}
+    QIconEngine *clone() const Q_DECL_OVERRIDE { return new TintedIconEngine( name, size ); }
+    QPixmap pixmap( const QSize &sz, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
+    {
+        const int px = sz.isValid() ? qMin( sz.width(), sz.height() ) : size;
+        if( mode == QIcon::Disabled )
+            return Theme::pixmap( name, px, g_pal.iconDisabled );
+        if( state == QIcon::On )
+            return Theme::pixmap( activeName( name ), px,
+                                  mode == QIcon::Active ? accentHover() : g_accent );
+        return Theme::pixmap( name, px, mode == QIcon::Active ? g_pal.iconHover : g_pal.icon );
+    }
+    void paint( QPainter *p, const QRect &r, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
+    {
+        QPixmap pix = pixmap( r.size(), mode, state );
+        p->drawPixmap( r, pix );
+    }
+    QSize actualSize( const QSize &sz, QIcon::Mode, QIcon::State ) Q_DECL_OVERRIDE
+    {
+        return sz.isValid() ? sz : QSize( size, size );
+    }
+private:
+    QString name;
+    int size;
+};
+}
+
 QIcon icon( const QString &name, int size )
 {
-    QIcon ic;
-    const QString on = activeName( name );
-    ic.addPixmap( pixmap( name, size, g_pal.icon ), QIcon::Normal, QIcon::Off );
-    ic.addPixmap( pixmap( name, size, g_pal.iconHover ), QIcon::Active, QIcon::Off );
-    ic.addPixmap( pixmap( name, size, g_pal.iconDisabled ), QIcon::Disabled, QIcon::Off );
-    ic.addPixmap( pixmap( on, size, g_accent ), QIcon::Normal, QIcon::On );
-    ic.addPixmap( pixmap( on, size, accentHover() ), QIcon::Active, QIcon::On );
-    ic.addPixmap( pixmap( name, size, g_pal.iconDisabled ), QIcon::Disabled, QIcon::On );
-    return ic;
+    return QIcon( new TintedIconEngine( name, size ) );
 }
 
 void setupIconButton( QAbstractButton *b, const QString &name, int box, int glyph )
@@ -779,6 +820,18 @@ protected:
         return false;
     }
 };
+}
+
+void reload()
+{
+    if( !g_intf )
+        return;
+    init( g_intf );
+    apply();
+    /* stylesheet colours change with apply(); painted widgets and tinted
+     * icons pick the new values up on their next paint */
+    foreach( QWidget *w, QApplication::allWidgets() )
+        w->update();
 }
 
 void apply()

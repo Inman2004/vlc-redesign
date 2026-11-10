@@ -47,6 +47,8 @@ public:
     virtual ~PrefsDialog();
     /* open on one of the simple categories (e.g. SPrefsHotkeys) */
     void showSimplePanel( int );
+    /* the full option tree ("All VLC settings" in the redesigned window) */
+    void showAll() { setAdvanced(); }
 #if 0
     /*Called from extended settings, is not used anymore, but could be useful one day*/
     void showModulePrefs( char* );

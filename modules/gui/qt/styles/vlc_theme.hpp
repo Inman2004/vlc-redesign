@@ -119,6 +119,10 @@ QColor accent();
 QColor accentHover();
 QColor accentPressed();
 QColor seekFill();    /* filled part of the seek bar */
+QColor accentDim();   /* accent at 26%: selected segment, slider fill */
+QColor accentKnob();  /* accent at 81%: toggle knob, slider handle */
+/* Re-read qt-theme / qt-accent-color and restyle the running interface */
+void reload();
 
 /* Monochrome icon from :/redesign/<name>.svg, tinted for every state. */
 /* "<name>-active" when the Figma active variant exists, else name */

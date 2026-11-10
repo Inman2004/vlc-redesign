@@ -155,10 +155,10 @@ static const char *const psz_theme_texts[] = { N_("Dark"), N_("Light"), N_("Syst
 /* Keep in sync with Theme::ACCENT_VALUES */
 static const char *const psz_accent_values[] = {
     "#D37918", "#A03B26", "#8C721B", "#147528", "#147A97",
-    "#144497", "#6631B5", "#AB3C80", "#7E9E13" };
+    "#144497", "#6631B5", "#AB3C80", "#7E7E7E" };
 static const char *const psz_accent_texts[] = {
     N_("Amber"), N_("Rust"), N_("Olive"), N_("Green"), N_("Teal"),
-    N_("Blue"), N_("Violet"), N_("Magenta"), N_("Lime") };
+    N_("Blue"), N_("Violet"), N_("Magenta"), N_("Grey") };
 #define QT_DARK_LONGTEXT N_( "Applies a dark theme to the style." )
 
 #define UPDATER_TEXT N_( "Activate the updates availability notification" )
