@@ -858,7 +858,8 @@ void apply()
  *********************************************************************/
 void paintSeekBar( QPainter *p, const QRectF &groove, qreal position,
                    qreal buffering, const QList<qreal> &chapters,
-                   bool enabled, qreal hover, int hoverX, const QByteArray &peaks )
+                   bool enabled, qreal hover, int hoverX, const QByteArray &peaks,
+                   const QList<qreal> &bookmarks )
 {
     p->save();
     p->setRenderHint( QPainter::Antialiasing );
@@ -931,6 +932,18 @@ void paintSeekBar( QPainter *p, const QRectF &groove, qreal position,
             p->drawRect( QRectF( x - 0.75, groove.bottom() - 9, 1.5, 5 ) );
         }
     }
+    /* Bookmarks: accent ticks at both edges, longer than the chapters' */
+    if( !bookmarks.isEmpty() )
+    {
+        p->setBrush( g_accent );
+        foreach( qreal b, bookmarks )
+        {
+            const qreal x = groove.left() + SEEK_HANDLE_W / 2.0
+                          + b * ( groove.width() - SEEK_HANDLE_W );
+            p->drawRect( QRectF( x - 1, groove.top(), 2, 7 ) );
+            p->drawRect( QRectF( x - 1, groove.bottom() - 7, 2, 7 ) );
+        }
+    }
     /* Preview marker under the cursor */
     if( enabled && hoverX >= 0 && hover > 0.0 )
     {
@@ -950,6 +963,144 @@ void paintSeekBar( QPainter *p, const QRectF &groove, qreal position,
         const QRectF handle( handleX - hw / 2.0, groove.center().y() - hh / 2.0, hw, hh );
         p->setBrush( mix( g_accent, accentHover(), hover ) );
         p->drawRoundedRect( handle, 2.5, 2.5 );
+    }
+    p->restore();
+}
+
+/* Measured on the Components bar (canvas ×1.4327): the buttons fill the
+ * track's height 1.4px inside its edge, ‹ › 18.6px and − + 21.5px wide,
+ * 1.4px apart; the cue window starts 1.4px after them. */
+namespace
+{
+const qreal SUB_INSET = 1.4, SUB_ARROW_W = 18.6, SUB_SIGN_W = 21.5, SUB_GAP = 1.4;
+}
+
+QRectF subtitleButtonRect( const QRectF &g, int b )
+{
+    const qreal top = g.top() + SUB_INSET, h = g.height() - 2 * SUB_INSET;
+    switch( b )
+    {
+    case SUB_PREV:
+        return QRectF( g.left() + SUB_INSET, top, SUB_ARROW_W, h );
+    case SUB_EARLIER:
+        return QRectF( g.left() + SUB_INSET + SUB_ARROW_W + SUB_GAP, top, SUB_SIGN_W, h );
+    case SUB_LATER:
+        return QRectF( g.right() - SUB_INSET - SUB_ARROW_W - SUB_GAP - SUB_SIGN_W, top, SUB_SIGN_W, h );
+    case SUB_NEXT:
+        return QRectF( g.right() - SUB_INSET - SUB_ARROW_W, top, SUB_ARROW_W, h );
+    }
+    return QRectF();
+}
+
+QRectF subtitleContentRect( const QRectF &g )
+{
+    const qreal side = SUB_INSET + SUB_ARROW_W + SUB_GAP + SUB_SIGN_W + SUB_GAP;
+    return QRectF( g.left() + side, g.top(), g.width() - 2 * side, g.height() );
+}
+
+void paintSubtitleBar( QPainter *p, const QRectF &groove, qreal position,
+                       const QVector<QPair<qreal, qreal> > &cues,
+                       const QList<qreal> &bookmarks,
+                       qreal hover, int hoverX, int hoveredButton, int pressedButton )
+{
+    p->save();
+    p->setRenderHint( QPainter::Antialiasing );
+    p->setPen( Qt::NoPen );
+    p->setBrush( g_pal.track );
+    p->drawRoundedRect( groove, SEEK_RADIUS, SEEK_RADIUS );
+
+    const QRectF content = subtitleContentRect( groove );
+    const qreal handleX = position >= 0.0
+                        ? content.left() + position * content.width() : -1.0;
+
+    /* Played part, then the cues: white at 14% over the track (#2C2C2C on
+     * #090909) and over the played fill (#533F29 on #371F06) */
+    p->save();
+    p->setClipRect( content );
+    const QColor fill = mix( seekFill(), seekFill().lighter( 125 ), hover );
+    if( handleX >= 0.0 )
+    {
+        p->setBrush( fill );
+        p->drawRect( QRectF( content.left(), content.top(), handleX - content.left(), content.height() ) );
+    }
+    const QColor cueRest = mix( g_pal.track, Qt::white, 0.142 );
+    const QColor cuePlayed = mix( fill, Qt::white, 0.142 );
+    p->setRenderHint( QPainter::Antialiasing, false );
+    for( int i = 0; i < cues.size(); i++ )
+    {
+        const qreal a = content.left() + cues[i].first * content.width();
+        const qreal b = content.left() + cues[i].second * content.width();
+        if( b < content.left() || a > content.right() )
+            continue;
+        const QRectF r( QPointF( a, content.top() ), QPointF( qMax( b, a + 2 ), content.bottom() ) );
+        if( handleX >= 0.0 && r.left() < handleX )
+        {
+            p->setBrush( cuePlayed );
+            p->drawRect( QRectF( r.topLeft(), QPointF( qMin( r.right(), handleX ), r.bottom() ) ) );
+        }
+        if( handleX < 0.0 || r.right() > handleX )
+        {
+            p->setBrush( cueRest );
+            p->drawRect( QRectF( QPointF( qMax( r.left(), handleX ), r.top() ), r.bottomRight() ) );
+        }
+    }
+    p->setRenderHint( QPainter::Antialiasing );
+    p->setBrush( g_accent );
+    foreach( qreal b, bookmarks )
+    {
+        const qreal x = content.left() + b * content.width();
+        p->drawRect( QRectF( x - 1, groove.top(), 2, 7 ) );
+        p->drawRect( QRectF( x - 1, groove.bottom() - 7, 2, 7 ) );
+    }
+    if( hoverX >= content.left() && hoverX <= content.right() && hover > 0.0 )
+    {
+        QColor m = g_pal.text;
+        m.setAlphaF( 0.35 * hover );
+        p->setBrush( m );
+        p->drawRect( QRectF( hoverX - 1, groove.top(), 2, groove.height() ) );
+    }
+    p->restore();
+
+    /* The four buttons: the accent knob colour, brighter while hovered */
+    for( int b = 0; b < SUB_BUTTONS; b++ )
+    {
+        const QRectF r = subtitleButtonRect( groove, b );
+        QColor c = accentKnob();
+        if( b == pressedButton )
+            c = scaled( g_accent, 0.7 );
+        else if( b == hoveredButton )
+            c = g_accent;
+        p->setBrush( c );
+        p->drawRoundedRect( r, 3, 3 );
+
+        QPen pen( QColor( 0x09, 0x09, 0x09 ), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin );
+        p->setPen( pen );
+        p->setBrush( Qt::NoBrush );
+        const QPointF c0 = r.center();
+        if( b == SUB_PREV || b == SUB_NEXT )
+        {
+            const qreal d = b == SUB_PREV ? 1 : -1;  /* chevron 5 × 10 */
+            QPolygonF chev;
+            chev << QPointF( c0.x() + 2.5 * d, c0.y() - 5 ) << QPointF( c0.x() - 2.5 * d, c0.y() )
+                 << QPointF( c0.x() + 2.5 * d, c0.y() + 5 );
+            p->drawPolyline( chev );
+        }
+        else
+        {
+            p->drawLine( QPointF( c0.x() - 5, c0.y() ), QPointF( c0.x() + 5, c0.y() ) );
+            if( b == SUB_LATER )
+                p->drawLine( QPointF( c0.x(), c0.y() - 5 ), QPointF( c0.x(), c0.y() + 5 ) );
+        }
+        p->setPen( Qt::NoPen );
+    }
+
+    /* Handle, as on the plain bar */
+    if( handleX >= 0.0 && handleX <= content.right() )
+    {
+        const qreal hw = SEEK_HANDLE_W + 2.0 * hover;
+        const qreal hh = qMin<qreal>( SEEK_HANDLE_H + 4.0 * hover, groove.height() );
+        p->setBrush( mix( g_accent, accentHover(), hover ) );
+        p->drawRoundedRect( QRectF( handleX - hw / 2.0, groove.center().y() - hh / 2.0, hw, hh ), 2.5, 2.5 );
     }
     p->restore();
 }

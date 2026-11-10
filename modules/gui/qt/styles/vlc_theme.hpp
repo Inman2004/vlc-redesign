@@ -38,6 +38,10 @@
 #include <QColor>
 #include <QIcon>
 #include <QString>
+#include <QList>
+#include <QPair>
+#include <QRectF>
+#include <QVector>
 
 class QPainter;
 class QRectF;
@@ -146,7 +150,21 @@ QString tooltipWithKey( intf_thread_t *, const QString &text, const char *keyOpt
 void paintSeekBar( QPainter *, const QRectF &groove, qreal position,
                    qreal buffering, const QList<qreal> &chapters,
                    bool enabled, qreal hover, int hoverX = -1,
-                   const QByteArray &peaks = QByteArray() );
+                   const QByteArray &peaks = QByteArray(),
+                   const QList<qreal> &bookmarks = QList<qreal>() );
+
+/* P7 subtitle timeline (Components bar variant): the track shows a window
+ * of the film with its subtitle cues, and four buttons sit inside its ends:
+ * ‹ previous cue, − subtitles earlier | + later, › next cue. */
+enum SubtitleButton { SUB_PREV, SUB_EARLIER, SUB_LATER, SUB_NEXT, SUB_BUTTONS };
+QRectF subtitleButtonRect( const QRectF &groove, int button );
+QRectF subtitleContentRect( const QRectF &groove );
+/* cues and bookmarks as [0..1] fractions of the content rect; position
+ * -1 hides the handle; hovered/pressed are SubtitleButton or -1 */
+void paintSubtitleBar( QPainter *, const QRectF &groove, qreal position,
+                       const QVector<QPair<qreal, qreal> > &cues,
+                       const QList<qreal> &bookmarks,
+                       qreal hover, int hoverX, int hoveredButton, int pressedButton );
 void paintVolumeWedge( QPainter *, const QRectF &rect, qreal fraction,
                        bool muted, bool hovered );
 

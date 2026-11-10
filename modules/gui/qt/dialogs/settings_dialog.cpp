@@ -41,6 +41,7 @@
 #include "main_interface.hpp"
 #include "recents.hpp"
 #include "styles/vlc_theme.hpp"
+#include "util/subtitle_timeline.hpp"
 #include "util/key_map.hpp"
 
 #include <vlc_aout.h>
@@ -1382,6 +1383,19 @@ void SettingsDialog::buildInterface()
     boolOption( p, qtr( "Show the album art when nothing plays" ), QString(), "qt-bgcone" );
     boolOption( p, qtr( "Preview frames on the seek bar" ),
                 qtr( "Show a thumbnail of the video while hovering the seek bar." ), "qt-seek-preview" );
+    {
+        /* shares its state with the Playback tab's switch */
+        SubtitleTimeline *subs = SubtitleTimeline::instance( p_intf );
+        SToggle *t = new SToggle;
+        t->setChecked( subs->enabled() );
+        row( p, qtr( "Subtitle timeline on the seek bar" ),
+             qtr( "While a subtitle file (.srt, .vtt, .ass) plays, show the 50 seconds "
+                  "around the playhead with every subtitle as a block." ), t, "qt-subtitle-timeline" );
+        connect( t, &SToggle::toggled, subs, [subs]( bool on ) { subs->setEnabled( on ); } );
+        connect( subs, &SubtitleTimeline::changed, t, [t, subs]() {
+            if( t->isChecked() != subs->enabled() ) t->setChecked( subs->enabled() );
+        } );
+    }
     intChoice( p, qtr( "Raise the window when" ),
                qtr( "Bring the player to the front when playback starts from elsewhere." ),
                "qt-auto-raise" );

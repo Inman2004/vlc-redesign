@@ -80,6 +80,7 @@
 #include <QGuiApplication>
 #include <vlc_modules.h>
 #include "util/key_map.hpp"
+#include "util/bookmarks.hpp"
 #ifdef _WIN32
 #include <QFileInfo>
 #endif
@@ -547,6 +548,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     /* the bindings the core loaded; edits in Keyboard Shortcuts apply
      * through KeyMap without a restart */
     KeyMap::init( p_intf );
+    /* bookmarks come back the next time a file plays (P7) */
+    if( Theme::redesign() )
+        Bookmarks::init( p_intf );
 
     /* Settings > Interface > Remember window size and position */
     if( !Theme::redesign() || settings->value( "Settings/rememberGeometry", true ).toBool() )

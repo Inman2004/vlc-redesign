@@ -31,6 +31,7 @@
 #include "qt.hpp"
 #include "components/interface_widgets.hpp"
 #include "styles/vlc_theme.hpp"
+#include "util/subtitle_timeline.hpp"
 #include "dialogs_provider.hpp"
 #include "util/customwidgets.hpp"               // qtEventToVLCKey, QVLCStackedWidget
 
@@ -954,6 +955,17 @@ TimeLabel::TimeLabel( intf_thread_t *_p_intf, TimeLabel::Display _displayType  )
     connect( THEMIM->getIM(), &InputManager::remainingTimeChanged,
               this, &TimeLabel::setRemainingTime );
 
+    /* P7: with the subtitle timeline, the labels show the window's edges */
+    if( Theme::redesign() && _displayType != TimeLabel::Both )
+    {
+        SubtitleTimeline *subs = SubtitleTimeline::instance( p_intf );
+        connect( subs, &SubtitleTimeline::changed, this, &TimeLabel::refresh );
+        connect( subs, &SubtitleTimeline::moved, this, [this, subs]() {
+            if( subs->active() ) refresh();
+        } );
+        setProperty( "plainTip", toolTip() );
+    }
+
 
     auto updateStyle = [this]() {
         setStyleSheet( "TimeLabel {  padding-left: 4px; padding-right: 4px; }" );
@@ -1025,6 +1037,41 @@ void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
 
         if ( b_remainingTime )
             minsize += QSize( fontMetrics().size( 0, "-", 0, 0 ).width(), 0 );
+    }
+
+    if( Theme::redesign() && displayType != TimeLabel::Both )
+    {
+        SubtitleTimeline *subs = SubtitleTimeline::instance( p_intf );
+        if( subs->active() )
+        {
+            int64_t a, e;
+            subs->window( &a, &e );
+            const int w = int( ( displayType == TimeLabel::Elapsed ? a : e ) / 1000000 );
+            /* Figma: the asterisk takes 4px of the gap to the bar */
+            if( !property( "subMargins" ).toBool() )
+            {
+                const QMargins m = contentsMargins();
+                setProperty( "subMargins", true );
+                setProperty( "plainLeft", m.left() );
+                setProperty( "plainRight", m.right() );
+                setContentsMargins( qMax( 0, m.left() - 4 ), m.top(), qMax( 0, m.right() - 4 ), m.bottom() );
+            }
+            setText( QString::asprintf( "%02d:%02d:%02d*", w / 3600, ( w / 60 ) % 60, w % 60 ) );
+            setToolTip( displayType == TimeLabel::Elapsed
+                        ? qtr( "Start of the subtitle timeline (the 50 seconds around the playhead)" )
+                        : qtr( "End of the subtitle timeline (the 50 seconds around the playhead)" ) );
+            cachedLength = length;
+            cachedTime = t;
+            return;
+        }
+        setToolTip( property( "plainTip" ).toString() );
+        if( property( "subMargins" ).toBool() )
+        {
+            const QMargins m = contentsMargins();
+            setContentsMargins( property( "plainLeft" ).toInt(), m.top(),
+                                property( "plainRight" ).toInt(), m.bottom() );
+            setProperty( "subMargins", false );
+        }
     }
 
     switch( displayType )

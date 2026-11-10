@@ -249,6 +249,8 @@ signals:
     /// Other
     void synchroChanged();
     void bookmarksChanged();
+    /* a track was added, removed or selected */
+    void esChanged();
     void cachingChanged( float );
     /// Program Event changes
     void encryptionChanged( bool );

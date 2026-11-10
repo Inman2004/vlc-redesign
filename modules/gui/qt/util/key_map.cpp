@@ -21,6 +21,7 @@
 #endif
 
 #include "util/key_map.hpp"
+#include "util/bookmarks.hpp"
 
 #include <vlc_actions.h>
 #include <vlc_configuration.h>
@@ -38,6 +39,24 @@ namespace
 QHash<uint32_t, int> current;   /* key -> action, from the configuration now */
 QSet<uint32_t> loaded;          /* keys the core's map knows (from start) */
 bool active = false;            /* true once a binding changed this session */
+QSet<uint32_t> quickBookmark;   /* qt-key-quick-bookmark: owned by the interface */
+
+QSet<uint32_t> readKeys( intf_thread_t *p_intf, const char *option )
+{
+    QSet<uint32_t> keys;
+    char *psz = config_GetPsz( p_intf, option );
+    if( psz )
+    {
+        for( const QString &k : QString::fromUtf8( psz ).split( '\t', Qt::SkipEmptyParts ) )
+        {
+            const uint32_t code = vlc_str2keycode( k.toUtf8().constData() );
+            if( code != KEY_UNSET )
+                keys.insert( code );
+        }
+        free( psz );
+    }
+    return keys;
+}
 
 QHash<uint32_t, int> readBindings( intf_thread_t *p_intf )
 {
@@ -74,6 +93,7 @@ void KeyMap::init( intf_thread_t *p_intf )
     current = readBindings( p_intf );
     loaded = QSet<uint32_t>( current.keyBegin(), current.keyEnd() );
     active = false;
+    quickBookmark = readKeys( p_intf, "qt-key-quick-bookmark" );
 }
 
 void KeyMap::reload( intf_thread_t *p_intf )
@@ -82,12 +102,18 @@ void KeyMap::reload( intf_thread_t *p_intf )
         init( p_intf );
     current = readBindings( p_intf );
     active = true;
+    quickBookmark = readKeys( p_intf, "qt-key-quick-bookmark" );
 }
 
 void KeyMap::send( intf_thread_t *p_intf, int vlcKey )
 {
     if( vlcKey <= 0 )
         return;
+    if( quickBookmark.contains( (uint32_t)vlcKey ) )
+    {
+        Bookmarks::add( p_intf, true );
+        return;
+    }
     if( !active )
     {
         var_SetInteger( p_intf->obj.libvlc, "key-pressed", vlcKey );

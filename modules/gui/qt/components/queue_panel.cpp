@@ -27,6 +27,7 @@
 #include "dialogs_provider.hpp"
 #include "input_manager.hpp"
 #include "styles/vlc_theme.hpp"
+#include "util/bookmarks.hpp"
 
 #include <vlc_playlist.h>
 #include <vlc_input.h>
@@ -61,15 +62,6 @@ enum
     NAME_X      = 63,
     RIGHT_INSET = 25,
 };
-
-static QString clock( qint64 us, bool hours )
-{
-    const qint64 s = us / CLOCK_FREQ;
-    if( hours || s >= 3600 )
-        return QString( "%1:%2:%3" ).arg( s / 3600 ).arg( ( s / 60 ) % 60, 2, 10, QChar( '0' ) )
-                                    .arg( s % 60, 2, 10, QChar( '0' ) );
-    return QString( "%1:%2" ).arg( s / 60, 2, 10, QChar( '0' ) ).arg( s % 60, 2, 10, QChar( '0' ) );
-}
 
 /* "2h 3m", "14m", "45s" */
 static QString span( qint64 us )
@@ -463,10 +455,13 @@ void QueueList::showSortMenu( const QPoint &globalPos )
  * Bookmarks: VLC's bookmarks of the input (P7 adds quick bookmarks)
  **********************************************************************/
 /* a name and its time, in the queue rows' geometry */
+/* measured (canvas ×1.43): bookmarks name 20, time 27 from the right;
+ * chapters number 24 (accent), name 69, time 27 from the right */
 class TimedRowDelegate : public QStyledItemDelegate
 {
 public:
-    using QStyledItemDelegate::QStyledItemDelegate;
+    TimedRowDelegate( QObject *parent, int nameX, bool numbered )
+        : QStyledItemDelegate( parent ), nameX( nameX ), numbered( numbered ) {}
     QSize sizeHint( const QStyleOptionViewItem &, const QModelIndex & ) const override
     {
         return QSize( 100, ROW_H );
@@ -490,23 +485,33 @@ public:
         const QString t = index.data( Qt::UserRole ).toString();
         const int tw = fm.horizontalAdvance( t );
         p->setPen( QColor( 0x6B, 0x6B, 0x6B ) );
-        p->drawText( QRect( r.right() - RIGHT_INSET - tw, r.top(), tw + 1, r.height() ),
+        p->drawText( QRect( r.right() - TIME_RIGHT - tw, r.top(), tw + 1, r.height() ),
                      Qt::AlignRight | Qt::AlignVCenter, t );
+        if( numbered )
+        {
+            p->setPen( Theme::accent() );
+            p->drawText( QRect( r.left() + NUMBER_X, r.top(), nameX - NUMBER_X, r.height() ),
+                         Qt::AlignLeft | Qt::AlignVCenter, QString::number( index.row() + 1 ) );
+        }
         p->setPen( hover ? Theme::colors().text : Theme::colors().textMuted );
-        const QRect name( r.left() + INSET, r.top(), r.width() - INSET - RIGHT_INSET - tw - 16, r.height() );
+        const QRect name( r.left() + nameX, r.top(), r.width() - nameX - TIME_RIGHT - tw - 16, r.height() );
         p->drawText( name, Qt::AlignLeft | Qt::AlignVCenter,
                      fm.elidedText( index.data( Qt::DisplayRole ).toString(), Qt::ElideRight, name.width() ) );
         p->restore();
     }
+private:
+    enum { NUMBER_X = 24, TIME_RIGHT = 26 };
+    int nameX;
+    bool numbered;
 };
 
-static QListWidget *panelList( QWidget *parent )
+static QListWidget *panelList( QWidget *parent, int nameX, bool numbered )
 {
     QListWidget *l = new QListWidget( parent );
     l->setObjectName( "QueueSimpleList" );
     l->setFrameShape( QFrame::NoFrame );
     l->setMouseTracking( true );
-    l->setItemDelegate( new TimedRowDelegate( l ) );
+    l->setItemDelegate( new TimedRowDelegate( l, nameX, numbered ) );
     return l;
 }
 
@@ -517,24 +522,22 @@ QWidget *QueuePanel::buildBookmarksPage()
     v->setContentsMargins( 0, 0, 0, 0 );
     v->setSpacing( 0 );
     QWidget *header = headerRow( &bookmarkCount );
+    /* Figma draws this header 2px higher and the rows 5px higher than the
+     * queue's: count centred 34 under the tabs, first row centred 83 */
+    header->setFixedHeight( 59 );
     QHBoxLayout *h = static_cast<QHBoxLayout *>( header->layout() );
+    h->setContentsMargins( INSET + 1, 6, 16, 0 );
     QToolButton *removeBtn = headerButton( header, "remove", qtr( "Remove the bookmark" ) );
     QToolButton *addBtn = headerButton( header, "add", qtr( "Bookmark this moment" ) );
     h->addWidget( removeBtn );
     h->addWidget( addBtn );
     v->addWidget( header );
-    bookmarkList = panelList( page );
+    bookmarkList = panelList( page, 20, false );
     v->addWidget( bookmarkList, 1 );
 
     connect( addBtn, &QToolButton::clicked, this, [this]() {
-        input_thread_t *input = THEMIM->getInput();
-        seekpoint_t bookmark;
-        if( !input || input_Control( input, INPUT_GET_BOOKMARK, &bookmark ) )
-            return;
-        const QString name = qtr( "Bookmark %1" ).arg( bookmarkList->count() + 1 );
-        QByteArray raw = name.toUtf8();
-        bookmark.psz_name = raw.data();
-        input_Control( input, INPUT_ADD_BOOKMARK, &bookmark );
+        /* named like the quick bookmark (Ctrl+B): "<Title> <n>" */
+        Bookmarks::add( p_intf, false );
         refreshBookmarks();
     } );
     connect( removeBtn, &QToolButton::clicked, this, [this]() {
@@ -565,12 +568,15 @@ void QueuePanel::refreshBookmarks()
         {
             QListWidgetItem *it = new QListWidgetItem( bookmarkList );
             it->setText( qfu( marks[i]->psz_name ) );
-            it->setData( Qt::UserRole, clock( marks[i]->i_time_offset, false ) );
+            /* Figma: 00:00:42:023 */
+            const qint64 ms = marks[i]->i_time_offset / 1000;
+            it->setData( Qt::UserRole, QString::asprintf( "%02lld:%02lld:%02lld:%03lld",
+                         ms / 3600000, ( ms / 60000 ) % 60, ( ms / 1000 ) % 60, ms % 1000 ) );
             vlc_seekpoint_Delete( marks[i] );
         }
         free( marks );
     }
-    bookmarkCount->setText( n == 1 ? qtr( "1 bookmark" ) : qtr( "%1 bookmarks" ).arg( n ) );
+    bookmarkCount->setText( n == 1 ? qtr( "1 Bookmark" ) : qtr( "%1 Bookmarks" ).arg( n ) );
 }
 
 /**********************************************************************
@@ -582,8 +588,13 @@ QWidget *QueuePanel::buildChaptersPage()
     QVBoxLayout *v = new QVBoxLayout( page );
     v->setContentsMargins( 0, 0, 0, 0 );
     v->setSpacing( 0 );
-    v->addWidget( headerRow( &chapterCount ) );
-    chapterList = panelList( page );
+    /* Figma: no count row, the numbered list starts under the tabs (first
+     * row centred 38 below them) */
+    QWidget *chapterHeader = headerRow( &chapterCount );
+    chapterHeader->setParent( page );
+    chapterHeader->hide();
+    v->addSpacing( 38 - ROW_H / 2 );
+    chapterList = panelList( page, 69, true );
     v->addWidget( chapterList, 1 );
     chapters = new SeekPoints( this, p_intf );
     connect( THEMIM->getIM(), &InputManager::chapterChanged, this, [this]() {
@@ -606,7 +617,9 @@ void QueuePanel::refreshChapters()
     {
         QListWidgetItem *it = new QListWidgetItem( chapterList );
         it->setText( points[i].name.isEmpty() ? qtr( "Chapter %1" ).arg( i + 1 ) : points[i].name );
-        it->setData( Qt::UserRole, clock( points[i].time, false ) );
+        const qint64 sec = points[i].time / CLOCK_FREQ;   /* Figma: 00:02:15 */
+        it->setData( Qt::UserRole, QString::asprintf( "%02lld:%02lld:%02lld",
+                     sec / 3600, ( sec / 60 ) % 60, sec % 60 ) );
     }
     chapterCount->setText( points.size() == 1 ? qtr( "1 chapter" )
                                               : qtr( "%1 chapters" ).arg( points.size() ) );

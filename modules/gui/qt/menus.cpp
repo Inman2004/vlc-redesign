@@ -733,7 +733,8 @@ QMenu *VLCMenuBar::NavigMenu( intf_thread_t *p_intf, QMenu *menu )
     submenu = new QMenu( qtr( I_MENU_BOOKMARK ), menu );
     submenu->setTearOffEnabled( true );
     addDPStaticEntry( submenu, qtr( "&Manage" ), "",
-                      SLOT( bookmarksDialog() ), "Ctrl+B" );
+                      SLOT( bookmarksDialog() ),
+                      Theme::redesign() ? NULL : "Ctrl+B" ); /* P7: Ctrl+B is the quick bookmark */
     submenu->addSeparator();
     action = menu->addMenu( submenu );
     action->setData( "bookmark" );

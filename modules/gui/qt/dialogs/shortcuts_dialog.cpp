@@ -416,6 +416,9 @@ void ShortcutsDialog::build()
     for( const Group &g : groups )
     {
         QStringList l;
+        /* the interface's own key (P7), first in Bookmarks */
+        if( g.keys == bookmarkKeys && config_FindConfig( "qt-key-quick-bookmark" ) )
+            l << "@qt-key-quick-bookmark";
         for( const char *const *k = g.keys; *k; k++ )
             if( keys.contains( *k ) ) { l << *k; placed.insert( *k ); }
         layout << qMakePair( qtr( g.title ), l );
@@ -457,22 +460,26 @@ void ShortcutsDialog::build()
 
         for( const QString &k : layout[si].second )
         {
+            const bool own = k.startsWith( '@' );
+            const QString option = own ? k.mid( 1 ) : QString( "key-" ) + k;
             module_config_t *c = keys.value( k );
-            QString label = designLabel( k );
+            QString label = own ? qtr( "Add a quick bookmark" ) : designLabel( k );
             if( label.isEmpty() )
-                label = c->psz_text ? qtr( c->psz_text ) : k;
+                label = c && c->psz_text ? qtr( c->psz_text ) : k;
             QWidget *rw = new QWidget( host );
             rw->setFixedHeight( ROW_PITCH );
             QLabel *l = new QLabel( label, rw );
             l->setFont( uiFont( 14 ) );
             l->setStyleSheet( labelCss );
             l->setGeometry( SIDE, 0, COL_HOTKEY_X - SIDE - 16, CELL_H );
-            l->setToolTip( QString( "--key-%1" ).arg( k ) );
-            KeyBox *hk = new KeyBox( QString( "key-" ) + k, rw );
+            l->setToolTip( QString( "--%1" ).arg( option ) );
+            KeyBox *hk = new KeyBox( option, rw );
             hk->move( COL_HOTKEY_X, 0 );
-            KeyBox *gk = new KeyBox( QString( "global-key-" ) + k, rw );
+            KeyBox *gk = new KeyBox( QString( "global-" ) + option, rw );
             gk->move( COL_GLOBAL_X, 0 );
-            if( !globalOk )
+            if( own )
+                gk->setAvailable( false, qtr( "This shortcut works while VLC has the focus." ) );
+            else if( !globalOk )
                 gk->setAvailable( false, qtr( "Global hotkeys need the globalhotkeys module, "
                                               "which this build does not have." ) );
             for( KeyBox *b : { hk, gk } )

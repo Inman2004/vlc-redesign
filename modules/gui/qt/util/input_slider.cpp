@@ -38,6 +38,8 @@
 #include "imagehelper.hpp"
 #include "customwidgets.hpp"
 #include "styles/vlc_theme.hpp"
+#include "util/subtitle_timeline.hpp"
+#include "util/bookmarks.hpp"
 #include <vlc_actions.h>
 
 #include <QPaintEvent>
@@ -58,6 +60,8 @@
 #include <QScreen>
 #include <QSequentialAnimationGroup>
 #include <QVariantAnimation>
+#include <QToolTip>
+#include <algorithm>
 
 namespace {
     int const MIN_SLIDER_VALUE = 0;
@@ -147,6 +151,25 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
         setAttribute( Qt::WA_Hover );
         setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
         setCursor( Qt::PointingHandCursor );
+
+        /* P7: subtitle timeline and bookmark marks */
+        subs = SubtitleTimeline::instance( p_intf );
+        connect( subs, &SubtitleTimeline::changed, this, [this]() {
+            if( !subMode() ) { subHover = subPressed = -1; subDragging = false; }
+            update();
+        } );
+        connect( subs, &SubtitleTimeline::moved, this, [this]() {
+            if( subMode() ) update();
+        } );
+        subRepeat = new QTimer( this );
+        connect( subRepeat, &QTimer::timeout, this, [this]() {
+            subRepeat->setInterval( 90 );
+            if( subPressed == Theme::SUB_EARLIER ) subs->earlier();
+            else if( subPressed == Theme::SUB_LATER ) subs->later();
+        } );
+        auto readMarks = [this]() { bookmarkTimes = Bookmarks::times(); update(); };
+        connect( THEMIM->getIM(), &InputManager::bookmarksChanged, this, readMarks );
+        connect( THEMIM, &MainInputManager::inputChanged, this, readMarks );
 
         /* thumbnail over the hover time (qt-seek-preview) */
         preview = SeekPreview::shared( p_intf );
@@ -284,6 +307,11 @@ void SeekSlider::setPosition( float pos, int64_t time, int length )
 
     }
 
+    /* a new input: its chapters are known once its length is (the
+     * chapter event alone can come before them, or not until the next
+     * chapter starts) */
+    if( length != inputLength && chapters )
+        chapters->update();
     inputLength = length;
 }
 
@@ -342,6 +370,18 @@ void SeekSlider::processReleasedButton()
 
 void SeekSlider::mouseReleaseEvent( QMouseEvent *event )
 {
+    if( subPressed >= 0 || subDragging )
+    {
+        if( subDragging && subDragTime >= 0 )
+            subSeek( subDragTime, true );
+        subPressed = -1;
+        subDragging = false;
+        subDragStart = subDragTime = -1;
+        if( subRepeat ) subRepeat->stop();
+        update();
+        event->accept();
+        return;
+    }
     if ( event->button() != Qt::LeftButton && event->button() != Qt::MiddleButton )
     {
         QSlider::mouseReleaseEvent( event );
@@ -359,6 +399,27 @@ void SeekSlider::mousePressEvent( QMouseEvent* event )
        )
     {
         QSlider::mousePressEvent( event );
+        return;
+    }
+
+    if( subMode() && event->button() == Qt::LeftButton )
+    {
+        const int b = subButtonAt( event->pos() );
+        if( b >= 0 )
+            subPress( b );
+        else
+        {
+            /* the window holds still while dragging inside it */
+            int64_t a, e;
+            subWindow( &a, &e );
+            subDragStart = a;
+            subDragging = true;
+            subDragTime = subTimeAt( event->x() );
+            subSeekClock.invalidate();
+            subSeek( subDragTime, true );
+        }
+        update();
+        event->accept();
         return;
     }
 
@@ -418,6 +479,12 @@ void SeekSlider::mouseMoveEvent( QMouseEvent *event )
     {
         /* Handle button release when mouserelease has been hijacked by popup */
         processReleasedButton();
+    }
+
+    if( subMode() )
+    {
+        subMouseMove( event );
+        return;
     }
 
     if ( !isEnabled() ) return event->accept();
@@ -528,6 +595,12 @@ void SeekSlider::enterEvent( QEvent * )
 
 void SeekSlider::leaveEvent( QEvent * )
 {
+    if( subHover >= 0 )
+    {
+        subHover = -1;
+        QToolTip::hideText();
+        update();
+    }
     if( hoverAnim )
     {
         hoverX = -1;
@@ -550,6 +623,30 @@ void SeekSlider::leaveEvent( QEvent * )
 
 void SeekSlider::paintEvent( QPaintEvent *ev )
 {
+    if( subMode() )
+    {
+        int64_t a, e;
+        subWindow( &a, &e );
+        const qreal w = qMax<int64_t>( 1, e - a );
+        const int64_t now = subDragging && subDragTime >= 0 ? subDragTime : subs->now();
+        const int64_t d = subs->delay();
+        QVector<QPair<qreal, qreal> > cues;
+        const QVector<SubtitleTimeline::Cue> &all = subs->cues();
+        /* cues are sorted by start: begin a little before the window */
+        auto it = std::lower_bound( all.constBegin(), all.constEnd(), a - d - INT64_C( 60000000 ),
+                                    []( const SubtitleTimeline::Cue &c, int64_t v ) { return c.start < v; } );
+        for( ; it != all.constEnd() && it->start + d < e; ++it )
+            if( it->end + d > a )
+                cues << qMakePair( ( it->start + d - a ) / w, ( it->end + d - a ) / w );
+        QList<qreal> marks;
+        foreach( int64_t t, bookmarkTimes )
+            if( t >= a && t <= e )
+                marks << ( t - a ) / w;
+        QPainter painter( this );
+        Theme::paintSubtitleBar( &painter, QRectF( rect() ), qBound<qreal>( 0, ( now - a ) / w, 1 ),
+                                 cues, marks, hoverAmount, hoverX, subHover, subPressed );
+        return;
+    }
     if( Theme::redesign() )
     {
         const int span = maximum() - minimum();
@@ -557,15 +654,23 @@ void SeekSlider::paintEvent( QPaintEvent *ev )
                         ? qreal( sliderPosition() - minimum() ) / span : -1.0;
         QList<qreal> marks;
         if( chapters && inputLength > 0 )
+        {
             foreach( const SeekPoint &point, chapters->getPoints() )
                 if( point.time > 0 )
                     marks << qBound( 0.0, point.time / 1000000.0 / inputLength, 1.0 );
+        }
         const qreal buffering =
             ( QTime::currentTime() > bufferingStart.addSecs( 1 ) ) ? f_buffering : 0.0;
         QPainter painter( this );
+        QList<qreal> bookmarks;
+        if( inputLength > 0 )
+        {
+            foreach( int64_t t, bookmarkTimes )
+                bookmarks << qBound( 0.0, t / 1000000.0 / inputLength, 1.0 );
+        }
         Theme::paintSeekBar( &painter, QRectF( rect() ), pos, buffering, marks,
                              isEnabled(), isEnabled() ? hoverAmount : 0.0, hoverX,
-                             waveform ? peaks : QByteArray() );
+                             waveform ? peaks : QByteArray(), bookmarks );
         return;
     }
     if ( alternativeStyle )
@@ -592,6 +697,143 @@ void SeekSlider::paintEvent( QPaintEvent *ev )
     }
     else
         QSlider::paintEvent( ev );
+}
+
+/* P7 subtitle timeline */
+bool SeekSlider::subMode() const
+{
+    return subs && isEnabled() && subs->active();
+}
+
+void SeekSlider::subWindow( int64_t *start, int64_t *end ) const
+{
+    if( subDragging && subDragStart >= 0 )
+    {
+        int64_t a, e;
+        subs->window( &a, &e );
+        *start = subDragStart;
+        *end = subDragStart + ( e - a );
+        return;
+    }
+    subs->window( start, end );
+}
+
+int SeekSlider::subButtonAt( const QPoint &p ) const
+{
+    for( int b = 0; b < Theme::SUB_BUTTONS; b++ )
+        if( Theme::subtitleButtonRect( QRectF( rect() ), b ).adjusted( -1, -4, 1, 4 ).contains( p ) )
+            return b;
+    return -1;
+}
+
+int64_t SeekSlider::subTimeAt( int x ) const
+{
+    int64_t a, e;
+    subWindow( &a, &e );
+    const QRectF c = Theme::subtitleContentRect( QRectF( rect() ) );
+    const qreal f = qBound<qreal>( 0, ( x - c.left() ) / c.width(), 1 );
+    return a + int64_t( f * ( e - a ) );
+}
+
+/* positions are floats over the whole film: finer than the 0..10000 slider */
+void SeekSlider::subSeek( int64_t time, bool force )
+{
+    const int64_t len = subs->length();
+    if( len <= 0 )
+        return;
+    if( !force && subSeekClock.isValid() && subSeekClock.elapsed() < 80 )
+        return;
+    subSeekClock.start();
+    const float pos = float( double( time ) / double( len ) );
+    setValue( int( pos * maximum() ) );
+    emit sliderDragged( pos );
+}
+
+void SeekSlider::subPress( int b )
+{
+    subPressed = b;
+    switch( b )
+    {
+    case Theme::SUB_PREV:    subs->previousCue(); break;
+    case Theme::SUB_NEXT:    subs->nextCue(); break;
+    case Theme::SUB_EARLIER: subs->earlier(); break;
+    case Theme::SUB_LATER:   subs->later(); break;
+    }
+    /* hold − / + to keep shifting */
+    if( b == Theme::SUB_EARLIER || b == Theme::SUB_LATER )
+    {
+        subRepeat->setInterval( 400 );
+        subRepeat->start();
+    }
+}
+
+void SeekSlider::subMouseMove( QMouseEvent *event )
+{
+    if( subDragging )
+    {
+        subDragTime = subTimeAt( event->x() );
+        subSeek( subDragTime, false );
+        update();
+    }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    const QPoint global = event->globalPosition().toPoint();
+#else
+    const QPoint global = event->globalPos();
+#endif
+    const int b = subDragging ? -1 : subButtonAt( event->pos() );
+    if( b != subHover )
+    {
+        subHover = b;
+        update();
+    }
+    if( b >= 0 )
+    {
+        mTimeTooltip->hide();
+        const double ms = subs->delay() / 1000.0;
+        const QString delay = qtr( "Subtitle delay: %1 ms" ).arg( ms, 0, 'f', 0 );
+        QString tip;
+        switch( b )
+        {
+        case Theme::SUB_PREV:    tip = qtr( "Previous subtitle" ); break;
+        case Theme::SUB_NEXT:    tip = qtr( "Next subtitle" ); break;
+        case Theme::SUB_EARLIER: tip = qtr( "Show subtitles 50 ms earlier" ) + "\n" + delay; break;
+        case Theme::SUB_LATER:   tip = qtr( "Show subtitles 50 ms later" ) + "\n" + delay; break;
+        }
+        QToolTip::showText( global, tip, this );
+        setCursor( Qt::PointingHandCursor );
+        event->accept();
+        return;
+    }
+    QToolTip::hideText();
+
+    /* the time under the cursor, and the subtitle line there */
+    const int64_t t = subTimeAt( event->x() );
+    const int cue = subs->cueAt( t );
+    const int sec = int( t / 1000000 );
+    snprintf( psz_length, sizeof( psz_length ), "%02d:%02d:%02d",
+              sec / 3600, ( sec / 60 ) % 60, sec % 60 );
+    QString line = cue >= 0 ? subs->cues()[cue].text : QString();
+    if( line.size() > 60 )
+        line = line.left( 58 ) + QString::fromUtf8( "…" );
+    const QPoint target( global.x(), QWidget::mapToGlobal( QPoint( 0, 0 ) ).y() );
+    if( preview )
+    {
+        const bool on = SeekPreview::available( p_intf );
+        mTimeTooltip->setPreviewEnabled( on );
+        if( on )
+        {
+            const float ht = t / 1000000.f;
+            previewTime = ht;
+            const QImage img = preview->cached( ht, inputLength );
+            if( !img.isNull() )
+                mTimeTooltip->setThumbnail( img );
+            preview->request( ht, inputLength );
+        }
+    }
+    mTimeTooltip->setTip( target, psz_length, line );
+    if( !mTimeTooltip->isVisible() && !qApp->activePopupWidget() )
+        mTimeTooltip->show();
+    event->accept();
 }
 
 void SeekSlider::setWaveform( bool b )

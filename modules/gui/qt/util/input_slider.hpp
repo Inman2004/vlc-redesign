@@ -36,6 +36,7 @@
 #include <QSlider>
 #include <QPainter>
 #include <QTime>
+#include <QElapsedTimer>
 
 #define MSTRTIME_MAX_SIZE 22
 
@@ -49,6 +50,7 @@ class QVariantAnimation;
 class QCommonStyle;
 class TimeTooltip;
 class SeekPreview;
+class SubtitleTimeline;
 class QSequentialAnimationGroup;
 
 /* Input Slider derived from QSlider */
@@ -95,6 +97,21 @@ protected:
 
 private:
     void refreshPeaks();
+    /* P7: the subtitle timeline replaces the track while it is active */
+    bool subMode() const;
+    void subWindow( int64_t *start, int64_t *end ) const;
+    int subButtonAt( const QPoint & ) const;
+    int64_t subTimeAt( int x ) const;
+    void subSeek( int64_t time, bool force );
+    void subMouseMove( QMouseEvent * );
+    void subPress( int button );
+    SubtitleTimeline *subs = NULL;
+    int subHover = -1, subPressed = -1;
+    bool subDragging = false;
+    int64_t subDragStart = -1, subDragTime = -1;   /* the frozen window */
+    QElapsedTimer subSeekClock;
+    QTimer *subRepeat = NULL;
+    QList<int64_t> bookmarkTimes;
     bool waveform = false;
     QString peaksPath;
     QByteArray peaks;

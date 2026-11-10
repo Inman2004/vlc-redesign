@@ -24,6 +24,7 @@
 #include "components/extended_panels.hpp"
 #include "util/redesign_widgets.hpp"
 #include "styles/vlc_theme.hpp"
+#include "util/subtitle_timeline.hpp"
 #include "input_manager.hpp"
 #include "dialogs_provider.hpp"
 
@@ -841,6 +842,22 @@ QWidget *AdjustPanel::buildPlaybackTab()
 
     /* Seek bar and controls (Settings > Interface until P6 has its page) */
     sec = addSection( page, qtr( "Controls" ) );
+    /* P7: the Components bar variant with cue blocks */
+    SubtitleTimeline *subs = SubtitleTimeline::instance( p_intf );
+    ToggleSwitch *subLine = new ToggleSwitch;
+    subLine->setChecked( subs->enabled() );
+    subLine->setToolTip( qtr( "While a subtitle file (.srt, .vtt, .ass) plays, the seek bar shows "
+                              "the 50 seconds around the playhead with every subtitle as a block" ) );
+    connect( subLine, &ToggleSwitch::clicked, this, [this, subs]( bool on ) {
+        subs->setEnabled( on );
+        saveTimer.start();
+    } );
+    connect( subs, &SubtitleTimeline::changed, subLine, [subLine, subs]() {
+        if( subLine->isChecked() != subs->enabled() )
+            subLine->setCheckedAnimated( subs->enabled() );
+    } );
+    addRow( sec, qtr( "Show Subtitle Timeline on Seekbar" ), subLine );
+
     ToggleSwitch *thumbs = new ToggleSwitch;
     thumbs->setChecked( var_InheritBool( p_intf, "qt-seek-preview" ) );
     thumbs->setToolTip( qtr( "Preview the hovered position of local video files" ) );

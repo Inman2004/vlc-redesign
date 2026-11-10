@@ -51,6 +51,7 @@
 #include "components/playlist/playlist_model.hpp" /* for ~PLModel() */
 
 #include <vlc_plugin.h>
+#include <vlc_actions.h>    /* KEY_UNSET for add_key */
 #include <vlc_vout_window.h>
 
 #ifdef _WIN32 /* For static builds */
@@ -131,6 +132,13 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define QT_AUTOHIDE_TEXT N_( "Auto-hide the controls" )
 #define QT_AUTOHIDE_LONGTEXT N_( "When the header and control bar hide while " \
     "the mouse rests on the video. The delay is the mouse hide timeout." )
+#define QT_SUB_TIMELINE_TEXT N_( "Show the subtitle timeline on the seek bar" )
+#define QT_SUB_TIMELINE_LONGTEXT N_( "While a subtitle file plays, the seek bar shows " \
+    "the 50 seconds around the playhead with each subtitle as a block, and " \
+    "buttons to jump between subtitles and shift their timing." )
+#define QT_QUICK_BOOKMARK_TEXT N_( "Add a quick bookmark" )
+#define QT_QUICK_BOOKMARK_LONGTEXT N_( "Bookmark the current moment of the " \
+    "playing file and confirm it on the video." )
 #define QT_SEEK_PREVIEW_TEXT N_( "Show a thumbnail when hovering the seek bar" )
 #define QT_SEEK_PREVIEW_LONGTEXT N_( "Decode a small preview of the hovered " \
     "position of local video files with a second, hidden input." )
@@ -306,6 +314,9 @@ vlc_module_begin ()
         change_integer_list( i_autohide_list, psz_autohide_list_text )
     add_string( "qt-library-roots", "", QT_LIBRARY_ROOTS_TEXT, QT_LIBRARY_ROOTS_LONGTEXT, false )
     add_bool( "qt-seek-preview", true, QT_SEEK_PREVIEW_TEXT, QT_SEEK_PREVIEW_LONGTEXT, false )
+    add_bool( "qt-subtitle-timeline", false, QT_SUB_TIMELINE_TEXT, QT_SUB_TIMELINE_LONGTEXT, false )
+    add_key( "qt-key-quick-bookmark", "Ctrl+b", QT_QUICK_BOOKMARK_TEXT,
+             QT_QUICK_BOOKMARK_LONGTEXT, false )
     add_string( "qt-theme", "dark", QT_THEME_TEXT, QT_THEME_LONGTEXT, false )
         change_string_list( psz_theme_values, psz_theme_texts )
     add_string( "qt-accent-color", "#D37918", QT_ACCENT_TEXT, QT_ACCENT_LONGTEXT, false )
