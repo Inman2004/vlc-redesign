@@ -41,6 +41,7 @@
 #include "main_interface.hpp"
 #include "recents.hpp"
 #include "styles/vlc_theme.hpp"
+#include "util/key_map.hpp"
 
 #include <vlc_aout.h>
 #include <vlc_configuration.h>
@@ -1486,7 +1487,8 @@ void SettingsDialog::buildControls()
             if( cfg[i].i_type == CONFIG_ITEM_KEY && cfg[i].psz_name )
                 config_PutPsz( p_intf, cfg[i].psz_name, cfg[i].orig.psz );
         module_config_free( cfg );
-        dirty = true;
+        config_SaveConfigFile( p_intf );
+        KeyMap::reload( p_intf );
     } );
 
     p->section( qtr( "Skip Amounts" ) );

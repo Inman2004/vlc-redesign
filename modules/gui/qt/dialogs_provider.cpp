@@ -45,6 +45,8 @@
 #include "dialogs/bookmarks.hpp"
 #include "dialogs/preferences.hpp"
 #include "dialogs/settings_dialog.hpp"
+#include "dialogs/shortcuts_dialog.hpp"
+#include "util/key_map.hpp"
 #include "dialogs/mediainfo.hpp"
 #include "dialogs/messages.hpp"
 #include "dialogs/extended.hpp"
@@ -269,6 +271,12 @@ void DialogsProvider::prefsDialog()
 /* Keyboard Shortcuts: the Hotkeys page until the P6b screen exists */
 void DialogsProvider::hotkeysDialog()
 {
+    if( Theme::redesign() )
+    {
+        ShortcutsDialog *d = new ShortcutsDialog( p_intf, (QWidget *)p_intf->p_sys->p_mi );
+        d->show();
+        return;
+    }
     PrefsDialog *p = new PrefsDialog( (QWidget *)p_intf->p_sys->p_mi, p_intf );
     p->showSimplePanel( SPrefsHotkeys );
     p->toggleVisible();
@@ -923,5 +931,5 @@ void DialogsProvider::sendKey( int key )
      }
 
      // forward key to vlc core when not a key accelerator
-     var_SetInteger( p_intf->obj.libvlc, "key-pressed", key );
+     KeyMap::send( p_intf, key );
 }

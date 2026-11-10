@@ -168,6 +168,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/library/library_browser.cpp gui/qt/library/library_browser.hpp \
 	gui/qt/dialogs/redesign_dialogs.cpp gui/qt/dialogs/redesign_dialogs.hpp \
 	gui/qt/dialogs/settings_dialog.cpp gui/qt/dialogs/settings_dialog.hpp \
+	gui/qt/dialogs/shortcuts_dialog.cpp gui/qt/dialogs/shortcuts_dialog.hpp \
+	gui/qt/util/key_map.cpp gui/qt/util/key_map.hpp \
 	gui/qt/components/settings_controls.cpp gui/qt/components/settings_controls.hpp \
 	gui/qt/components/redesign_menus.cpp gui/qt/components/redesign_menus.hpp
 if HAVE_WIN32
@@ -215,6 +217,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/library/library_browser.moc.cpp \
 	gui/qt/dialogs/redesign_dialogs.moc.cpp \
 	gui/qt/dialogs/settings_dialog.moc.cpp \
+	gui/qt/dialogs/shortcuts_dialog.moc.cpp \
 	gui/qt/components/settings_controls.moc.cpp \
 	gui/qt/components/redesign_menus.moc.cpp \
 	gui/qt/adapters/seekpoints.moc.cpp \

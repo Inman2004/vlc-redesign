@@ -79,6 +79,7 @@
 #include <QScreen>
 #include <QGuiApplication>
 #include <vlc_modules.h>
+#include "util/key_map.hpp"
 #ifdef _WIN32
 #include <QFileInfo>
 #endif
@@ -542,6 +543,10 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     }
     else if( settings->value( "MainWindow/playlist-visible", false ).toBool() )
         togglePlaylist();
+
+    /* the bindings the core loaded; edits in Keyboard Shortcuts apply
+     * through KeyMap without a restart */
+    KeyMap::init( p_intf );
 
     /* Settings > Interface > Remember window size and position */
     if( !Theme::redesign() || settings->value( "Settings/rememberGeometry", true ).toBool() )
@@ -2411,7 +2416,7 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
     int i_vlck = qtEventToVLCKey( e );
     if( i_vlck > 0 )
     {
-        var_SetInteger( p_intf->obj.libvlc, "key-pressed", i_vlck );
+        KeyMap::send( p_intf, i_vlck );
         e->accept();
     }
     else
@@ -2421,7 +2426,7 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
 void MainInterface::wheelEvent( QWheelEvent *e )
 {
     int i_vlckey = qtWheelEventToVLCKey( e );
-    var_SetInteger( p_intf->obj.libvlc, "key-pressed", i_vlckey );
+    KeyMap::send( p_intf, i_vlckey );
     e->accept();
 }
 
