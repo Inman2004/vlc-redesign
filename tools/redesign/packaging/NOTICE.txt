@@ -1,0 +1,46 @@
+VLC Redesign — modified version of VLC media player 3.0.24
+==========================================================
+
+This is a MODIFIED, UNOFFICIAL build of VLC media player 3.0.24. It is not
+made, endorsed or supported by VideoLAN. The official player is at
+https://www.videolan.org/vlc/
+
+Changes
+-------
+Modified in 2026 by Immanuvel B (https://github.com/Inman2004):
+
+- modules/gui/qt/: a redesigned Qt interface (new and changed files
+  throughout the module);
+- configure.ac: the Qt Network module made optional;
+- extras/package/win32/: Windows packaging without browser plugins, and
+  the NSIS files missing from the 3.0.24 source release;
+- tools/redesign/: build and packaging scripts.
+
+The full record of every change, with dates, is the git history of the
+source repository. The original VLC copyright notices are unchanged.
+
+Design
+------
+The interface design is "VLC Redesign" by Juxtopposed:
+  Video:  "I Redesigned VLC After 25 Years" — https://youtu.be/ERFeOgqk324
+  Figma:  https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN
+  YouTube: https://www.youtube.com/@juxtopposed
+
+Source code
+-----------
+VLC is free software under the GNU General Public License, version 2 or
+later (COPYING), with libVLC under the LGPL 2.1 or later (COPYING.LIB).
+The complete source of this build is at
+  https://github.com/Inman2004/vlc-redesign
+under the tag of the release you downloaded. Whoever gives you this build
+must also give you that source on request, under the same licence.
+
+Third-party components built into the interface
+-----------------------------------------------
+- Google Sans font: SIL Open Font License 1.1 (OFL.txt). "Google" and
+  "Google Sans" are trademarks of Google LLC.
+- Iconoir icons: MIT License (ICONOIR-LICENSE.txt).
+
+"VLC", "VLC media player", "VideoLAN" and the cone logo are trademarks of
+VideoLAN. They're used here only to name the software this build is based
+on, as VideoLAN's legal page allows for GPL-compliant redistribution.

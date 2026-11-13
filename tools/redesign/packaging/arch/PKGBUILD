@@ -7,12 +7,12 @@
 #   sudo pacman -U ../dist/vlc-redesign-*.pkg.tar.zst
 
 pkgname=vlc-redesign
-pkgver=3.0.24.r11.g389874e
+pkgver=3.0.24.r31.g4fccc5e
 pkgrel=1
 pkgdesc='VLC media player with the redesigned Qt interface (unofficial build)'
 arch=(x86_64)
 url='https://www.videolan.org/vlc/'
-license=(GPL-2.0-or-later LGPL-2.1-or-later)
+license=(GPL-2.0-or-later LGPL-2.1-or-later OFL-1.1 MIT)
 # from the built binaries: ./deps.sh $BUILDDIR/vlc-redesign/pkg/vlc-redesign
 # (minus libvlc: the RUNPATH loads our own core from /opt first)
 depends=(
@@ -57,7 +57,7 @@ _prefix=/opt/vlc-redesign
 
 pkgver() {
   cd vlc
-  printf '3.0.24.r%s.g%s' "$(git rev-list --count 32a367d..HEAD)" "$(git rev-parse --short HEAD)"
+  printf '3.0.24.r%s.g%s' "$(git rev-list --count "$(git rev-list --max-parents=0 HEAD)"..HEAD)" "$(git rev-parse --short HEAD)"
 }
 
 prepare() {
@@ -88,4 +88,11 @@ package() {
     "$pkgdir/usr/share/applications/vlc-redesign.desktop"
   install -Dm644 COPYING "$pkgdir/usr/share/licenses/$pkgname/COPYING"
   install -Dm644 COPYING.LIB "$pkgdir/usr/share/licenses/$pkgname/COPYING.LIB"
+  # the font and icons built into the interface, and the modification notice
+  install -Dm644 modules/gui/qt/pixmaps/redesign/fonts/OFL.txt \
+    "$pkgdir/usr/share/licenses/$pkgname/OFL.txt"
+  install -Dm644 modules/gui/qt/pixmaps/modern/ICONOIR-LICENSE \
+    "$pkgdir/usr/share/licenses/$pkgname/ICONOIR-LICENSE"
+  install -Dm644 tools/redesign/packaging/NOTICE.txt \
+    "$pkgdir/usr/share/licenses/$pkgname/NOTICE.txt"
 }

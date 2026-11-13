@@ -58,6 +58,10 @@ package-win-common: package-win-install package-win-sdk
 	for file in NEWS COPYING README; \
 		do cp "$(srcdir)/$$file" "$(win32_destdir)/$${file}.txt"; \
 	done
+# the redesign's notice, and the licences of the font and icons it embeds
+	cp "$(srcdir)/tools/redesign/packaging/NOTICE.txt" "$(win32_destdir)/NOTICE.txt"
+	cp "$(srcdir)/modules/gui/qt/pixmaps/redesign/fonts/OFL.txt" "$(win32_destdir)/OFL.txt"
+	cp "$(srcdir)/modules/gui/qt/pixmaps/modern/ICONOIR-LICENSE" "$(win32_destdir)/ICONOIR-LICENSE.txt"
 
 	cp $(srcdir)/share/icons/vlc.ico $(win32_destdir)
 	for plugindir in $(prefix)/lib/vlc/plugins/*/; do \

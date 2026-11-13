@@ -187,5 +187,13 @@ and 5.15.
 - **Iconoir** icons, used where the Figma file has none — MIT
   ([`ICONOIR-LICENSE`](modules/gui/qt/pixmaps/modern/ICONOIR-LICENSE)).
 
-"VLC" and the cone are trademarks of VideoLAN; they're used here only to
-name the software this is built on.
+This is a **modified version of VLC 3.0.24**; what changed, who changed
+it and when is summarised in
+[`tools/redesign/packaging/NOTICE.txt`](tools/redesign/packaging/NOTICE.txt),
+which ships in every package with the font and icon licences. The git
+history is the full record.
+
+"VLC", "VLC media player", "VideoLAN" and the cone are trademarks of
+VideoLAN. They're used here only to name the software this is built on, as
+[VideoLAN's legal page](https://www.videolan.org/legal.html) allows for
+redistributions that comply with the GPL.
