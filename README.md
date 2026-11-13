@@ -1,133 +1,123 @@
 # VLC Redesign
 
-A redesigned Qt interface for **VLC media player 3.0.24**, brought to life
-from **[Juxtopposed](https://www.youtube.com/@juxtopposed)'s** *VLC Redesign*
-— her video [*I Redesigned VLC After 25 Years*](https://youtu.be/ERFeOgqk324)
-and her [Figma Community file](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN).
-The whole player is VLC 3.0.24 — the same decoders, formats and settings —
-with her interface: frameless window, library, music mode, queue, settings
-and dialogs, set in Google Sans.
+Hey! This is VLC 3.0.24 with a completely new look.
 
-Built by **[Immanuvel B](https://github.com/Inman2004)**
-([rvinmandev.vercel.app](https://rvinmandev.vercel.app)).
+It all started with Juxtopposed's video,
+[I Redesigned VLC After 25 Years](https://youtu.be/ERFeOgqk324). If you haven't
+seen it, go watch it, it's great. She reimagined VLC's interface and shared the
+whole thing as a [Figma file](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN).
+I loved it so much I wanted to actually use it, so I built it into the real VLC.
 
-> **Unofficial.** This is an independent project. It isn't made, endorsed or
-> supported by VideoLAN, and Juxtopposed isn't involved in this build.
-> For the official player, see [videolan.org](https://www.videolan.org/vlc/).
+Under the hood it's still the VLC you know: same codecs, same formats, same
+settings. Only the interface is new.
 
-![The player: header, navigation rail, playlist sidebar and one-row control bar](docs/screenshots/player.png)
+![The player with the library sidebar open](docs/screenshots/player.png)
 
-## The design is Juxtopposed's
+> Heads up: this is an unofficial build. It isn't made or supported by
+> VideoLAN, and Juxtopposed isn't involved in it either. If you want the
+> official player, grab it from [videolan.org](https://www.videolan.org/vlc/).
 
-Every screen here is Juxtopposed's work. In
-[**I Redesigned VLC After 25 Years**](https://youtu.be/ERFeOgqk324) she
-reimagines VLC's interface. She keeps what makes VLC recognisable: the
-traffic cone, now the volume control, and the warm dark look. Around that
-she modernises everything:
+## Her design, plus my own touches
 
-- **A cleaner player:** a frameless window and a single control bar.
-- **A library:** a library, a music mode and a queue.
-- **Tools:** a subtitle timeline, a Customize Player editor, and a
-  reorganised settings window.
+The look and layout come from Juxtopposed's design, and I followed her Figma
+file closely: the header, the rail, the single control bar, the volume cone,
+the library, music mode, the menus and the dialogs. Her icons too, wherever
+the file had them.
 
-She published the full design as a
-[**Figma Community file**](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN):
-every screen, state, icon, colour and measurement. This project exists
-because of that generosity. Her video explains the reasoning; her Figma
-file is the specification this code follows, down to the pixel and her own
-icon vectors.
+A Figma file is mostly still pictures, though, so plenty of it I had to decide
+on my own. Some of it is just my taste:
 
-All of the UI and UX thinking is hers; the implementation in VLC is ours,
-and so are any mistakes. If you like what you see here, go watch the video
-and follow her work:
+- **All the motion.** Panels sliding in, fades, hover effects, how things
+  open and close. Most of that isn't spelled out in the design, so it's how I
+  like it to feel. It runs at your screen's refresh rate.
+- **A brighter seek bar fill.** The original was a bit too dark for me.
+- **Icons she didn't draw.** For those I used [Iconoir](https://iconoir.com),
+  since the style is close.
+- **Things her screens hint at but don't spell out:** the zoomed subtitle
+  timeline, seek-preview thumbnails, the waveform in music mode, keyboard
+  shortcuts and how settings behave.
 
-- YouTube: [@juxtopposed](https://www.youtube.com/@juxtopposed)
-- Video: [I Redesigned VLC After 25 Years](https://youtu.be/ERFeOgqk324)
-- Figma: [VLC Redesign](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN)
-
-## Author
-
-**Immanuvel B** built this, turning Juxtopposed's design into a working
-VLC: the Qt interface, the Linux package and the Windows installers.
-
-- GitHub: [@Inman2004](https://github.com/Inman2004)
-- Website: [rvinmandev.vercel.app](https://rvinmandev.vercel.app)
+So if something feels off, that's probably on me, not her.
 
 ## Download
 
-Get the latest build from [**Releases**](../../releases).
+Grab the latest build from [Releases](../../releases).
 
-| Platform | File | Notes |
+| You're on | Get | Then |
 |---|---|---|
-| Windows 10 / 11 (64-bit) | `vlc-redesign-…-win64-setup.exe` | Installer |
-| Windows 10 / 11 (64-bit) | `vlc-redesign-…-win64.zip` | Portable: unzip and run `vlc.exe` |
-| Arch Linux / CachyOS (x86_64) | `vlc-redesign-…-x86_64.pkg.tar.zst` | `sudo pacman -U <file>`, then run `vlc-redesign` |
+| Windows 10 / 11 (64-bit) | `…-win64-setup.exe` | Run the installer |
+| Windows 10 / 11 (64-bit) | `…-win64.zip` | Unzip anywhere and run `vlc.exe` |
+| Arch Linux / CachyOS | `…-x86_64.pkg.tar.zst` | `sudo pacman -U <file>`, then run `vlc-redesign` |
 
-Each release lists SHA-256 checksums in `SHA256SUMS`.
+There's a `SHA256SUMS` file with each release if you want to check your
+download.
 
-**Before installing on Windows**
+A few things to know on Windows:
 
-- **The installer replaces an installed official VLC.** It still installs
-  as "VLC media player", in the same folder. To keep the official player,
-  use the portable zip instead; it runs from any folder.
-- **The builds aren't code-signed**, so SmartScreen warns on first run.
-  Choose *More info → Run anyway* if you trust the download.
-- **Windows builds are cross-compiled from Linux.** See
-  [Known limitations](#known-limitations).
+- **The installer replaces an official VLC if you have one**, because it
+  installs as "VLC media player" in the same folder. Want to keep both? Use
+  the zip; it runs from any folder.
+- **Windows will warn you on first launch** because the builds aren't signed.
+  Click *More info*, then *Run anyway*.
+- **I build the Windows version on Linux** and haven't been able to test it on
+  a real Windows machine yet. If something breaks, please open an issue.
 
-The Arch package installs to `/opt/vlc-redesign` and leaves the system's
-`vlc` alone.
+On Arch, everything goes in `/opt/vlc-redesign`, so your normal `vlc` stays
+untouched.
 
-## What's new
+## What you get
 
-| Area | What changed |
-|---|---|
-| Player | Frameless window with its own header (menu, library toggle, folder, title, window buttons); navigation rail; one-row control bar with an accent play pill, a 28 px seek bar and a volume cone |
-| Fullscreen | Auto-hiding top strip and control bar; seek-bar preview thumbnails |
-| Menus | Main menu with shortcuts and profiles; Video / Audio / Subtitles track popover; item, sort and view menus |
-| Adjustments | Four-tab side panel: video, audio, subtitles and playback |
-| Dialogs | Open Network Stream, New Playlist, Add Subtitles (folder, link or OpenSubtitles search) |
-| Library | Folder scan with thumbnails, Home with a resume card, Recent, browse and list views, a mini player |
-| Music | Song tags and cover art, music categories, a music-mode bar with a waveform seek bar |
-| Playlists and queue | Named playlists; Queue / Bookmarks / Chapters panel; drag to the queue |
-| Settings | Settings window with 13 pages; Keyboard Shortcuts dialog where keys apply without a restart |
-| Subtitles | Optional subtitle timeline on the seek bar; `Ctrl+B` quick bookmark; bookmarks kept per file |
-| Look | Dark, light or system theme; nine accent colours |
+- **The player:** a frameless window with its own title bar, a navigation rail
+  on the left, and one clean control bar with the cone-shaped volume slider.
+- **Fullscreen:** the controls hide when you're watching, and hovering the seek
+  bar shows a little preview of that moment.
+- **A library:** your videos and music, a home screen that remembers where you
+  stopped, recents, and a mini player.
+- **Music mode:** cover art, song info, and a seek bar that shows the
+  song's waveform.
+- **Playlists and the queue,** plus bookmarks and chapters in one side panel.
+  Drag stuff into the queue.
+- **Adjustments:** video, audio, subtitles and playback settings in a panel
+  that slides in from the right.
+- **A new Settings window** with 13 pages, and a shortcuts editor where
+  changes work immediately.
+- **Subtitles:** an optional timeline on the seek bar showing each subtitle,
+  and `Ctrl+B` to drop a quick bookmark (saved per file).
+- **Themes:** dark, light or follow your system, with nine accent colours.
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/main-menu.png" alt="Main menu: build on the left, Figma design on the right"></td>
-    <td><img src="docs/screenshots/track-popover.png" alt="Track popover: build on the left, Figma design on the right"></td>
+    <td><img src="docs/screenshots/main-menu.png" alt="The main menu, my build next to the Figma design"></td>
+    <td><img src="docs/screenshots/track-popover.png" alt="The track picker, my build next to the Figma design"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Main menu — build (left) and Figma (right)</sub></td>
-    <td align="center"><sub>Track popover — build (left) and Figma (right)</sub></td>
+    <td align="center"><sub>Main menu: mine on the left, her Figma on the right</sub></td>
+    <td align="center"><sub>Track picker: mine on the left, her Figma on the right</sub></td>
   </tr>
 </table>
 
-![Subtitle timeline: Figma design on top, build below](docs/screenshots/subtitle-timeline.png)
-<sub>Subtitle timeline — Figma (top) and build (bottom)</sub>
+![Subtitle timeline, her Figma on top and my build below](docs/screenshots/subtitle-timeline.png)
+<sub>Subtitle timeline: her Figma on top, mine below</sub>
 
-## Options
+## Tweaking it
 
-Everything is in **Settings**; these are the same options from the command
-line or `vlcrc`.
+Everything's in Settings, but these work from the command line too:
 
 | Option | Default | What it does |
 |---|---|---|
-| `--qt-redesign` / `--no-qt-redesign` | on | The redesigned interface; off gives VLC's classic Qt interface |
-| `--qt-redesign-frameless` | on | Frameless window with the custom header; off keeps the system title bar |
+| `--no-qt-redesign` | (on) | Turn the new look off and get classic VLC back |
+| `--no-qt-redesign-frameless` | (on) | Keep your system's normal title bar |
 | `--qt-theme` | `dark` | `dark`, `light` or `system` |
 | `--qt-accent-color` | `#D37918` | Amber, Rust, Olive, Green, Teal, Blue, Violet, Magenta or Grey |
-| `--qt-subtitle-timeline` | off | Subtitle blocks on the seek bar while a subtitle file plays |
-| `--qt-key-quick-bookmark` | `Ctrl+B` | Bookmark the current position |
-| `--qt-library-roots` | Videos and Music | Folders the library scans, separated by `;` |
+| `--qt-subtitle-timeline` | off | Show subtitles on the seek bar |
+| `--qt-key-quick-bookmark` | `Ctrl+B` | The quick-bookmark key |
+| `--qt-library-roots` | Videos, Music | Folders the library scans, separated by `;` |
 
-## Building from source
+## Building it yourself
 
-The interface lives in `modules/gui/qt/`. Everything else is VLC 3.0.24.
+All my changes live in `modules/gui/qt/`; the rest is stock VLC 3.0.24.
 
-**Linux (development build)**
+On Linux:
 
 ```bash
 ./bootstrap
@@ -136,64 +126,65 @@ make -j"$(nproc)"
 ./vlc
 ```
 
-**Arch Linux package**
+The Arch package:
 
 ```bash
 cd tools/redesign/packaging/arch
-makepkg -si          # -s installs the build dependencies, -i the package
+makepkg -si
 ```
 
-**Windows (cross-compiled from Linux)**
-
-Needs `mingw-w64-gcc`, `mingw-w64-tools` and `nsis`, plus VideoLAN's
-prebuilt win64 contribs unpacked in `contrib/x86_64-w64-mingw32`.
+The Windows build is cross-compiled from Linux. You need `mingw-w64-gcc`,
+`mingw-w64-tools` and `nsis`, plus VideoLAN's prebuilt win64 libraries unpacked
+in `contrib/x86_64-w64-mingw32`. Then:
 
 ```bash
 tools/redesign/packaging/windows/build.sh all
 ```
 
-That script also explains the two build-time shims it links: VideoLAN's
-contribs ship Qt 5.6 and were built for the older msvcrt runtime.
-`modules/gui/qt/util/qt_compat.*` keeps the interface building on Qt 5.6
-and 5.15.
+The script has notes on the two small workarounds it needs. VideoLAN's Windows
+libraries ship an older Qt (5.6) and an older C runtime, so
+`modules/gui/qt/util/qt_compat.*` keeps everything building on both.
 
-## Known limitations
+## Known issues
 
-- **Windows builds haven't been tested on Windows yet.** They're
-  cross-compiled and checked statically: 64-bit binaries that import only
-  Windows system DLLs.
-- **Windows: no online subtitle search.** VideoLAN's Windows Qt has no
-  network module. Adding subtitles from a folder or a link works.
-- **Windows: no SRT streaming and English only.** The prebuilt SRT library
-  doesn't link with the current toolchain, and the interface is built
-  without translations.
-- **Customize Player** (drag-and-drop layout editor) is in progress and not
-  in these builds.
+- The Windows builds haven't been tested on Windows yet (see above).
+- On Windows, searching subtitles online doesn't work, because VideoLAN's
+  Windows Qt has no network module. Adding them from a file or a link is fine.
+- On Windows there's no SRT streaming, and the interface is English only.
+- Customize Player (drag and drop your own control layout) is still in the
+  works.
 
-## Credits and licences
+## Who made this
 
-- **VLC media player** — © the VideoLAN team and contributors,
-  GPL-2.0-or-later / LGPL-2.1-or-later. See [`COPYING`](COPYING),
-  [`COPYING.LIB`](COPYING.LIB) and [`AUTHORS`](AUTHORS); VLC's own readme
-  is [`README`](README).
-- **The redesign in VLC** — [Immanuvel B](https://github.com/Inman2004).
-- **UI and UX design** — *VLC Redesign* by
-  [Juxtopposed](https://www.youtube.com/@juxtopposed): the video
-  [*I Redesigned VLC After 25 Years*](https://youtu.be/ERFeOgqk324) and the
-  [Figma Community file](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN).
-  Icons come from her Figma vectors wherever the file has them.
-- **Google Sans** — SIL Open Font License 1.1
-  ([`OFL.txt`](modules/gui/qt/pixmaps/redesign/fonts/OFL.txt)).
-- **Iconoir** icons, used where the Figma file has none — MIT
+- **The design:** [Juxtopposed](https://www.youtube.com/@juxtopposed). Her
+  video [I Redesigned VLC After 25 Years](https://youtu.be/ERFeOgqk324) and her
+  [Figma file](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN)
+  are where all of this comes from. Seriously, go check out her channel.
+- **The build:** me, [Immanuvel B](https://github.com/Inman2004)
+  ([rvinmandev.vercel.app](https://rvinmandev.vercel.app)). I put it into VLC,
+  added the motion and the bits the design didn't cover, and packaged it for
+  Linux and Windows.
+- **VLC itself:** the [VideoLAN](https://www.videolan.org) team and
+  contributors. None of this exists without them.
+
+## Licences
+
+VLC is free software under the GPL 2.0 or later (see [`COPYING`](COPYING)),
+with libVLC under the LGPL 2.1 or later ([`COPYING.LIB`](COPYING.LIB)). This is
+a modified version of VLC 3.0.24.
+[`NOTICE.txt`](tools/redesign/packaging/NOTICE.txt) sums up what I changed and
+when, and it ships in every package. The git history has the full details.
+
+Also bundled:
+
+- the Google Sans font, under the SIL Open Font License 1.1
+  ([`OFL.txt`](modules/gui/qt/pixmaps/redesign/fonts/OFL.txt));
+- Iconoir icons, under the MIT License
   ([`ICONOIR-LICENSE`](modules/gui/qt/pixmaps/modern/ICONOIR-LICENSE)).
 
-This is a **modified version of VLC 3.0.24**; what changed, who changed
-it and when is summarised in
-[`tools/redesign/packaging/NOTICE.txt`](tools/redesign/packaging/NOTICE.txt),
-which ships in every package with the font and icon licences. The git
-history is the full record.
+"VLC", "VLC media player", "VideoLAN" and the cone logo are VideoLAN's
+trademarks. I only use them to say what this is built on, which
+[VideoLAN's legal page](https://www.videolan.org/legal.html) allows for builds
+that follow the GPL.
 
-"VLC", "VLC media player", "VideoLAN" and the cone are trademarks of
-VideoLAN. They're used here only to name the software this is built on, as
-[VideoLAN's legal page](https://www.videolan.org/legal.html) allows for
-redistributions that comply with the GPL.
+VLC's original readme is still here as [`README`](README).

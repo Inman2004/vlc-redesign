@@ -107,15 +107,15 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
         /* the redesigned interface is Juxtopposed's design */
         const QString link = QStringLiteral( "<a href=\"%1\"><span style=\" text-decoration: underline; color:%2;\">%3</span></a>" );
         const QString &c = linkColor;
-        translatedString += "</p>" + qtr( "<p>This interface is the <b>VLC Redesign</b> by %1. "
-            "Her video %2 and her %3 are the design it is built from: all credit for "
-            "its UI and UX goes to her.</p>" )
+        translatedString += "</p>" + qtr( "<p>This interface is based on the <b>VLC Redesign</b> "
+            "by %1, from her video %2 and her %3.</p>" )
             .arg( link.arg( "https://www.youtube.com/@juxtopposed", c, "Juxtopposed" ),
                   link.arg( "https://youtu.be/ERFeOgqk324", c,
                             "&ldquo;" + qtr( "I Redesigned VLC After 25 Years" ) + "&rdquo;" ),
                   link.arg( "https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN", c,
                             qtr( "Figma Community file" ) ) );
-        translatedString += qtr( "<p>Built into VLC by <b>Immanuvel B</b> (%1, %2).</p>" )
+        translatedString += qtr( "<p>Built into VLC, with its animations and other "
+            "changes, by <b>Immanuvel B</b> (%1, %2).</p>" )
             .arg( link.arg( "https://github.com/Inman2004", c, "GitHub" ),
                   link.arg( "https://rvinmandev.vercel.app", c, "rvinmandev.vercel.app" ) );
     }

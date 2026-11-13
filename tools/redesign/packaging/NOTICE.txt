@@ -21,10 +21,12 @@ source repository. The original VLC copyright notices are unchanged.
 
 Design
 ------
-The interface design is "VLC Redesign" by Juxtopposed:
-  Video:  "I Redesigned VLC After 25 Years" — https://youtu.be/ERFeOgqk324
-  Figma:  https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN
+The interface is based on "VLC Redesign" by Juxtopposed:
+  Video:   "I Redesigned VLC After 25 Years", https://youtu.be/ERFeOgqk324
+  Figma:   https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN
   YouTube: https://www.youtube.com/@juxtopposed
+The animations and some other details are Immanuvel B's own choices and
+aren't part of her design.
 
 Source code
 -----------
