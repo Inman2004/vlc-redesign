@@ -1,16 +1,46 @@
 # VLC Redesign
 
-A redesigned Qt interface for **VLC media player 3.0.24**, built from the
-*VLC Redesign* concept by **Juxtopposed** on the Figma Community. The whole
-player is VLC 3.0.24 — the same decoders, formats and settings — with a new
-interface: frameless window, library, music mode, queue, settings and
-dialogs, matched to the Figma file and set in Google Sans.
+A redesigned Qt interface for **VLC media player 3.0.24**, brought to life
+from **[Juxtopposed](https://www.youtube.com/@juxtopposed)'s** *VLC Redesign*
+— her video [*I Redesigned VLC After 25 Years*](https://youtu.be/ERFeOgqk324)
+and her [Figma Community file](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN).
+The whole player is VLC 3.0.24 — the same decoders, formats and settings —
+with her interface: frameless window, library, music mode, queue, settings
+and dialogs, set in Google Sans.
 
 > **Unofficial.** This is an independent project. It isn't made, endorsed or
-> supported by VideoLAN, and the Figma concept's designer isn't involved.
+> supported by VideoLAN, and Juxtopposed isn't involved in this build.
 > For the official player, see [videolan.org](https://www.videolan.org/vlc/).
 
 ![The player: header, navigation rail, playlist sidebar and one-row control bar](docs/screenshots/player.png)
+
+## The design is Juxtopposed's
+
+Every screen here is Juxtopposed's work. In
+[**I Redesigned VLC After 25 Years**](https://youtu.be/ERFeOgqk324) she
+reimagines VLC's interface. She keeps what makes VLC recognisable: the
+traffic cone, now the volume control, and the warm dark look. Around that
+she modernises everything:
+
+- **A cleaner player:** a frameless window and a single control bar.
+- **A library:** a library, a music mode and a queue.
+- **Tools:** a subtitle timeline, a Customize Player editor, and a
+  reorganised settings window.
+
+She published the full design as a
+[**Figma Community file**](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN):
+every screen, state, icon, colour and measurement. This project exists
+because of that generosity. Her video explains the reasoning; her Figma
+file is the specification this code follows, down to the pixel and her own
+icon vectors.
+
+All of the UI and UX thinking is hers; the implementation in VLC is ours,
+and so are any mistakes. If you like what you see here, go watch the video
+and follow her work:
+
+- YouTube: [@juxtopposed](https://www.youtube.com/@juxtopposed)
+- Video: [I Redesigned VLC After 25 Years](https://youtu.be/ERFeOgqk324)
+- Figma: [VLC Redesign](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN)
 
 ## Download
 
@@ -135,8 +165,11 @@ and 5.15.
   GPL-2.0-or-later / LGPL-2.1-or-later. See [`COPYING`](COPYING),
   [`COPYING.LIB`](COPYING.LIB) and [`AUTHORS`](AUTHORS); VLC's own readme
   is [`README`](README).
-- **Design** — *VLC Redesign* by Juxtopposed, published on the Figma
-  Community.
+- **UI and UX design** — *VLC Redesign* by
+  [Juxtopposed](https://www.youtube.com/@juxtopposed): the video
+  [*I Redesigned VLC After 25 Years*](https://youtu.be/ERFeOgqk324) and the
+  [Figma Community file](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN).
+  Icons come from her Figma vectors wherever the file has them.
 - **Google Sans** — SIL Open Font License 1.1
   ([`OFL.txt`](modules/gui/qt/pixmaps/redesign/fonts/OFL.txt)).
 - **Iconoir** icons, used where the Figma file has none — MIT
