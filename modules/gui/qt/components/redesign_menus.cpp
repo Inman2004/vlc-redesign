@@ -48,7 +48,7 @@
 #include <QScrollArea>
 #include <QFrame>
 #include <QKeyEvent>
-#include <QVariantAnimation>
+#include "util/frame_animation.hpp"
 #include <QDateTime>
 #include <QScreen>
 #include <QFileInfo>
@@ -331,10 +331,10 @@ TrackPopover::TrackPopover( intf_thread_t *_p_intf, QAbstractButton *_anchor )
     underline = new QWidget( tabBar );
     underline->setObjectName( "TPTabLine" );
     underline->setAttribute( Qt::WA_StyledBackground, true );
-    underlineAnim = new QVariantAnimation( this );
+    underlineAnim = new FrameAnimation( this );
     underlineAnim->setDuration( 180 );
     underlineAnim->setEasingCurve( QEasingCurve::OutCubic );
-    connect( underlineAnim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+    connect( underlineAnim, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
         underline->setGeometry( v.toRect() );
     } );
     connect( tabs, QOverload<int>::of( &QButtonGroup::buttonClicked ), this,

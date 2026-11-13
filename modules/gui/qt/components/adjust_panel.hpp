@@ -23,6 +23,7 @@
 # include "config.h"
 #endif
 
+#include "util/frame_animation.hpp"
 #include "qt.hpp"
 
 #include <QWidget>
@@ -41,7 +42,7 @@ class QStackedWidget;
 class QToolButton;
 class QPushButton;
 class QButtonGroup;
-class QVariantAnimation;
+class FrameAnimation;
 class QScrollArea;
 class AdjustSlider;
 class ToggleSwitch;
@@ -130,7 +131,7 @@ private:
     QWidget *tabBar;
     QButtonGroup *tabs;
     QWidget *underline;
-    QVariantAnimation *underlineAnim;
+    FrameAnimation *underlineAnim;
     QPushButton *presetButton;
     QLabel *presetLabel;
     QList<Control> controls;
@@ -151,25 +152,15 @@ private:
     QList<QPair<ToggleSwitch *, AudioFilterControlWidget *>> audioEffects;
 };
 
-/* Host whose width animates while the panel keeps its 400px layout and
- * stays anchored to the right edge, so it slides in without reflowing.
- * The first GAP pixels separate it from the content panel. */
-class AdjustDock : public QWidget
+/* The adjustment panel's slot right of the content (see SlideDock) */
+class AdjustDock : public SlideDock
 {
 public:
-    enum { GAP = 10 };
     AdjustDock( intf_thread_t *, QWidget *parent );
     AdjustPanel *panel() const { return p; }
-    bool isOpen() const { return open; }
-    void setOpen( bool, bool animate = true );
-
-protected:
-    void resizeEvent( QResizeEvent * ) override;
 
 private:
     AdjustPanel *p;
-    QVariantAnimation *anim;
-    bool open;
 };
 
 #endif

@@ -22,12 +22,12 @@
 
 #include "util/redesign_widgets.hpp"
 #include "styles/vlc_theme.hpp"
+#include "util/frame_animation.hpp"
 
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
 #include <QWheelEvent>
-#include <QVariantAnimation>
 #include <QStyleOptionSlider>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -57,10 +57,10 @@ AdjustSlider::AdjustSlider( QWidget *parent )
     setFixedHeight( HANDLE_H );
     setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
 
-    hoverAnim = new QVariantAnimation( this );
+    hoverAnim = new FrameAnimation( this );
     hoverAnim->setDuration( 120 );
     hoverAnim->setEasingCurve( QEasingCurve::OutCubic );
-    connect( hoverAnim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+    connect( hoverAnim, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
         hover = v.toReal();
         update();
     } );
@@ -208,10 +208,10 @@ ToggleSwitch::ToggleSwitch( QWidget *parent )
     setCursor( Qt::PointingHandCursor );
     setFocusPolicy( Qt::StrongFocus );
     setFixedSize( sizeHint() );
-    anim = new QVariantAnimation( this );
+    anim = new FrameAnimation( this );
     anim->setDuration( 140 );
     anim->setEasingCurve( QEasingCurve::OutCubic );
-    connect( anim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+    connect( anim, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
         pos = v.toReal();
         update();
     } );
@@ -331,26 +331,31 @@ CollapsibleSection::CollapsibleSection( QWidget *parent )
     hl->addWidget( chevron );
     outer->addWidget( header );
 
+    /* bodyHost clips; bodyInner keeps its full height, so the content
+     * never gets squeezed while the section opens or closes */
     bodyHost = new QWidget( this );
-    body = new QVBoxLayout( bodyHost );
+    bodyInner = new QWidget( bodyHost );
+    body = new QVBoxLayout( bodyInner );
     body->setContentsMargins( 16, 0, 16, 18 );
     body->setSpacing( 14 );
-    bodyHost->setMaximumHeight( 0 );
+    bodyHost->setFixedHeight( 0 );
     bodyHost->hide();
+    bodyHost->installEventFilter( this );
+    bodyInner->installEventFilter( this );
     outer->addWidget( bodyHost );
 
-    anim = new QVariantAnimation( this );
-    anim->setDuration( 200 );
+    anim = new FrameAnimation( this );
+    anim->setDuration( 220 );
     anim->setEasingCurve( QEasingCurve::OutCubic );
-    connect( anim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+    connect( anim, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
         const qreal t = v.toReal();
         angle = 90 * t;
         updateHeader();
-        bodyHost->setMaximumHeight( qRound( bodyHost->sizeHint().height() * t ) );
+        bodyHost->setFixedHeight( qRound( innerHeight() * t ) );
     } );
-    connect( anim, &QVariantAnimation::finished, this, [this]() {
+    connect( anim, &FrameAnimation::finished, this, [this]() {
         if( expanded )
-            bodyHost->setMaximumHeight( QWIDGETSIZE_MAX );
+            bodyHost->setFixedHeight( innerHeight() );
         else
             bodyHost->hide();
     } );
@@ -388,11 +393,12 @@ void CollapsibleSection::setExpanded( bool b, bool animate )
     expanded = b;
     const qreal from = angle / 90.;
     bodyHost->show();
+    placeInner();
     anim->stop();
     if( !animate || !isVisible() )
     {
         angle = b ? 90 : 0;
-        bodyHost->setMaximumHeight( b ? QWIDGETSIZE_MAX : 0 );
+        bodyHost->setFixedHeight( b ? innerHeight() : 0 );
         bodyHost->setVisible( b );
         updateHeader();
     }
@@ -405,8 +411,30 @@ void CollapsibleSection::setExpanded( bool b, bool animate )
     emit expandedChanged( b );
 }
 
+int CollapsibleSection::innerHeight() const
+{
+    const int w = bodyHost->width();
+    return bodyInner->hasHeightForWidth() ? bodyInner->heightForWidth( w )
+                                          : bodyInner->sizeHint().height();
+}
+
+void CollapsibleSection::placeInner()
+{
+    bodyInner->setGeometry( 0, 0, bodyHost->width(), innerHeight() );
+}
+
 bool CollapsibleSection::eventFilter( QObject *o, QEvent *e )
 {
+    if( o == bodyHost && e->type() == QEvent::Resize )
+        placeInner();
+    else if( o == bodyInner && e->type() == QEvent::LayoutRequest )
+    {
+        /* the content changed: follow it when open and still */
+        bodyHost->setMinimumWidth( bodyInner->minimumSizeHint().width() );
+        placeInner();
+        if( expanded && anim->state() != QAbstractAnimation::Running )
+            bodyHost->setFixedHeight( innerHeight() );
+    }
     if( o == header )
     {
         switch( e->type() )

@@ -41,7 +41,7 @@
 #include <QMenu>
 #include <QProxyStyle>
 #include <QStyleFactory>
-#include <QVariantAnimation>
+#include "util/frame_animation.hpp"
 #include <QEvent>
 #include <QIconEngine>
 #include <QApplication>
@@ -274,10 +274,10 @@ class HoverFade : public QObject
 public:
     HoverFade( QAbstractButton *b, int r ) : QObject( b ), button( b ), radius( r ), t( 0.0 )
     {
-        anim = new QVariantAnimation( this );
+        anim = new FrameAnimation( this );
         anim->setDuration( 120 );
         anim->setEasingCurve( QEasingCurve::OutCubic );
-        QObject::connect( anim, &QVariantAnimation::valueChanged, this,
+        QObject::connect( anim, &FrameAnimation::valueChanged, this,
                           [this]( const QVariant &v ) { t = v.toReal(); button->update(); } );
         b->setAttribute( Qt::WA_Hover );
         b->installEventFilter( this );
@@ -324,7 +324,7 @@ private:
         anim->start();
     }
     QAbstractButton *button;
-    QVariantAnimation *anim;
+    FrameAnimation *anim;
     int radius;
     qreal t;
 };

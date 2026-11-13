@@ -35,7 +35,7 @@ class QVBoxLayout;
 class QStackedWidget;
 class QButtonGroup;
 class QAbstractButton;
-class QVariantAnimation;
+class FrameAnimation;
 
 namespace RedesignMenus
 {
@@ -80,7 +80,7 @@ private:
     int tab;
     QButtonGroup *tabs;
     QWidget *tabBar, *underline;
-    QVariantAnimation *underlineAnim;
+    FrameAnimation *underlineAnim;
     QWidget *pageHost;
     QVBoxLayout *pageLayout;
 };

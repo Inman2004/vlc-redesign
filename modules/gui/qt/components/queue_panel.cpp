@@ -49,7 +49,7 @@
 #include <QStackedWidget>
 #include <QStyledItemDelegate>
 #include <QToolButton>
-#include <QVariantAnimation>
+#include "util/frame_animation.hpp"
 #include <QVBoxLayout>
 
 /* Components "Queue" (canvas 1.43): tabs 50, the header row centred 36
@@ -290,10 +290,10 @@ QueuePanel::QueuePanel( intf_thread_t *_p_intf, QWidget *parent )
     underline = new QWidget( tabBar );
     underline->setObjectName( "QueueTabLine" );
     underline->setAttribute( Qt::WA_StyledBackground, true );
-    underlineAnim = new QVariantAnimation( this );
+    underlineAnim = new FrameAnimation( this );
     underlineAnim->setDuration( 200 );
     underlineAnim->setEasingCurve( QEasingCurve::OutCubic );
-    connect( underlineAnim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+    connect( underlineAnim, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
         underline->setGeometry( v.toRect() );
     } );
     tabBar->installEventFilter( this );
@@ -683,46 +683,9 @@ void QueuePanel::keyPressEvent( QKeyEvent *e )
  * Dock
  **********************************************************************/
 QueueDock::QueueDock( intf_thread_t *p_intf, QWidget *parent )
-    : QWidget( parent ), open( false )
+    : SlideDock( parent )
 {
     setObjectName( "VLCQueueDock" );
-    setFixedWidth( 0 );
     p = new QueuePanel( p_intf, this );
-    anim = new QVariantAnimation( this );
-    anim->setDuration( 200 );
-    anim->setEasingCurve( QEasingCurve::OutCubic );
-    connect( anim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
-        setFixedWidth( v.toInt() );
-    } );
-    connect( anim, &QVariantAnimation::finished, this, [this]() {
-        if( !open )
-            hide();
-    } );
-    hide();
-}
-
-void QueueDock::setOpen( bool b, bool animate )
-{
-    const int full = QueuePanel::PANEL_WIDTH + GAP;
-    open = b;
-    anim->stop();
-    if( b )
-        show();
-    if( !animate || !window()->isVisible() )
-    {
-        setFixedWidth( b ? full : 0 );
-        setVisible( b );
-    }
-    else
-    {
-        anim->setStartValue( width() );
-        anim->setEndValue( b ? full : 0 );
-        anim->start();
-    }
-}
-
-void QueueDock::resizeEvent( QResizeEvent *e )
-{
-    QWidget::resizeEvent( e );
-    p->setGeometry( width() - QueuePanel::PANEL_WIDTH, 0, QueuePanel::PANEL_WIDTH, height() );
+    setPanel( p, QueuePanel::PANEL_WIDTH );
 }

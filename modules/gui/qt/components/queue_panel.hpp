@@ -23,6 +23,7 @@
 # include "config.h"
 #endif
 
+#include "util/frame_animation.hpp"
 #include "qt.hpp"
 
 #include <QListView>
@@ -34,7 +35,7 @@ class QListView;
 class QListWidget;
 class QStackedWidget;
 class QToolButton;
-class QVariantAnimation;
+class FrameAnimation;
 class PLModel;
 class SeekPoints;
 
@@ -107,7 +108,7 @@ private:
     intf_thread_t *p_intf;
     QWidget *tabBar;
     QWidget *underline;
-    QVariantAnimation *underlineAnim;
+    FrameAnimation *underlineAnim;
     QButtonGroup *tabs;
     QStackedWidget *stack;
 
@@ -119,23 +120,15 @@ private:
     SeekPoints *chapters;
 };
 
-/* the panel's slot right of the content, sliding open like AdjustDock */
-class QueueDock : public QWidget
+/* The queue panel's slot right of the content (see SlideDock) */
+class QueueDock : public SlideDock
 {
 public:
-    enum { GAP = 10 };
     QueueDock( intf_thread_t *, QWidget *parent );
     QueuePanel *panel() const { return p; }
-    bool isOpen() const { return open; }
-    void setOpen( bool, bool animate = true );
-
-protected:
-    void resizeEvent( QResizeEvent * ) override;
 
 private:
     QueuePanel *p;
-    QVariantAnimation *anim;
-    bool open;
 };
 
 #endif

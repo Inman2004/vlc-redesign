@@ -21,6 +21,7 @@
 #endif
 
 #include "components/adjust_panel.hpp"
+#include "util/frame_animation.hpp"
 #include "components/extended_panels.hpp"
 #include "util/redesign_widgets.hpp"
 #include "styles/vlc_theme.hpp"
@@ -56,8 +57,6 @@
 #include <QKeyEvent>
 #include <QWheelEvent>
 #include <QSignalBlocker>
-#include <QVariantAnimation>
-#include <QGraphicsOpacityEffect>
 #include <QSettings>
 #include <QStyle>
 #include <QCoreApplication>
@@ -197,10 +196,10 @@ AdjustPanel::AdjustPanel( intf_thread_t *_p_intf, QWidget *parent )
     underline = new QWidget( tabBar );
     underline->setObjectName( "AdjustTabLine" );
     underline->setAttribute( Qt::WA_StyledBackground, true );
-    underlineAnim = new QVariantAnimation( this );
+    underlineAnim = new FrameAnimation( this );
     underlineAnim->setDuration( 200 );
     underlineAnim->setEasingCurve( QEasingCurve::OutCubic );
-    connect( underlineAnim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+    connect( underlineAnim, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
         underline->setGeometry( v.toRect() );
     } );
     tabBar->installEventFilter( this );
@@ -265,29 +264,31 @@ void AdjustPanel::setCurrentTab( int i, bool animate )
         return;
     tabs->button( i )->setChecked( true );
     const bool changed = stack->currentIndex() != i;
+    const bool fade = changed && animate && isVisible();
+    /* a still of the old page fades out over the new one: one picture per
+     * frame instead of rendering the whole page off-screen */
+    delete stack->findChild<SnapshotOverlay *>( "vlcPageFade" );
+    const QPixmap before = fade ? stack->currentWidget()->grab() : QPixmap();
     stack->setCurrentIndex( i );
     getSettings()->setValue( "Adjust/tab", i );
     if( changed && i == AUDIO_TAB )
         refreshAudioEffects();
     moveUnderline( animate && isVisible() );
 
-    if( changed && animate && isVisible() )
+    if( fade )
     {
-        /* quick fade-in of the new page */
-        QWidget *page = stack->currentWidget();
-        QGraphicsOpacityEffect *fx = new QGraphicsOpacityEffect( page );
-        page->setGraphicsEffect( fx );
-        QVariantAnimation *a = new QVariantAnimation( page );
-        a->setDuration( 140 );
-        a->setStartValue( 0. );
-        a->setEndValue( 1. );
-        connect( a, &QVariantAnimation::valueChanged, fx, [fx]( const QVariant &v ) {
-            fx->setOpacity( v.toReal() );
+        SnapshotOverlay *still = new SnapshotOverlay( stack, before, QColor() );
+        still->setObjectName( "vlcPageFade" );
+        FrameAnimation *a = new FrameAnimation( still );
+        a->setDuration( 160 );
+        a->setEasingCurve( QEasingCurve::OutCubic );
+        a->setStartValue( 1. );
+        a->setEndValue( 0. );
+        connect( a, &FrameAnimation::valueChanged, still, [still]( const QVariant &v ) {
+            still->setStillOpacity( v.toReal() );
         } );
-        connect( a, &QVariantAnimation::finished, page, [page]() {
-            page->setGraphicsEffect( NULL );
-        } );
-        a->start( QAbstractAnimation::DeleteWhenStopped );
+        connect( a, &FrameAnimation::finished, still, &QObject::deleteLater );
+        a->start();
     }
 }
 
@@ -1734,48 +1735,9 @@ void AdjustPanel::refreshVout()
  * AdjustDock
  **********************************************************************/
 AdjustDock::AdjustDock( intf_thread_t *p_intf, QWidget *parent )
-    : QWidget( parent ), open( false )
+    : SlideDock( parent )
 {
     setObjectName( "VLCAdjustDock" );
-    setFixedWidth( 0 );
     p = new AdjustPanel( p_intf, this );
-    anim = new QVariantAnimation( this );
-    anim->setDuration( 200 );
-    anim->setEasingCurve( QEasingCurve::OutCubic );
-    connect( anim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
-        setFixedWidth( v.toInt() );
-    } );
-    connect( anim, &QVariantAnimation::finished, this, [this]() {
-        if( !open )
-            hide();
-    } );
-    hide();
-}
-
-void AdjustDock::setOpen( bool b, bool animate )
-{
-    const int full = AdjustPanel::PANEL_WIDTH + GAP;
-    open = b;
-    anim->stop();
-    if( b )
-        show();
-    if( !animate || !window()->isVisible() )
-    {
-        setFixedWidth( b ? full : 0 );
-        setVisible( b );
-    }
-    else
-    {
-        anim->setStartValue( width() );
-        anim->setEndValue( b ? full : 0 );
-        anim->start();
-    }
-    if( b )
-        p->setFocus( Qt::OtherFocusReason );
-}
-
-void AdjustDock::resizeEvent( QResizeEvent *e )
-{
-    QWidget::resizeEvent( e );
-    p->setGeometry( width() - AdjustPanel::PANEL_WIDTH, 0, AdjustPanel::PANEL_WIDTH, height() );
+    setPanel( p, AdjustPanel::PANEL_WIDTH );
 }

@@ -371,7 +371,7 @@ private:
     void fadeTo( qreal );
     QWidget *topStrip = NULL;
     class QLabel *topTitle = NULL;
-    class QVariantAnimation *fadeAnim = NULL;
+    class FrameAnimation *fadeAnim = NULL;
     bool b_suppressed = false;
 };
 

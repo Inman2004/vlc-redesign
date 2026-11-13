@@ -59,7 +59,7 @@
 #include <QDebug>
 #include <QScreen>
 #include <QSequentialAnimationGroup>
-#include <QVariantAnimation>
+#include "util/frame_animation.hpp"
 #include <QToolTip>
 #include <algorithm>
 
@@ -142,10 +142,10 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
         /* Painted by Theme::paintSeekBar: 28px track, 8px handle */
         b_classic = false;
         mHandleLength = Theme::SEEK_HANDLE_W;
-        hoverAnim = new QVariantAnimation( this );
+        hoverAnim = new FrameAnimation( this );
         hoverAnim->setDuration( 140 );
         hoverAnim->setEasingCurve( QEasingCurve::OutCubic );
-        connect( hoverAnim, &QVariantAnimation::valueChanged, this,
+        connect( hoverAnim, &FrameAnimation::valueChanged, this,
                  [this]( const QVariant &v ) { hoverAmount = v.toReal(); update(); } );
         setFixedHeight( Theme::SEEK_THICKNESS );
         setAttribute( Qt::WA_Hover );

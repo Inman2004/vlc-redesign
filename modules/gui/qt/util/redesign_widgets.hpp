@@ -28,7 +28,8 @@
 #include <QWidget>
 #include <QColor>
 
-class QVariantAnimation;
+class FrameAnimation;
+class FrameAnimation;
 class QLabel;
 class QLineEdit;
 class QToolButton;
@@ -70,7 +71,7 @@ private:
     qreal xFor( int value ) const;
     void animateHover( bool );
 
-    QVariantAnimation *hoverAnim;
+    FrameAnimation *hoverAnim;
     qreal hover;
     int origin;
     bool hasOrigin;
@@ -98,7 +99,7 @@ protected:
 
 private:
     void animateTo( bool on );
-    QVariantAnimation *anim;
+    FrameAnimation *anim;
     qreal pos;     /* 0 = off, 1 = on */
     bool hovered;
 };
@@ -111,7 +112,7 @@ class CollapsibleSection : public QWidget
 public:
     explicit CollapsibleSection( QWidget *parent = NULL );
     QVBoxLayout *bodyLayout() const { return body; }
-    QWidget *bodyWidget() const { return bodyHost; }
+    QWidget *bodyWidget() const { return bodyInner; }
     bool isExpanded() const { return expanded; }
 
 public slots:
@@ -126,12 +127,14 @@ protected:
 
 private:
     void updateHeader();
+    int innerHeight() const;
+    void placeInner();
     QWidget *header;
     QLabel *headerText;
     QLabel *chevron;
-    QWidget *bodyHost;
+    QWidget *bodyHost, *bodyInner;
     QVBoxLayout *body;
-    QVariantAnimation *anim;
+    FrameAnimation *anim;
     qreal angle;
     bool expanded;
 };

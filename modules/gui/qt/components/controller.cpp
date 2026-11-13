@@ -59,7 +59,7 @@
 #include <QScreen>
 #include <QMenu>
 #include <QLabel>
-#include <QVariantAnimation>
+#include "util/frame_animation.hpp"
 #include "main_interface.hpp"
 #if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
 #include <QDesktopWidget>
@@ -1138,15 +1138,15 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
         setStyleSheet( styleSheet().replace( "border-radius: 8px;", "border-radius: 0px;" ) );
         isWideFSC = true;
         buildTopStrip();
-        fadeAnim = new QVariantAnimation( this );
+        fadeAnim = new FrameAnimation( this );
         fadeAnim->setDuration( 150 );
         fadeAnim->setEasingCurve( QEasingCurve::OutCubic );
-        connect( fadeAnim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
+        connect( fadeAnim, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
             setWindowOpacity( v.toReal() );
             if( topStrip )
                 topStrip->setWindowOpacity( v.toReal() );
         } );
-        connect( fadeAnim, &QVariantAnimation::finished, this, [this]() {
+        connect( fadeAnim, &FrameAnimation::finished, this, [this]() {
             if( fadeAnim->endValue().toReal() <= 0.0 )
             {
                 hide();

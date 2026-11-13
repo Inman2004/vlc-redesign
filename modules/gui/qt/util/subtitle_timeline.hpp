@@ -96,6 +96,8 @@ private:
     QString path, reason;
     qint64 stamp;           /* mtime of `path` when read */
     int64_t lastTime, lengthUs;
+    int64_t correction = 0;     /* drawn minus reported time at the last update */
+    enum { DRIFT_MS = 300 };
     QElapsedTimer sinceUpdate;
     QTimer *ticker;
     bool on;

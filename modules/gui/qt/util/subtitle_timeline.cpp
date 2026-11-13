@@ -21,6 +21,8 @@
 #endif
 
 #include "util/subtitle_timeline.hpp"
+#include "util/frame_animation.hpp"
+#include "main_interface.hpp"
 #include "input_manager.hpp"
 #include "qt.hpp"
 #include "styles/vlc_theme.hpp"
@@ -153,9 +155,11 @@ SubtitleTimeline::SubtitleTimeline( intf_thread_t *_p_intf )
     on = var_InheritBool( p_intf, "qt-subtitle-timeline" );
     sinceUpdate.start();
 
-    /* smooth scrolling between the core's position updates */
+    /* smooth scrolling between the core's position updates, one step per
+     * display refresh */
     ticker = new QTimer( this );
-    ticker->setInterval( 33 );
+    ticker->setTimerType( Qt::PreciseTimer );
+    ticker->setInterval( FrameAnimation::refreshInterval( p_intf->p_sys->p_mi ) );
     connect( ticker, &QTimer::timeout, this, &SubtitleTimeline::moved );
 
     connect( THEMIM, &MainInputManager::inputChanged, this, &SubtitleTimeline::reload );
@@ -211,8 +215,12 @@ int64_t SubtitleTimeline::now() const
     input_thread_t *input = THEMIM->getInput();
     const float rate = input ? var_GetFloat( input, "rate" ) : 1.f;
     /* never run more than a second ahead of the last real update */
-    const int64_t ahead = qMin<int64_t>( sinceUpdate.elapsed(), 1000 ) * 1000;
-    return qBound<int64_t>( 0, lastTime + int64_t( ahead * rate ), qMax<int64_t>( lengthUs, 0 ) );
+    const int64_t elapsed = qMin<int64_t>( sinceUpdate.elapsed(), 1000 );
+    /* the gap between where we drew and where the core says we are
+     * closes over DRIFT_MS instead of in one jump */
+    const int64_t drift = elapsed < DRIFT_MS ? correction * ( DRIFT_MS - elapsed ) / DRIFT_MS : 0;
+    return qBound<int64_t>( 0, lastTime + int64_t( elapsed * 1000 * rate ) + drift,
+                            qMax<int64_t>( lengthUs, 0 ) );
 }
 
 void SubtitleTimeline::window( int64_t *start, int64_t *end, int64_t around ) const
@@ -245,6 +253,11 @@ int SubtitleTimeline::cueAt( int64_t time ) const
 
 void SubtitleTimeline::onPosition( float, int64_t time, int length )
 {
+    /* small differences (the core's updates jitter) are smoothed; a seek
+     * or a pause jumps straight to the new time */
+    const int64_t shown = now();
+    const bool playing = THEMIM->getIM()->playingStatus() == PLAYING_S;
+    correction = playing && qAbs( shown - time ) < 400000 ? shown - time : 0;
     lastTime = time;
     sinceUpdate.restart();
     const int64_t len = int64_t( length ) * US;

@@ -75,7 +75,7 @@
 #include <QStackedWidget>
 #include <QSplitter>
 #include <QShortcut>
-#include <QVariantAnimation>
+#include "util/frame_animation.hpp"
 #include <QHBoxLayout>
 #include <QScreen>
 #include <QGuiApplication>
@@ -1549,7 +1549,7 @@ void MainInterface::setSidebarVisible( bool b_visible )
 
 /* The Queue panel takes the adjustment panel's place right of the
  * content; the bar's queue button is accent while it is open */
-void MainInterface::setQueuePanelVisible( bool b )
+void MainInterface::setQueuePanelVisible( bool b, bool animate )
 {
     if( !body )
         return;
@@ -1562,9 +1562,12 @@ void MainInterface::setQueuePanelVisible( bool b )
         connect( queueDock->panel(), &QueuePanel::closeRequested, this,
                  [this]() { setQueuePanelVisible( false ); } );
     }
-    if( b && adjustDock && adjustDock->isOpen() )
-        setAdjustPanelVisible( false );
-    queueDock->setOpen( b, !b_minimalView && !isFullScreen() );
+    /* switching panels: the other one goes at once and this one slides
+     * into the same slot, so the content keeps its width */
+    const bool switching = b && adjustDock && adjustDock->isOpen();
+    if( switching )
+        setAdjustPanelVisible( false, false );
+    queueDock->setOpen( b, animate && !b_minimalView && !isFullScreen() );
     if( b )
         queueDock->panel()->setFocus( Qt::OtherFocusReason );
     foreach( QToolButton *btn, findChildren<QToolButton *>( "PLAYLISTButton" ) )
@@ -1578,8 +1581,8 @@ void MainInterface::setQueuePanelVisible( bool b )
         setFocus();
 }
 
-/* Slide the sidebar open or closed (180ms) by animating the splitter */
-void MainInterface::setAdjustPanelVisible( bool b )
+/* The adjustment panel slides into its slot right of the content */
+void MainInterface::setAdjustPanelVisible( bool b, bool animate )
 {
     if( !body )
         return;
@@ -1593,9 +1596,12 @@ void MainInterface::setAdjustPanelVisible( bool b )
         connect( adjustDock->panel(), &AdjustPanel::closeRequested, this,
                  [this]() { setAdjustPanelVisible( false ); } );
     }
-    if( b && queueDock && queueDock->isOpen() )
-        setQueuePanelVisible( false );
-    adjustDock->setOpen( b, !b_minimalView && !isFullScreen() );
+    const bool switching = b && queueDock && queueDock->isOpen();
+    if( switching )
+        setQueuePanelVisible( false, false );
+    adjustDock->setOpen( b, animate && !b_minimalView && !isFullScreen() );
+    if( b )
+        adjustDock->panel()->setFocus( Qt::OtherFocusReason );
 
     /* the bar's settings button shows the panel state */
     foreach( QToolButton *btn, findChildren<QToolButton *>( "EXTENDEDButton" ) )
@@ -1634,18 +1640,33 @@ void MainInterface::toggleAdjustPanel( int tab )
         adjustDock->panel()->setCurrentTab( tab, open );
 }
 
+/* The sidebar takes its width in one step and a still of its content
+ * slides in over it; closing slides the still out, then gives the width
+ * back in one step. Nothing re-lays out and the video resizes once. */
 void MainInterface::animateSidebar( bool b_visible )
 {
-    const bool shown = sidebar->isVisible();
-    if( shown == b_visible && !sidebar->property( "vlcAnimating" ).toBool() )
+    FrameAnimation *anim = sidebar->findChild<FrameAnimation *>( "vlcSlide" );
+    SnapshotOverlay *still = sidebar->findChild<SnapshotOverlay *>( "vlcSlideStill" );
+    const bool animating = anim && anim->state() == QAbstractAnimation::Running;
+    const bool closing = sidebar->property( "vlcClosing" ).toBool();
+    const bool open = sidebar->isVisible() && !closing;
+    if( open == b_visible )
         return;
 
     int target = sidebar->property( "vlcWidth" ).toInt();
     if( target <= 0 )
         target = Theme::SIDEBAR_WIDTH;
-    if( shown && !sidebar->property( "vlcAnimating" ).toBool() )
+    if( sidebar->isVisible() && !animating )
         target = sidebar->width(); /* remember the user's width */
     sidebar->setProperty( "vlcWidth", target );
+
+    /* where a reversed slide picks up from */
+    const qreal from = animating && still ? still->getOffset().x()
+                                          : ( b_visible ? -qreal( target ) : 0. );
+    if( anim )
+        anim->stop();
+    delete still;
+    sidebar->setProperty( "vlcClosing", false );
 
     /* No animation before the window is on screen or in minimal view */
     if( !isVisible() || b_minimalView || isFullScreen() )
@@ -1656,32 +1677,43 @@ void MainInterface::animateSidebar( bool b_visible )
         return;
     }
 
-    QVariantAnimation *anim = sidebar->findChild<QVariantAnimation *>( "vlcSlide" );
     if( !anim )
     {
-        anim = new QVariantAnimation( sidebar );
+        anim = new FrameAnimation( sidebar );
         anim->setObjectName( "vlcSlide" );
-        anim->setDuration( 180 );
-        anim->setEasingCurve( QEasingCurve::OutCubic );
-        connect( anim, &QVariantAnimation::valueChanged, this, [this]( const QVariant &v ) {
-            const int w = v.toInt();
-            bodySplitter->setSizes( QList<int>() << w << qMax( 1, bodySplitter->width() - w ) );
+        anim->setDuration( 220 );
+        connect( anim, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
+            if( SnapshotOverlay *o = sidebar->findChild<SnapshotOverlay *>( "vlcSlideStill" ) )
+                o->setOffset( QPointF( v.toReal(), 0 ) );
         } );
-        connect( anim, &QVariantAnimation::finished, this, [this, anim]() {
-            sidebar->setProperty( "vlcAnimating", false );
-            sidebar->setMinimumWidth( Theme::SIDEBAR_MIN_WIDTH );
-            if( anim->endValue().toInt() == 0 )
-                sidebar->hide();
+        connect( anim, &FrameAnimation::finished, this, [this]() {
+            delete sidebar->findChild<SnapshotOverlay *>( "vlcSlideStill" );
+            if( sidebar->property( "vlcClosing" ).toBool() )
+            {
+                sidebar->setProperty( "vlcClosing", false );
+                sidebar->hide();    /* the content takes the width back */
+            }
         } );
     }
-    const int from = shown ? sidebar->width() : 0;
-    anim->stop();
-    sidebar->setProperty( "vlcAnimating", true );
-    sidebar->setMinimumWidth( 0 );
-    sidebar->show();
-    bodySplitter->setSizes( QList<int>() << from << qMax( 1, bodySplitter->width() - from ) );
+
+    if( b_visible )
+    {
+        sidebar->show();
+        bodySplitter->setSizes( QList<int>() << target << qMax( 1, bodySplitter->width() - target ) );
+        anim->setEasingCurve( QEasingCurve::OutCubic );
+        anim->setEndValue( 0. );
+    }
+    else
+    {
+        sidebar->setProperty( "vlcClosing", true );
+        anim->setEasingCurve( QEasingCurve::InOutCubic );
+        anim->setEndValue( -qreal( sidebar->width() ) );
+    }
+    still = new SnapshotOverlay( sidebar, SnapshotOverlay::grabOf( sidebar ),
+                                 Theme::colors().sidebar );
+    still->setObjectName( "vlcSlideStill" );
+    still->setOffset( QPointF( from, 0 ) );
     anim->setStartValue( from );
-    anim->setEndValue( b_visible ? target : 0 );
     anim->start();
 }
 
