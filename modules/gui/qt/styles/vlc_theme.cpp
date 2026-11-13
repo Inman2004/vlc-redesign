@@ -381,7 +381,9 @@ static QPalette buildPalette()
     p.setColor( QPalette::Mid,             c.border );
     p.setColor( QPalette::Dark,            c.track );
     p.setColor( QPalette::Shadow,          Qt::black );
+#if QT_VERSION >= QT_VERSION_CHECK( 5, 12, 0 )
     p.setColor( QPalette::PlaceholderText, c.textMuted );
+#endif
 
     p.setColor( QPalette::Disabled, QPalette::WindowText, c.iconDisabled );
     p.setColor( QPalette::Disabled, QPalette::Text,       c.iconDisabled );

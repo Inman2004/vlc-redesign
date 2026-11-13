@@ -21,6 +21,7 @@
 #endif
 
 #include "util/frame_grabber.hpp"
+#include "util/qt_compat.hpp"
 
 #include <vlc_input.h>
 #include <vlc_input_item.h>
@@ -126,7 +127,7 @@ void FrameGrabber::displayCb( void *opaque, void * )
     const QImage copy = img.copy();
     QPointer<FrameGrabber> owner = j->owner;
     if( owner )
-        QMetaObject::invokeMethod( owner.data(), [owner, j, copy]() {
+        QtCompat::invokeQueued( owner.data(), [owner, j, copy]() {
             if( owner )
                 owner->finish( j, copy );
         }, Qt::QueuedConnection );

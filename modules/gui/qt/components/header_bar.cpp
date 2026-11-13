@@ -23,6 +23,7 @@
 #endif
 
 #include "components/header_bar.hpp"
+#include "util/qt_compat.hpp"
 #include "styles/vlc_theme.hpp"
 #include "main_interface.hpp"
 #include "input_manager.hpp"
@@ -293,7 +294,7 @@ void HeaderBar::mousePressEvent( QMouseEvent *e )
     if( e->button() == Qt::LeftButton && Theme::frameless() && mi->windowHandle()
         && !mi->isFullScreen() )
     {
-        mi->windowHandle()->startSystemMove();
+        QtCompat::startSystemMove( mi );
         e->accept();
         return;
     }
@@ -378,7 +379,7 @@ bool FramelessResizer::eventFilter( QObject *obj, QEvent *e )
         QMouseEvent *me = static_cast<QMouseEvent *>( e );
         if( edges && me->button() == Qt::LeftButton && window->windowHandle() )
         {
-            window->windowHandle()->startSystemResize( edges );
+            QtCompat::startSystemResize( window, edges );
             return true;
         }
         return false;

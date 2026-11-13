@@ -21,6 +21,7 @@
 #endif
 
 #include "library/mini_player.hpp"
+#include "util/qt_compat.hpp"
 #include "components/redesign_menus.hpp"
 #include "styles/vlc_theme.hpp"
 #include "components/queue_panel.hpp"
@@ -375,7 +376,7 @@ void MiniPlayer::layoutText()
     title->ensurePolished();
     const QFontMetrics fm( title->font() );
     const int top = queueOpen ? int( QUEUE_H ) : 0;
-    title->setGeometry( TEXT_INSET, top + TITLE_CAP_Y - ( fm.ascent() - fm.capHeight() ),
+    title->setGeometry( TEXT_INSET, top + TITLE_CAP_Y - ( fm.ascent() - QtCompat::capHeight( fm ) ),
                         CARD_W - 2 * TEXT_INSET, fm.height() );
 }
 

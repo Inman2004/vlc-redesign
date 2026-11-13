@@ -21,6 +21,7 @@
 #endif
 
 #include "library/playlist_store.hpp"
+#include "util/qt_compat.hpp"
 #include "dialogs/redesign_dialogs.hpp"      /* SubtitleScope::playlistDir / writeXspf */
 #include "library/media_library.hpp"
 #include "dialogs_provider.hpp"
@@ -174,7 +175,7 @@ bool PlaylistStore::rename( const QString &file, const QString &title )
 
 bool PlaylistStore::remove( const QString &file )
 {
-    bool ok = QFile::moveToTrash( file );
+    bool ok = QtCompat::moveToTrash( file );
     if( !ok )
         ok = QFile::remove( file );
     debounce.start();
@@ -221,8 +222,8 @@ void PlaylistStore::play( const QString &file, int track )
     /* Home's Frequently Visited Playlists */
     const QString key = "Playlists/" + QFileInfo( file ).completeBaseName();
     getSettings()->setValue( key + "/plays", p.plays + 1 );
-    getSettings()->setValue( key + "/lastPlayed", QDateTime::currentSecsSinceEpoch() );
+    getSettings()->setValue( key + "/lastPlayed", QtCompat::currentSecsSinceEpoch() );
     list[i].plays = p.plays + 1;
-    list[i].lastPlayed = QDateTime::currentSecsSinceEpoch();
+    list[i].lastPlayed = QtCompat::currentSecsSinceEpoch();
     emit changed();
 }

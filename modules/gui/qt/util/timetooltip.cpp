@@ -20,6 +20,8 @@
  *****************************************************************************/
 
 #include "timetooltip.hpp"
+#include "util/qt_compat.hpp"
+#include <QScreen>
 #include "styles/vlc_theme.hpp"
 #include "util/seek_preview.hpp"
 
@@ -76,7 +78,7 @@ void TimeTooltip::adjustPosition()
         /* Components column: a 36px #0F0F0F pill with the time, or a
          * #191919 card with the thumbnail over the time; 8px of shadow */
         QFontMetrics metrics( mFont );
-        const int textW = metrics.horizontalAdvance( mDisplayedText );
+        const int textW = QtCompat::textWidth( metrics, mDisplayedText );
         QSize card;
         if( mPreview )
             card = QSize( qMax( mThumbSize.width() + 12, textW + 32 ),
@@ -88,7 +90,7 @@ void TimeTooltip::adjustPosition()
         QPoint position( mTarget.x() - size.width() / 2,
                          mTarget.y() - size.height() + pad - 10 );
         QRect screen{};
-        if( QScreen *sc = QGuiApplication::screenAt( mTarget ) )
+        if( QScreen *sc = QtCompat::screenAt( mTarget ) )
             screen = sc->geometry();
         if( screen.isValid() )
             position.setX( qMax( screen.left(), qMin( position.x(),

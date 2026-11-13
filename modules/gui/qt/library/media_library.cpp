@@ -25,6 +25,7 @@
 #endif
 
 #include "library/media_library.hpp"
+#include "util/qt_compat.hpp"
 #include "util/frame_grabber.hpp"
 #include "util/audio_scanner.hpp"
 #include "input_manager.hpp"
@@ -259,7 +260,7 @@ void MediaLibrary::rescan()
 
     QPointer<MediaLibrary> self( this );
     std::atomic<bool> *abort = &scanAbort;
-    scanThread = QThread::create( [dirs, self, abort]() {
+    scanThread = QtCompat::createThread( [dirs, self, abort]() {
         QVector<ScanEntry> found;
         QSet<QString> seen;
         foreach( const QString &root, dirs )
@@ -282,12 +283,12 @@ void MediaLibrary::rescan()
                     continue;
                 seen.insert( canon );
                 found.append( { fi.absoluteFilePath(), fi.size(),
-                                fi.lastModified().toSecsSinceEpoch(), audio } );
+                                QtCompat::secsSinceEpoch( fi.lastModified() ), audio } );
             }
         }
         if( abort->load() )
             return;
-        QMetaObject::invokeMethod( self.data(), [self, found]() {
+        QtCompat::invokeQueued( self.data(), [self, found]() {
             if( self )
                 self->merge( found );
         }, Qt::QueuedConnection );
@@ -389,7 +390,7 @@ void MediaLibrary::trackInput()
         {
             playingPath = list[i].path;
             list[i].playCount++;
-            list[i].lastPlayed = QDateTime::currentSecsSinceEpoch();
+            list[i].lastPlayed = QtCompat::currentSecsSinceEpoch();
             emit itemChanged( i );
             scheduleSave();
         }
@@ -581,7 +582,7 @@ QString MediaLibrary::artFile( const QString &path ) const
     const QFileInfo fi( path );
     if( path.isEmpty() || !fi.isFile() )
         return QString();
-    const QString f = thumbDir + "/" + fileKey( path, fi.size(), fi.lastModified().toSecsSinceEpoch() )
+    const QString f = thumbDir + "/" + fileKey( path, fi.size(), QtCompat::secsSinceEpoch( fi.lastModified() ) )
                       + ".jpg";
     return QFileInfo::exists( f ) ? f : QString();
 }
@@ -594,7 +595,7 @@ QByteArray MediaLibrary::peaks( const QString &path )
     const QFileInfo fi( path );
     if( !fi.isFile() )
         return QByteArray();
-    QFile f( thumbDir + "/" + fileKey( path, fi.size(), fi.lastModified().toSecsSinceEpoch() )
+    QFile f( thumbDir + "/" + fileKey( path, fi.size(), QtCompat::secsSinceEpoch( fi.lastModified() ) )
              + ".wave" );
     if( f.open( QIODevice::ReadOnly ) )
     {
@@ -613,7 +614,7 @@ void MediaLibrary::songDone( const QString &path, const AudioScan &r, qint64 ela
 {
     scanning.clear();
     const QFileInfo fi( path );
-    const QString key = fileKey( path, fi.size(), fi.lastModified().toSecsSinceEpoch() );
+    const QString key = fileKey( path, fi.size(), QtCompat::secsSinceEpoch( fi.lastModified() ) );
     if( !r.peaks.isEmpty() )
     {
         QSaveFile f( thumbDir + "/" + key + ".wave" );

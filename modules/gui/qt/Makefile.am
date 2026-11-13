@@ -170,6 +170,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/dialogs/settings_dialog.cpp gui/qt/dialogs/settings_dialog.hpp \
 	gui/qt/dialogs/shortcuts_dialog.cpp gui/qt/dialogs/shortcuts_dialog.hpp \
 	gui/qt/util/key_map.cpp gui/qt/util/key_map.hpp \
+	gui/qt/util/qt_compat.cpp gui/qt/util/qt_compat.hpp \
 	gui/qt/util/subtitle_timeline.cpp gui/qt/util/subtitle_timeline.hpp \
 	gui/qt/util/bookmarks.cpp gui/qt/util/bookmarks.hpp \
 	gui/qt/components/settings_controls.cpp gui/qt/components/settings_controls.hpp \

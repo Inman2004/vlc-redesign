@@ -28,6 +28,7 @@
 #endif
 
 #include "qt.hpp"
+#include "util/qt_compat.hpp"
 
 #include "main_interface.hpp"
 #include "input_manager.hpp"                    // Creation
@@ -1177,7 +1178,7 @@ void MainInterface::toggleFSC()
 {
    /* called from the hotkeys thread: I peeks at the chrome when windowed */
    if( Theme::redesign() )
-       QMetaObject::invokeMethod( this, [this]() {
+       QtCompat::invokeQueued( this, [this]() {
            if( autoHider && !b_videoFullScreen )
                autoHider->peek();
        }, Qt::QueuedConnection );

@@ -26,7 +26,8 @@
 ManifestDPIAware true
 Unicode true
 
-!define INSTALL_ACTIVEX
+; the redesign ships no ActiveX plugin
+;!define INSTALL_ACTIVEX
 
 Var ReinstallType
 Var ReinstallUninstallBtn

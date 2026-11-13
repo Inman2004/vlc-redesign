@@ -21,6 +21,7 @@
 #endif
 
 #include "qt.hpp"
+#include "util/qt_compat.hpp"
 #include "components/settings_controls.hpp"
 #include "styles/vlc_theme.hpp"
 
@@ -428,7 +429,7 @@ SButton::SButton( const QString &text, QWidget *parent )
 
 QSize SButton::sizeHint() const
 {
-    return QSize( qMax<int>( BROWSE_W, QFontMetrics( SettingsUI::font( 14, true ) ).horizontalAdvance( text() ) + 32 ),
+    return QSize( qMax<int>( BROWSE_W, QtCompat::textWidth( QFontMetrics( SettingsUI::font( 14, true ) ), text() ) + 32 ),
                   BUTTON_H );
 }
 
@@ -570,7 +571,7 @@ void STickSlider::paintEvent( QPaintEvent * )
         {
             const double lf = ( labels[i].first - lo ) / ( hi - lo );
             const qreal x = usable.left() + lf * usable.width();
-            const int w = p.fontMetrics().horizontalAdvance( labels[i].second );
+            const int w = QtCompat::textWidth( p.fontMetrics(), labels[i].second );
             qreal left = x - w / 2.0;
             if( i == 0 && lf <= 0.0 ) left = 0;
             if( i == labels.count() - 1 && lf >= 1.0 ) left = width() - w;

@@ -21,6 +21,7 @@
 #endif
 
 #include "util/key_map.hpp"
+#include "util/qt_compat.hpp"
 #include "util/bookmarks.hpp"
 
 #include <vlc_actions.h>
@@ -91,7 +92,7 @@ QHash<uint32_t, int> readBindings( intf_thread_t *p_intf )
 void KeyMap::init( intf_thread_t *p_intf )
 {
     current = readBindings( p_intf );
-    loaded = QSet<uint32_t>( current.keyBegin(), current.keyEnd() );
+    loaded = QtCompat::keySet( current );
     active = false;
     quickBookmark = readKeys( p_intf, "qt-key-quick-bookmark" );
 }

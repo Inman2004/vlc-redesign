@@ -21,6 +21,7 @@
 #endif
 
 #include "dialogs/redesign_dialogs.hpp"
+#include "util/qt_compat.hpp"
 #include "styles/vlc_theme.hpp"
 #include "input_manager.hpp"
 #include "recents.hpp"
@@ -227,7 +228,7 @@ void RedesignDialog::showEvent( QShowEvent *e )
     /* Figma size, but never larger than the main window (or screen) */
     QWidget *ref = parentWidget() ? parentWidget()->window() : NULL;
     QRect avail = ref ? ref->geometry()
-                      : ( screen() ? screen()->availableGeometry() : QRect( 0, 0, 1920, 1080 ) );
+                      : ( QtCompat::screenOf( this ) ? QtCompat::screenOf( this )->availableGeometry() : QRect( 0, 0, 1920, 1080 ) );
     QSize s = designSize.isValid() ? designSize : sizeHint();
     s = s.boundedTo( avail.size() - QSize( 40, 40 ) ).expandedTo( minimumSizeHint() - QSize( 2 * SHADOW, 2 * SHADOW ) );
     resize( s + QSize( 2 * SHADOW, 2 * SHADOW ) );
@@ -242,7 +243,7 @@ bool RedesignDialog::eventFilter( QObject *o, QEvent *e )
      && static_cast<QMouseEvent *>( e )->button() == Qt::LeftButton
      && windowHandle() )
     {
-        windowHandle()->startSystemMove();
+        QtCompat::startSystemMove( this );
         return true;
     }
     return QDialog::eventFilter( o, e );

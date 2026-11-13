@@ -92,7 +92,8 @@ package-win-activex: build-npapi
 	mkdir -p "$(win32_destdir)/sdk/activex/"
 	cp $(top_builddir)/npapi-vlc/activex/README.TXT $(top_builddir)/npapi-vlc/share/test/test.html $(win32_destdir)/sdk/activex/
 
-package-win-strip: package-win-common package-win-activex
+# the redesign ships no browser plugins (NPAPI/ActiveX)
+package-win-strip: package-win-common
 	mkdir -p "$(win32_debugdir)"/
 	find $(win32_destdir) -type f \( -name '*$(LIBEXT)' -or -name '*$(EXEEXT)' \) | while read i; \
 	do if test -n "$$i" ; then \
@@ -104,13 +105,9 @@ package-win-strip: package-win-common package-win-activex
 
 $(win32_destdir)/NSIS/nsProcess.dll: extras/package/win32/NSIS/nsProcess/nsProcess.c extras/package/win32/NSIS/nsProcess/pluginapi.c
 	mkdir -p "$(win32_destdir)/NSIS/"
-if HAVE_WIN64
-	i686-w64-mingw32-gcc $^ -shared -o $@ -lole32 -static-libgcc -D_UNICODE=1 -DUNICODE=1
-	i686-w64-mingw32-strip $@
-else
+# the plugin matches the installer: makensis builds with 64-bit stubs
 	$(CC) $^ -D_WIN32_IE=0x0601 -shared -o $@ -lole32 -static-libgcc -D_UNICODE=1 -DUNICODE=1
 	$(STRIP) $@
-endif
 
 package-win32-src: package-win-strip
 # Script installer

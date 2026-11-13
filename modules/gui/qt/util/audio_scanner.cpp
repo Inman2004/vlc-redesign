@@ -21,6 +21,7 @@
 #endif
 
 #include "util/audio_scanner.hpp"
+#include "util/qt_compat.hpp"
 
 #include <vlc_input.h>
 #include <vlc_input_item.h>
@@ -93,7 +94,7 @@ int AudioScanner::eventCb( vlc_object_t *obj, const char *, vlc_value_t,
     j->ended = true;
     QPointer<AudioScanner> owner = j->owner;
     if( owner )
-        QMetaObject::invokeMethod( owner.data(), [owner, j]() {
+        QtCompat::invokeQueued( owner.data(), [owner, j]() {
             if( owner )
                 owner->finish( j );
         }, Qt::QueuedConnection );
@@ -269,7 +270,7 @@ void AudioScanner::finish( Job *j )
         const qint64 ms = j->clock.elapsed();
         delete j;
         if( self )
-            QMetaObject::invokeMethod( self.data(), [self, path, r, ms]() {
+            QtCompat::invokeQueued( self.data(), [self, path, r, ms]() {
                 if( self )
                     emit self->finished( path, r, ms );
             }, Qt::QueuedConnection );

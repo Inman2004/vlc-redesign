@@ -21,6 +21,7 @@
 #endif
 
 #include "components/queue_panel.hpp"
+#include "util/qt_compat.hpp"
 #include "components/playlist/playlist_model.hpp"
 #include "components/redesign_menus.hpp"
 #include "adapters/seekpoints.hpp"
@@ -119,7 +120,7 @@ public:
         QString d = dur.data( Qt::DisplayRole ).toString();
         if( d == "--:--" )
             d.clear();
-        const int dw = d.isEmpty() ? 0 : fm.horizontalAdvance( d );
+        const int dw = d.isEmpty() ? 0 : QtCompat::textWidth( fm, d );
         p->setPen( current ? Theme::accent() : QColor( 0x6B, 0x6B, 0x6B ) );
         p->drawText( QRect( r.right() - rightInset - dw, r.top(), dw + 1, r.height() ),
                      Qt::AlignRight | Qt::AlignVCenter, d );
@@ -483,7 +484,7 @@ public:
         p->setFont( f );
         const QFontMetrics fm( f );
         const QString t = index.data( Qt::UserRole ).toString();
-        const int tw = fm.horizontalAdvance( t );
+        const int tw = QtCompat::textWidth( fm, t );
         p->setPen( QColor( 0x6B, 0x6B, 0x6B ) );
         p->drawText( QRect( r.right() - TIME_RIGHT - tw, r.top(), tw + 1, r.height() ),
                      Qt::AlignRight | Qt::AlignVCenter, t );

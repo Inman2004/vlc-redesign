@@ -33,6 +33,7 @@
 #endif
 
 #include "dialogs/shortcuts_dialog.hpp"
+#include "util/qt_compat.hpp"
 #include "styles/vlc_theme.hpp"
 #include "components/settings_controls.hpp"
 #include "util/customwidgets.hpp"
@@ -293,7 +294,7 @@ void KeyBox::paintEvent( QPaintEvent * )
     {
         const QString s = display();
         p.setPen( available ? text : muted );
-        const int w = p.fontMetrics().horizontalAdvance( s );
+        const int w = QtCompat::textWidth( p.fontMetrics(), s );
         if( w <= centred.width() )
             p.drawText( centred, Qt::AlignCenter, s );
         else

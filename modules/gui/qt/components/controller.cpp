@@ -30,6 +30,7 @@
 
 /* Widgets */
 #include "components/controller.hpp"
+#include "util/qt_compat.hpp"
 #include "components/controller_widget.hpp"
 #include "components/interface_widgets.hpp"
 #include "util/buttons/DeckButtonsLayout.hpp"
@@ -1249,8 +1250,8 @@ void FullscreenControllerWidget::restoreFSC()
     else if( Theme::redesign() )
     {
         const QRect sg = fsScreenGeometry();
-        if( windowHandle() && QGuiApplication::screenAt( sg.center() ) )
-            windowHandle()->setScreen( QGuiApplication::screenAt( sg.center() ) );
+        if( windowHandle() && QtCompat::screenAt( sg.center() ) )
+            windowHandle()->setScreen( QtCompat::screenAt( sg.center() ) );
         setMinimumWidth( sg.width() );
         setGeometry( sg.x(), sg.y() + sg.height() - height(), sg.width(), height() );
         placeTopStrip();
@@ -1341,8 +1342,8 @@ void FullscreenControllerWidget::placeTopStrip()
     if( !topStrip )
         return;
     const QRect sg = fsScreenGeometry();
-    if( topStrip->windowHandle() && QGuiApplication::screenAt( sg.center() ) )
-        topStrip->windowHandle()->setScreen( QGuiApplication::screenAt( sg.center() ) );
+    if( topStrip->windowHandle() && QtCompat::screenAt( sg.center() ) )
+        topStrip->windowHandle()->setScreen( QtCompat::screenAt( sg.center() ) );
     topStrip->setGeometry( sg.x(), sg.y(), sg.width(), Theme::TITLEBAR_HEIGHT );
 }
 

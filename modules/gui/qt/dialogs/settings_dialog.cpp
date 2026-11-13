@@ -31,6 +31,7 @@
 #endif
 
 #include "dialogs/settings_dialog.hpp"
+#include "util/qt_compat.hpp"
 #include "components/settings_controls.hpp"
 #include "dialogs/preferences.hpp"
 #include "dialogs/plugins.hpp"
@@ -315,7 +316,7 @@ protected:
         p.setBrush( hovered ? c.nav.lighter( 120 ) : c.nav );
         p.drawRoundedRect( rect(), 4, 4 );
         p.setFont( SettingsUI::font( 14 ) );
-        const int tw = p.fontMetrics().horizontalAdvance( text() );
+        const int tw = QtCompat::textWidth( p.fontMetrics(), text() );
         const int g = 16, gap = 8;
         const int x = ( width() - tw - gap - g ) / 2;
         p.setPen( hovered ? c.strong : c.text );
@@ -662,9 +663,8 @@ void SettingsDialog::changed( const char *option )
     if( building )
         return;
     dirty = true;
-    auto range = refreshers.equal_range( QString( option ) );
-    for( auto it = range.first; it != range.second; ++it )
-        it.value()();
+    foreach( const std::function<void()> &f, refreshers.values( QString( option ) ) )
+        f();
 }
 
 /*********************************************************************
@@ -713,7 +713,7 @@ bool SettingsDialog::eventFilter( QObject *o, QEvent *e )
         const QPoint pt = o == title ? title->mapTo( frame, me->pos() ) : me->pos();
         if( me->button() == Qt::LeftButton && pt.y() < HEADER_H && windowHandle() )
         {
-            windowHandle()->startSystemMove();
+            QtCompat::startSystemMove( this );
             return true;
         }
     }
@@ -2438,7 +2438,7 @@ void SettingsDialog::buildExtensions()
                 qtr( "Move %1 to the trash?" ).arg( i.data( Qt::DisplayRole ).toString() ) )
             != QMessageBox::Yes )
             return;
-        if( !QFile::moveToTrash( file ) )
+        if( !QtCompat::moveToTrash( file ) )
             QFile::remove( file );
         em->reloadExtensions();
     } );

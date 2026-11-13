@@ -21,6 +21,7 @@
 #endif
 
 #include "components/redesign_menus.hpp"
+#include "util/qt_compat.hpp"
 #include "styles/vlc_theme.hpp"
 #include "main_interface.hpp"
 #include "dialogs_provider.hpp"
@@ -267,7 +268,7 @@ void TrackPopover::toggle( intf_thread_t *p_intf, QAbstractButton *anchor, int t
     const QPoint barTop = bar->mapToGlobal( QPoint( 0, 0 ) );
     int x = winTopRight.x() - Theme::BAR_MARGIN_RIGHT - POP_W;
     int y = barTop.y() - POP_GAP - POP_H;
-    const QRect screen = anchor->screen() ? anchor->screen()->availableGeometry() : QRect();
+    const QRect screen = QtCompat::screenOf( anchor ) ? QtCompat::screenOf( anchor )->availableGeometry() : QRect();
     if( screen.isValid() && y < screen.top() )
         y = barTop.y() + bar->height() + POP_GAP; /* no room above: below */
     p->move( x, y );
@@ -321,7 +322,7 @@ TrackPopover::TrackPopover( intf_thread_t *_p_intf, QAbstractButton *_anchor )
         /* stylesheet tool buttons left-align icon and text: centre them */
         QFont f = b->font();
         f.setPixelSize( 14 );
-        const int content = 18 + 6 + QFontMetrics( f ).horizontalAdvance( names[i] );
+        const int content = 18 + 6 + QtCompat::textWidth( QFontMetrics( f ), names[i] );
         b->setStyleSheet( QString( "padding-left: %1px;" ).arg( qMax( 0, ( w - content ) / 2 ) ) );
         b->setCursor( Qt::PointingHandCursor );
         tabs->addButton( b, i );

@@ -21,6 +21,7 @@
 #endif
 
 #include "library/library_view.hpp"
+#include "util/qt_compat.hpp"
 #include "library/library_browser.hpp"
 #include "library/media_library.hpp"
 #include "library/mini_player.hpp"
@@ -281,7 +282,7 @@ void LibraryGrid::layoutShelves()
             {
                 const int y = first ? SHELF_TOP : rowBottom + SHELF_NEXT;
                 first = false;
-                rects[i] = QRect( x0, y, hfm.horizontalAdvance( e.title ) + SHELF_CHEVRON_GAP + 24,
+                rects[i] = QRect( x0, y, QtCompat::textWidth( hfm, e.title ) + SHELF_CHEVRON_GAP + 24,
                                   SHELF_HEAD_H );
                 rowTop = rowBottom = y + SHELF_TILES_Y;
                 x = x0;
@@ -584,7 +585,7 @@ void LibraryGrid::paintShelfEntry( QPainter &p, int i, const QRect &rr, const QF
         }
         else
         {
-            const int tw = QFontMetrics( f ).horizontalAdvance( e.title );
+            const int tw = QtCompat::textWidth( QFontMetrics( f ), e.title );
             p.drawText( QRect( rr.left(), rr.top(), tw + 2, rr.height() ),
                         Qt::AlignLeft | Qt::AlignVCenter, e.title );
             p.drawPixmap( rr.left() + tw + SHELF_CHEVRON_GAP, rr.top(), chev );
