@@ -29,6 +29,7 @@
 #include "qt.hpp"
 #include "dialogs/help.hpp"
 #include "util/qt_dirs.hpp"
+#include "styles/vlc_theme.hpp"
 
 #include <vlc_about.h>
 #include <vlc_intf_strings.h>
@@ -101,6 +102,20 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     QString translatedString = qtr( "<p>VLC media player is a free and open source media player, encoder, and streamer made by the volunteers of the <a href=\"http://www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</span></a> community.</p><p>VLC uses its internal codecs, works on essentially every popular platform, and can read almost all files, CDs, DVDs, network streams, capture cards and other media formats!</p><p><a href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: underline; color:#0057ae;\">Help and join us!</span></a>" );
     if ( var_InheritBool( p_intf, "qt-dark-palette" ) )
         translatedString.remove(QLatin1String("#0057ae"));
+    if( Theme::redesign() )
+    {
+        /* the redesigned interface is Juxtopposed's design */
+        const QString link = QStringLiteral( "<a href=\"%1\"><span style=\" text-decoration: underline; color:%2;\">%3</span></a>" );
+        const QString &c = linkColor;
+        translatedString += "</p>" + qtr( "<p>This interface is the <b>VLC Redesign</b> by %1. "
+            "Her video %2 and her %3 are the design it is built from: all credit for "
+            "its UI and UX goes to her.</p>" )
+            .arg( link.arg( "https://www.youtube.com/@juxtopposed", c, "Juxtopposed" ),
+                  link.arg( "https://youtu.be/ERFeOgqk324", c,
+                            "&ldquo;" + qtr( "I Redesigned VLC After 25 Years" ) + "&rdquo;" ),
+                  link.arg( "https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN", c,
+                            qtr( "Figma Community file" ) ) );
+    }
     ui.MainBlabla->setText("<html><head/><body>" + translatedString + "</p></body> </html>");
 
 #if 0
@@ -120,7 +135,15 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     ui.licensePage->setText( qfu( psz_license ) );
 
     /* People who helped */
-    ui.creditPage->setText( qfu( psz_thanks ) );
+    if( Theme::redesign() )
+        ui.creditPage->setPlainText(
+            qtr( "Interface design: Juxtopposed, \"VLC Redesign\"" ) + "\n"
+            + qtr( "Video: \"I Redesigned VLC After 25 Years\"" ) + " - https://youtu.be/ERFeOgqk324\n"
+            + qtr( "Figma Community file" ) + " - https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN\n"
+            + qtr( "YouTube" ) + " - https://www.youtube.com/@juxtopposed\n\n"
+            + qfu( psz_thanks ) );
+    else
+        ui.creditPage->setText( qfu( psz_thanks ) );
 
     /* People who wrote the software */
     ui.authorsPage->setText( qfu( psz_authors ) );
