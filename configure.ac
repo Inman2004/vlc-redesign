@@ -3919,7 +3919,15 @@ AC_ARG_ENABLE(qt, [
 have_qt5_x11="no"
 qt6_configured="no"
 AS_IF([test "${enable_qt}" != "no"], [
-  PKG_CHECK_MODULES([QT], [Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg Qt5Network], [
+  PKG_CHECK_MODULES([QT], [Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg], [
+      dnl redesign: online subtitle search needs Qt Network, which
+      dnl VideoLAN's Windows contribs do not build; leave it out there
+      PKG_CHECK_MODULES([QT5_NETWORK], [Qt5Network], [
+          QT_CFLAGS="${QT_CFLAGS} ${QT5_NETWORK_CFLAGS} -DHAVE_QT_NETWORK"
+          QT_LIBS="${QT_LIBS} ${QT5_NETWORK_LIBS}"
+      ],[
+          AC_MSG_WARN([Qt5Network not found: the Qt interface is built without online subtitle search.])
+      ])
       PKG_CHECK_MODULES([QT5_X11], [Qt5X11Extras], [
           have_qt5_x11="yes"
       ],[

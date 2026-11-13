@@ -67,9 +67,11 @@
 #include <QTimer>
 #include <QAction>
 #include <QDesktopServices>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
+#ifdef HAVE_QT_NETWORK
+# include <QNetworkAccessManager>
+# include <QNetworkRequest>
+# include <QNetworkReply>
+#endif
 #include <QUrlQuery>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -1257,9 +1259,11 @@ void AddSubtitlesDialog::downloadNext()
 static const char *const OS_API = "https://api.opensubtitles.com/api/v1";
 
 OpenSubtitlesClient::OpenSubtitlesClient( QObject *parent )
-    : QObject( parent ), pendingSearch( NULL )
+    : QObject( parent ), net( NULL ), pendingSearch( NULL )
 {
+#ifdef HAVE_QT_NETWORK
     net = new QNetworkAccessManager( this );
+#endif
 }
 
 QString OpenSubtitlesClient::apiKey( intf_thread_t *p_intf )
@@ -1293,6 +1297,7 @@ QString OpenSubtitlesClient::movieHash( const QString &path )
     return QString( "%1" ).arg( hash, 16, 16, QChar( '0' ) );
 }
 
+#ifdef HAVE_QT_NETWORK
 QNetworkReply *OpenSubtitlesClient::request( const QString &key, const QString &path,
                                              const QByteArray &postBody )
 {
@@ -1411,6 +1416,23 @@ void OpenSubtitlesClient::download( const QString &key, int fileId, const QStrin
         } );
     } );
 }
+#else
+/* built without Qt Network (VideoLAN's Windows contribs): no online search */
+void OpenSubtitlesClient::search( const QString &, const QString &,
+                                  const QString &, const QString & )
+{
+    QTimer::singleShot( 0, this, [this]() {
+        emit failed( qtr( "Online subtitle search isn't available in this build of VLC." ) );
+    } );
+}
+
+void OpenSubtitlesClient::download( const QString &, int, const QString & )
+{
+    QTimer::singleShot( 0, this, [this]() {
+        emit failed( qtr( "Online subtitle search isn't available in this build of VLC." ) );
+    } );
+}
+#endif /* HAVE_QT_NETWORK */
 
 /**********************************************************************
  * SubtitleScope

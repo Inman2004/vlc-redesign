@@ -3,6 +3,12 @@ TEMPLATE = app
 QT = core gui svg widgets
 QTPLUGIN = qsvgicon qsvg qjpeg qico
 
+# redesign: online subtitle search (Add Subtitles) when Qt Network exists
+qtHaveModule(network) {
+QT += network
+DEFINES += HAVE_QT_NETWORK
+}
+
 CONFIG -= entrypoint
 CONFIG -= debug_and_release
 CONFIG += no_include_pwd
