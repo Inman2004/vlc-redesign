@@ -115,6 +115,9 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
                             "&ldquo;" + qtr( "I Redesigned VLC After 25 Years" ) + "&rdquo;" ),
                   link.arg( "https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN", c,
                             qtr( "Figma Community file" ) ) );
+        translatedString += qtr( "<p>Built into VLC by <b>Immanuvel B</b> (%1, %2).</p>" )
+            .arg( link.arg( "https://github.com/Inman2004", c, "GitHub" ),
+                  link.arg( "https://rvinmandev.vercel.app", c, "rvinmandev.vercel.app" ) );
     }
     ui.MainBlabla->setText("<html><head/><body>" + translatedString + "</p></body> </html>");
 
@@ -141,6 +144,8 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
             + qtr( "Video: \"I Redesigned VLC After 25 Years\"" ) + " - https://youtu.be/ERFeOgqk324\n"
             + qtr( "Figma Community file" ) + " - https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN\n"
             + qtr( "YouTube" ) + " - https://www.youtube.com/@juxtopposed\n\n"
+            + qtr( "Built into VLC by Immanuvel B" ) + " - https://github.com/Inman2004"
+            + " - https://rvinmandev.vercel.app\n\n"
             + qfu( psz_thanks ) );
     else
         ui.creditPage->setText( qfu( psz_thanks ) );

@@ -8,6 +8,9 @@ The whole player is VLC 3.0.24 — the same decoders, formats and settings —
 with her interface: frameless window, library, music mode, queue, settings
 and dialogs, set in Google Sans.
 
+Built by **[Immanuvel B](https://github.com/Inman2004)**
+([rvinmandev.vercel.app](https://rvinmandev.vercel.app)).
+
 > **Unofficial.** This is an independent project. It isn't made, endorsed or
 > supported by VideoLAN, and Juxtopposed isn't involved in this build.
 > For the official player, see [videolan.org](https://www.videolan.org/vlc/).
@@ -41,6 +44,14 @@ and follow her work:
 - YouTube: [@juxtopposed](https://www.youtube.com/@juxtopposed)
 - Video: [I Redesigned VLC After 25 Years](https://youtu.be/ERFeOgqk324)
 - Figma: [VLC Redesign](https://www.figma.com/community/file/4UaxYzCN8lGeBI9uEAeWhN)
+
+## Author
+
+**Immanuvel B** built this, turning Juxtopposed's design into a working
+VLC: the Qt interface, the Linux package and the Windows installers.
+
+- GitHub: [@Inman2004](https://github.com/Inman2004)
+- Website: [rvinmandev.vercel.app](https://rvinmandev.vercel.app)
 
 ## Download
 
@@ -165,6 +176,7 @@ and 5.15.
   GPL-2.0-or-later / LGPL-2.1-or-later. See [`COPYING`](COPYING),
   [`COPYING.LIB`](COPYING.LIB) and [`AUTHORS`](AUTHORS); VLC's own readme
   is [`README`](README).
+- **The redesign in VLC** — [Immanuvel B](https://github.com/Inman2004).
 - **UI and UX design** — *VLC Redesign* by
   [Juxtopposed](https://www.youtube.com/@juxtopposed): the video
   [*I Redesigned VLC After 25 Years*](https://youtu.be/ERFeOgqk324) and the
