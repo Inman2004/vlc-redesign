@@ -59,8 +59,8 @@ A few things to know on Windows:
   the zip; it runs from any folder.
 - **Windows will warn you on first launch** because the builds aren't signed.
   Click *More info*, then *Run anyway*.
-- **I build the Windows version on Linux** and haven't been able to test it on
-  a real Windows machine yet. If something breaks, please open an issue.
+- **I build the Windows version on Linux**, so bug reports from Windows
+  users really help. If something breaks, please open an issue.
 
 On Arch, everything goes in `/opt/vlc-redesign`, so your normal `vlc` stays
 untouched.
@@ -107,6 +107,7 @@ Everything's in Settings, but these work from the command line too:
 |---|---|---|
 | `--no-qt-redesign` | (on) | Turn the new look off and get classic VLC back |
 | `--no-qt-redesign-frameless` | (on) | Keep your system's normal title bar |
+| `--qt-autohide-controls` | `2` | When the bars slide away: `0` never, `1` fullscreen only, `2` also while a video plays in the window |
 | `--qt-theme` | `dark` | `dark`, `light` or `system` |
 | `--qt-accent-color` | `#D37918` | Amber, Rust, Olive, Green, Teal, Blue, Violet, Magenta or Grey |
 | `--qt-subtitle-timeline` | off | Show subtitles on the seek bar |
@@ -134,8 +135,14 @@ makepkg -si
 ```
 
 The Windows build is cross-compiled from Linux. You need `mingw-w64-gcc`,
-`mingw-w64-tools` and `nsis`, plus VideoLAN's prebuilt win64 libraries unpacked
-in `contrib/x86_64-w64-mingw32`. Then:
+`mingw-w64-tools` and `nsis`, plus VideoLAN's prebuilt win64 libraries. This
+grabs them for you:
+
+```bash
+tools/redesign/packaging/windows/fetch-contribs.sh .
+```
+
+Then:
 
 ```bash
 tools/redesign/packaging/windows/build.sh all
@@ -147,7 +154,6 @@ libraries ship an older Qt (5.6) and an older C runtime, so
 
 ## Known issues
 
-- The Windows builds haven't been tested on Windows yet (see above).
 - On Windows, searching subtitles online doesn't work, because VideoLAN's
   Windows Qt has no network module. Adding them from a file or a link is fine.
 - On Windows there's no SRT streaming, and the interface is English only.

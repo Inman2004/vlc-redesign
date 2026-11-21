@@ -39,7 +39,9 @@ configure() {
     compat
     # regenerate the build system with this machine's autotools: the
     # Makefiles otherwise ask for the automake version that made them
-    (cd "$SRC" && ./bootstrap)
+    # (outside this script's cross pkg-config settings, which it can't run)
+    (cd "$SRC" && env -u PKG_CONFIG -u PKG_CONFIG_LIBDIR ./bootstrap)
+    [ -f "$SRC/configure" ] || { echo "bootstrap failed" >&2; exit 1; }
     mkdir -p "$B"; cd "$B"
     # GCC 16 defaults to C23, which dropped ATOMIC_VAR_INIT; Windows 7 API
     # level keeps WaitOnAddress (Windows 8) out of the build
