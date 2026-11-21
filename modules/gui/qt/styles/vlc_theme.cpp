@@ -459,7 +459,7 @@ static QString buildStyleSheet()
 
     /* Control bar */
     "#VLCControlBar { background: @bar; }\n"
-    "#VLCControlBar QToolButton#PlayButton { background: @accent; border-radius: 6px; }\n"
+    "#VLCControlBar QToolButton#PlayButton { background: @accent; border-radius: 8px; }\n"
     "#VLCControlBar QToolButton#PlayButton:hover { background: @accentHov; }\n"
     "#VLCControlBar QToolButton#PlayButton:pressed { background: @accentPre; }\n"
     "#VLCControlBar TimeLabel, #VLCFullscreenBar TimeLabel { color: @muted; font-size: 15px;"

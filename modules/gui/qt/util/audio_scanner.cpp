@@ -106,6 +106,9 @@ AudioScanner::AudioScanner( intf_thread_t *_p_intf, QObject *parent )
 {
     qRegisterMetaType<AudioScan>( "AudioScan" );
     host = static_cast<vlc_object_t *>( vlc_object_create( p_intf, sizeof( vlc_object_t ) ) );
+    /* a background job: never an error dialog for a file it can't read */
+    if( host )
+        host->obj.flags |= OBJECT_FLAGS_NOINTERACT;
 
     /* a song that never ends (a broken file, a stream) must not block */
     watchdog.setSingleShot( true );
@@ -149,6 +152,7 @@ bool AudioScanner::scan( const QString &path )
                                   ":std{access=file,mux=raw,dst='%2'}" )
                          .arg( int( SAMPLE_RATE ) ).arg( j->pcm );
     static const char *const options[] = {
+        ":no-interact",
         ":no-video", ":no-spu", ":no-sout-video", ":no-sout-spu", ":no-stats",
         ":no-sub-autodetect-file", ":file-caching=0", ":avcodec-hw=none",
     };

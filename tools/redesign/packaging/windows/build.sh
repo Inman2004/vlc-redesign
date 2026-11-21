@@ -37,6 +37,9 @@ compat() {
 
 configure() {
     compat
+    # regenerate the build system with this machine's autotools: the
+    # Makefiles otherwise ask for the automake version that made them
+    (cd "$SRC" && ./bootstrap)
     mkdir -p "$B"; cd "$B"
     # GCC 16 defaults to C23, which dropped ATOMIC_VAR_INIT; Windows 7 API
     # level keeps WaitOnAddress (Windows 8) out of the build

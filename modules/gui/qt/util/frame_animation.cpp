@@ -210,9 +210,11 @@ void SlideDock::setOpen( bool b, bool animate )
 
 void SlideDock::place()
 {
+    /* inside the contents rect: the window's floating bars pad it */
+    const QRect r = contentsRect();
     if( panelWidget )
-        panelWidget->setGeometry( width() - panelWidth + qRound( shift ), 0,
-                                  panelWidth, height() );
+        panelWidget->setGeometry( width() - panelWidth + qRound( shift ), r.top(),
+                                  panelWidth, r.height() );
 }
 
 void SlideDock::resizeEvent( QResizeEvent *e )

@@ -247,14 +247,24 @@ public:
     void setGripVisible( bool b_visible )
     { if( grip ) grip->setVisible( b_visible ); }
 
+    /* redesign: as narrow as play, the seek bar and the queue need; the
+     * rest of the bar folds away (see fitToWidth) */
+    QSize minimumSizeHint() const Q_DECL_OVERRIDE;
+
 protected:
     friend class MainInterface;
+    void resizeEvent( QResizeEvent * ) Q_DECL_OVERRIDE;
+    void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
 
     bool advancedAvailable();
     bool b_advancedVisible;
 
 private:
+    /* hide the least important controls until the bar fits its width;
+     * they come back as soon as there is room again */
+    void fitToWidth();
     QSizeGrip *grip;
+    bool fitting = false;
 
 protected slots:
     void toggleAdvanced();

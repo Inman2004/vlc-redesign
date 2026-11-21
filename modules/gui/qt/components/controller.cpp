@@ -425,6 +425,8 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
         /* Create the widget */
         QWidget *widg = createWidget( i_type, i_option );
         if( !widg ) return;
+        /* lets a narrow bar choose what to fold away (fitToWidth) */
+        widg->setProperty( "vlcBarItem", int( i_type ) );
 
         /* Buttons */
         if( i_type < BUTTON_MAX )
@@ -485,10 +487,10 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         BUTTON_SET_BAR(  playButton );
         if( Theme::redesign() )
         {
-            /* accent pill, 54x28 as measured */
+            /* accent pill, a little bigger than Figma's 54x28 */
             playButton->setObjectName( "PlayButton" );
             playButton->setFixedSize( QSize( Theme::PLAY_BUTTON_W, Theme::PLAY_BUTTON_H ) );
-            playButton->setIconSize( QSize( Theme::SMALL_GLYPH, Theme::SMALL_GLYPH ) );
+            playButton->setIconSize( QSize( Theme::PLAY_GLYPH, Theme::PLAY_GLYPH ) );
         }
         connect( playButton, &PlayButton::clicked, toolbarActionsMapper, QOverload<>::of(&QSignalMapper::map) );
         toolbarActionsMapper->setMapping( playButton, PLAY_ACTION );
@@ -998,6 +1000,9 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
         controlLayout = new QHBoxLayout( this );
         controlLayout->setContentsMargins( Theme::BAR_MARGIN_LEFT, 0, Theme::BAR_MARGIN_RIGHT, 0 );
         controlLayout->setSpacing( 0 );
+        /* the layout must not hold the window wide: fitToWidth folds the
+         * bar instead, so a narrow window never squeezes controls together */
+        controlLayout->setSizeConstraint( QLayout::SetNoConstraint );
         parseAndCreate( getSettings()->value( toolbarKey( TOOLBAR_MAIN1 ),
                             toolbarDefault( TOOLBAR_MAIN1 ) ).toString(), controlLayout );
         QString line = toolbarLine( getSettings(), TOOLBAR_MAIN2 );
@@ -1033,6 +1038,108 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
 
     controlLayout->addLayout( controlLayout1 );
     controlLayout->addLayout( controlLayout2 );
+}
+
+namespace
+{
+/* the order a narrow bar folds in: level 1 goes first, 0 never goes */
+int foldLevel( int type )
+{
+    switch( type )
+    {
+    case PLAY_BUTTON: case INPUT_SLIDER: case PLAYLIST_BUTTON:
+        return 0;
+    case ROTATE_BUTTON:
+        return 2;
+    case LOOP_BUTTON: case RANDOM_BUTTON:
+        return 3;
+    case AUDIO_TRACKS_BUTTON:
+        return 4;
+    case SUBTITLE_TRACKS_BUTTON:
+        return 5;
+    case EXTENDED_BUTTON:
+        return 6;
+    case VOLUME: case VOLUME_SPECIAL:
+        return 7;
+    case TIME_LABEL_REMAINING:
+        return 8;
+    case PREVIOUS_BUTTON: case NEXT_BUTTON: case SKIP_BACK_BUTTON: case SKIP_FW_BUTTON:
+        return 9;
+    case TIME_LABEL: case TIME_LABEL_ELAPSED:
+        return 10;
+    default:
+        return 1;   /* extras from a customised bar go first */
+    }
+}
+enum { FOLD_LEVELS = 10, MIN_SEEK_WIDTH = 160 };
+}
+
+QSize ControlsWidget::minimumSizeHint() const
+{
+    if( !Theme::redesign() )
+        return AbstractController::minimumSizeHint();
+    /* margins, the play pill, a usable seek bar and the queue button */
+    return QSize( Theme::BAR_MARGIN_LEFT + Theme::BAR_MARGIN_RIGHT + Theme::PLAY_BUTTON_W
+                  + 2 * Theme::BAR_SPACER + MIN_SEEK_WIDTH + Theme::BAR_BUTTON,
+                  Theme::CONTROLBAR_HEIGHT );
+}
+
+void ControlsWidget::resizeEvent( QResizeEvent *e )
+{
+    AbstractController::resizeEvent( e );
+    fitToWidth();
+}
+
+void ControlsWidget::showEvent( QShowEvent *e )
+{
+    AbstractController::showEvent( e );
+    fitToWidth();
+}
+
+void ControlsWidget::fitToWidth()
+{
+    if( fitting || !Theme::redesign() || !controlLayout )
+        return;
+    fitting = true;
+
+    QList<QWidget *> items;
+    foreach( QWidget *w, findChildren<QWidget *>( QString(), Qt::FindDirectChildrenOnly ) )
+        if( w->property( "vlcBarItem" ).isValid() )
+            items << w;
+
+    /* bring back what an earlier, narrower width folded away */
+    foreach( QWidget *w, items )
+        if( w->property( "vlcFolded" ).toBool() )
+        {
+            w->setProperty( "vlcFolded", false );
+            w->setVisible( true );
+        }
+
+    /* the width the bar needs to show what is visible now at its natural
+     * size, with room for a usable seek bar (the layout's own minimum lets
+     * the seek bar vanish and the time labels overlap) */
+    QWidget *slider = NULL;
+    foreach( QWidget *w, items )
+        if( w->property( "vlcBarItem" ).toInt() == INPUT_SLIDER )
+            slider = w;
+    auto needed = [this, slider]() {
+        for( int i = 0; i < controlLayout->count(); i++ )
+            if( QLayout *l = controlLayout->itemAt( i )->layout() )
+                l->invalidate();
+        controlLayout->invalidate();
+        int w = controlLayout->sizeHint().width();
+        if( slider && slider->isVisibleTo( this ) )
+            w += MIN_SEEK_WIDTH - slider->sizeHint().width();
+        return w;
+    };
+    for( int level = 1; level <= FOLD_LEVELS && needed() > width(); level++ )
+        foreach( QWidget *w, items )
+            if( foldLevel( w->property( "vlcBarItem" ).toInt() ) == level && w->isVisibleTo( this ) )
+            {
+                w->setProperty( "vlcFolded", true );
+                w->setVisible( false );
+            }
+    fitting = false;
 }
 
 bool ControlsWidget::advancedAvailable()
@@ -1127,7 +1234,7 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
                                 "#VLCFullscreenBar QToolButton { background: transparent;"
                                 " border: none; border-radius: 6px; }"
                                 "#VLCFullscreenBar QToolButton:hover { background: %2; }"
-                                "#VLCFullscreenBar QToolButton#PlayButton { background: %3; }" )
+                                "#VLCFullscreenBar QToolButton#PlayButton { background: %3; border-radius: 8px; }" )
                        .arg( Theme::colors().controlbar.name(),
                              Theme::colors().elevated.name(),
                              Theme::accent().name() ) );

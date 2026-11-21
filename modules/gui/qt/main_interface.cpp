@@ -186,15 +186,26 @@ protected:
     bool eventFilter( QObject *obj, QEvent *e ) Q_DECL_OVERRIDE
     {
         if( e->type() == QEvent::MouseMove && obj->isWidgetType()
-            && static_cast<QWidget *>( obj )->window() == mi )
+            && static_cast<QWidget *>( obj )->window() == mi && pointerMoved() )
             activity();
         return QObject::eventFilter( obj, e );
     }
 
     void customEvent( QEvent *e ) Q_DECL_OVERRIDE
     {
-        if( e->type() == VoutMouseMovedEvent )
+        if( e->type() == VoutMouseMovedEvent && pointerMoved() )
             activity();
+    }
+
+    /* A bar sliding under a still pointer makes the window system report
+     * motion too; only a pointer that really moved is the user. */
+    bool pointerMoved()
+    {
+        const QPoint p = QCursor::pos();
+        if( p == lastPointer )
+            return false;
+        lastPointer = p;
+        return true;
     }
 
 private:
@@ -304,13 +315,184 @@ private:
     int mode() const { return var_InheritInteger( p_intf, "qt-autohide-controls" ); }
     bool autoHidden = false, peeking = false;
     QPoint peekCursor;
+    QPoint lastPointer;
     QList<vout_thread_t *> vouts;
+};
+
+/*****************************************************************************
+ * ChromeOverlay (redesign)
+ * While a video plays in the window and qt-autohide-controls is Always,
+ * the header and the bar float over the video's top and bottom edges
+ * instead of sitting beside it, so ChromeAutoHider can slide them away
+ * without the video ever changing size. The rail, the sidebar and the
+ * side panels keep clear of them with padding; only the video runs edge
+ * to edge. Anywhere else (library, music, fullscreen, Hide UI) they dock.
+ *****************************************************************************/
+class ChromeOverlay : public QObject
+{
+public:
+    ChromeOverlay( intf_thread_t *_p_intf, MainInterface *_mi )
+        : QObject( _mi ), p_intf( _p_intf ), mi( _mi )
+    {
+        slide = new FrameAnimation( this );
+        slide->setDuration( 240 );
+        connect( slide, &FrameAnimation::valueChanged, this, [this]( const QVariant &v ) {
+            shown = v.toReal();
+            place();
+        } );
+        mi->centralWidget()->installEventFilter( this );
+
+        /* re-decide once things settle, not on every intermediate signal */
+        pending.setSingleShot( true );
+        pending.setInterval( 0 );
+        connect( &pending, &QTimer::timeout, this, [this]() { apply(); } );
+        connect( THEMIM->getIM(), &InputManager::voutListChanged, this,
+                 [this]( vout_thread_t **, int ) { update(); }, Qt::QueuedConnection );
+        connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this,
+                 [this]( int ) { update(); } );
+        connect( THEMIM, &MainInputManager::inputChanged, this, [this]( bool ) { update(); } );
+    }
+
+    bool isOn() const { return on; }
+
+    /* the view changed: decide again, soon */
+    void update() { pending.start(); }
+
+    /* ChromeAutoHider: slide the header and the bar in or out */
+    void slideTo( bool visible )
+    {
+        const qreal target = visible ? 1. : 0.;
+        if( qFuzzyCompare( shown + 1., target + 1. ) && slide->state() != QAbstractAnimation::Running )
+            return;
+        slide->stop();
+        slide->setEasingCurve( visible ? QEasingCurve::OutCubic : QEasingCurve::InOutCubic );
+        slide->setStartValue( shown );
+        slide->setEndValue( target );
+        slide->start();
+    }
+
+    /* recreateToolbars() made a new bar and docked it */
+    void barRecreated()
+    {
+        if( !on )
+            return;
+        mi->mainLayout->removeWidget( mi->controls );
+        floatOver( mi->controls );
+        place();
+    }
+
+protected:
+    bool eventFilter( QObject *o, QEvent *e ) Q_DECL_OVERRIDE
+    {
+        if( on && o == mi->centralWidget() && e->type() == QEvent::Resize )
+            place();
+        return QObject::eventFilter( o, e );
+    }
+
+private:
+    bool wanted( bool needVideo = true ) const
+    {
+        return mi->header && mi->controls
+            && var_InheritInteger( p_intf, "qt-autohide-controls" ) == 2
+            && !mi->b_videoFullScreen && !mi->isFullScreen()
+            && !mi->b_minimalView && !mi->b_libraryMode
+            && mi->videoWidget && mi->stackCentralW->currentWidget() == mi->videoWidget
+            && ( !needVideo || THEMIM->getIM()->hasVideo() );
+    }
+
+    /* a native window of its own, so it can sit above the native video */
+    void floatOver( QWidget *w )
+    {
+        w->setAttribute( Qt::WA_NativeWindow );
+        w->show();
+        w->raise();
+    }
+
+    /* keeps the side columns' content clear of the floating bars */
+    void pad( bool b )
+    {
+        const QMargins m = b ? QMargins( 0, Theme::TITLEBAR_HEIGHT, 0, Theme::CONTROLBAR_HEIGHT )
+                             : QMargins();
+        QList<QWidget *> side;
+        side << mi->rail << mi->sidebar << (QWidget *)mi->adjustDock << (QWidget *)mi->queueDock;
+        foreach( QWidget *w, side )
+            if( w )
+                w->setContentsMargins( m );
+    }
+
+    void apply()
+    {
+        const bool want = wanted();
+        /* the video output goes away for a moment when it is rebuilt (a
+         * new format, the next item): docking then would make the video
+         * jump twice, so give it a little time to come back */
+        if( !want && on && wanted( false ) && THEMIM->getIM()->hasInput() )
+        {
+            if( !videoGone.isValid() )
+                videoGone.start();
+            if( videoGone.elapsed() < VIDEO_GRACE_MS )
+            {
+                QTimer::singleShot( 100, this, [this]() { apply(); } );
+                return;
+            }
+        }
+        videoGone.invalidate();
+        if( want == on )
+            return;
+        on = want;
+        slide->stop();
+        shown = 1.;
+        msg_Dbg( p_intf, "window chrome: %s", on ? "floats over the video" : "docked" );
+        if( on )
+        {
+            mi->mainLayout->removeWidget( mi->header );
+            mi->mainLayout->removeWidget( mi->controls );
+            floatOver( mi->header );
+            floatOver( mi->controls );
+            pad( true );
+            place();
+        }
+        else
+        {
+            pad( false );
+            mi->mainLayout->insertWidget( 0, mi->header );
+            mi->mainLayout->addWidget( mi->controls );
+        }
+    }
+
+    void place()
+    {
+        if( !on )
+            return;
+        QWidget *central = mi->centralWidget();
+        const int w = central->width(), h = central->height();
+        const int hh = Theme::TITLEBAR_HEIGHT, ch = Theme::CONTROLBAR_HEIGHT;
+        mi->header->setGeometry( 0, -qRound( hh * ( 1. - shown ) ), w, hh );
+        mi->controls->setGeometry( 0, h - qRound( ch * shown ), w, ch );
+        mi->header->raise();
+        mi->controls->raise();
+    }
+
+    intf_thread_t *p_intf;
+    MainInterface *mi;
+    FrameAnimation *slide;
+    QTimer pending;
+    QElapsedTimer videoGone;
+    enum { VIDEO_GRACE_MS = 800 };
+    bool on = false;
+    qreal shown = 1.;   /* 1: in view, 0: slid off the edges */
 };
 
 void MainInterface::setChromeVisible( bool b )
 {
     if( !header || b_libraryMode )
         return;
+    if( chromeOverlay && chromeOverlay->isOn() )
+    {
+        /* floating over the video: slide away, nothing resizes */
+        chromeOverlay->slideTo( b );
+        return;
+    }
     header->setVisible( b );
     rail->setVisible( b );
     sidebar->setVisible( b && playlistVisible );
@@ -427,6 +609,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     if( Theme::redesign() )
     {
         autoHider = new ChromeAutoHider( p_intf, this );
+        chromeOverlay = new ChromeOverlay( p_intf, this );
         /* the library scans in the background from the start (P5a) */
         MediaLibrary::instance( p_intf );
     }
@@ -640,7 +823,8 @@ void MainInterface::computeMinimumSize()
 {
     if( Theme::redesign() )
     {
-        setMinimumWidth( 640 );
+        /* the bar folds to fit (ControlsWidget::fitToWidth) */
+        setMinimumWidth( 480 );
         return;
     }
     int minWidth = 80;
@@ -668,6 +852,8 @@ void MainInterface::recreateToolbars()
     {
         mainLayout->addWidget( inputC );
         mainLayout->addWidget( controls );
+        if( chromeOverlay )
+            chromeOverlay->barRecreated();
     }
     else
     {
@@ -954,6 +1140,8 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     {
         mainLayout->addWidget( inputC );
         mainLayout->addWidget( controls );
+        if( chromeOverlay )
+            chromeOverlay->barRecreated();
     }
     else
     {
@@ -1399,6 +1587,8 @@ void MainInterface::setVideoFullScreen( bool fs )
 
     }
     videoWidget->sync();
+    if( chromeOverlay )
+        chromeOverlay->update();
 }
 
 void MainInterface::setHideMouse( bool hide )
@@ -1830,6 +2020,8 @@ void MainInterface::displayNormalView()
 {
     if( autoHider )
         autoHider->reset();
+    if( chromeOverlay )
+        chromeOverlay->update();
     if( header )
     {
         header->setVisible( false );
@@ -1854,6 +2046,8 @@ void MainInterface::setMinimalView( bool b_minimal )
 {
     if( autoHider )
         autoHider->reset();
+    if( chromeOverlay )
+        chromeOverlay->update();
     bool b_menuBarVisible = menuBar()->isVisible();
     bool b_controlsVisible = controls->isVisible();
 #ifndef QT_NO_STATUSBAR
@@ -1931,6 +2125,8 @@ void MainInterface::setLibraryMode( bool on, const QString &section )
     b_libraryMode = on;
     if( autoHider )
         autoHider->reset();
+    if( chromeOverlay )
+        chromeOverlay->update();
     header->setLibraryMode( on );
     if( on )
     {

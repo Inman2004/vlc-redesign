@@ -310,7 +310,7 @@ vlc_module_begin ()
     add_bool( "qt-redesign", true, QT_REDESIGN_TEXT, QT_REDESIGN_LONGTEXT, false )
     add_bool( "qt-redesign-frameless", true, QT_REDESIGN_FRAMELESS_TEXT,
               QT_REDESIGN_FRAMELESS_LONGTEXT, false )
-    add_integer( "qt-autohide-controls", 1, QT_AUTOHIDE_TEXT, QT_AUTOHIDE_LONGTEXT, false )
+    add_integer( "qt-autohide-controls", 2, QT_AUTOHIDE_TEXT, QT_AUTOHIDE_LONGTEXT, false )
         change_integer_list( i_autohide_list, psz_autohide_list_text )
     add_string( "qt-library-roots", "", QT_LIBRARY_ROOTS_TEXT, QT_LIBRARY_ROOTS_LONGTEXT, false )
     add_bool( "qt-seek-preview", true, QT_SEEK_PREVIEW_TEXT, QT_SEEK_PREVIEW_LONGTEXT, false )

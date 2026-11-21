@@ -139,6 +139,9 @@ FrameGrabber::FrameGrabber( intf_thread_t *_p_intf, QSize _maxSize, QObject *par
     host = static_cast<vlc_object_t *>( vlc_object_create( p_intf, sizeof( vlc_object_t ) ) );
     if( host )
     {
+        /* a background job: a file it can't open must never pop the
+         * "Your input can't be opened" dialog (inputs inherit this flag) */
+        host->obj.flags |= OBJECT_FLAGS_NOINTERACT;
         var_Create( host, "vmem-setup", VLC_VAR_ADDRESS );
         var_SetAddress( host, "vmem-setup", (void *)setupCb );
         var_Create( host, "vmem-lock", VLC_VAR_ADDRESS );
@@ -200,6 +203,7 @@ bool FrameGrabber::grab( const QString &uri, double seconds, double fraction )
         return false;
     }
     static const char *const options[] = {
+        ":no-interact",
         ":vout=vmem", ":no-audio", ":no-spu", ":no-osd", ":no-video-title-show",
         ":no-sub-autodetect-file", ":input-fast-seek", ":no-stats",
         ":video-filter=", ":sub-source=",

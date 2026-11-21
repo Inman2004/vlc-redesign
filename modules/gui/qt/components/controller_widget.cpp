@@ -256,8 +256,8 @@ void PlayButton::updateButtonIcons( bool b_playing )
         /* dark glyph on the accent pill */
         QIcon ic;
         const QString name = b_playing ? "pause" : "play";
-        ic.addPixmap( Theme::pixmap( name, Theme::SMALL_GLYPH, QColor( "#1B1B1B" ) ) );
-        ic.addPixmap( Theme::pixmap( name, Theme::SMALL_GLYPH, QColor( "#1B1B1B" ) ),
+        ic.addPixmap( Theme::pixmap( name, Theme::PLAY_GLYPH, QColor( "#1B1B1B" ) ) );
+        ic.addPixmap( Theme::pixmap( name, Theme::PLAY_GLYPH, QColor( "#1B1B1B" ) ),
                       QIcon::Disabled );
         setIcon( ic );
     }

@@ -60,6 +60,7 @@ class SidebarPanel;
 class AdjustDock;
 class QueueDock;
 class ChromeAutoHider;
+class ChromeOverlay;
 class LibraryView;
 class QSplitter;
 struct vout_window_t;
@@ -168,10 +169,13 @@ protected:
     QueueDock           *queueDock = NULL;   /* P5d: Queue / Bookmarks / Chapters */
     /* redesign: windowed auto-hide ("Always") and the I-key peek in Hide UI */
     ChromeAutoHider     *autoHider = NULL;
+    /* redesign: header and bar float over a playing video (see ChromeOverlay) */
+    ChromeOverlay       *chromeOverlay = NULL;
     /* redesign: the library window state (P5a) */
     LibraryView         *libraryView = NULL;
     bool                 b_libraryMode = false;
     friend class ChromeAutoHider;
+    friend class ChromeOverlay;
     void setChromeVisible( bool );
     /* the video goes into the library's mini player while it is shown */
     void placeVideo();
