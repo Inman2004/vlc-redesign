@@ -355,6 +355,10 @@ public:
 
     bool isOn() const { return on; }
 
+    /* a side panel built after the bars started floating needs the
+     * same padding as the rest, or its top hides under the title bar */
+    void repad() { if( on ) pad( true ); }
+
     /* the view changed: decide again, soon */
     void update() { pending.start(); }
 
@@ -1749,6 +1753,8 @@ void MainInterface::setQueuePanelVisible( bool b, bool animate )
             return;
         queueDock = new QueueDock( p_intf, body );
         static_cast<QHBoxLayout *>( body->layout() )->addWidget( queueDock );
+        if( chromeOverlay )
+            chromeOverlay->repad();
         connect( queueDock->panel(), &QueuePanel::closeRequested, this,
                  [this]() { setQueuePanelVisible( false ); } );
     }
@@ -1783,6 +1789,8 @@ void MainInterface::setAdjustPanelVisible( bool b, bool animate )
         /* built on first use: it creates every effect widget */
         adjustDock = new AdjustDock( p_intf, body );
         static_cast<QHBoxLayout *>( body->layout() )->addWidget( adjustDock );
+        if( chromeOverlay )
+            chromeOverlay->repad();
         connect( adjustDock->panel(), &AdjustPanel::closeRequested, this,
                  [this]() { setAdjustPanelVisible( false ); } );
     }

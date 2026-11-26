@@ -59,6 +59,8 @@ struct LibraryEntry
     qreal progress = 0.0;
     qint64 date = 0;        /* newest file date, for sorting */
     int track = -1;         /* inside a named playlist: its position */
+    QString image;          /* a picture URL (a Live TV channel's logo) */
+    QString glyphText;      /* glyph tiles: text instead of the icon (a flag) */
 };
 
 /* Where we are (videos > shows > The Wand > S01), the history, the search
@@ -114,6 +116,8 @@ signals:
     void played( const QString &first );
     /* an action row that is not handled here ("netstream", "podcast"...) */
     void actionRequested( const QString &key );
+    /* a picture of the current entries arrived (a channel logo) */
+    void artChanged();
 
 private:
     QVector<LibraryEntry> collect() const;
@@ -121,6 +125,10 @@ private:
     QVector<LibraryEntry> recentEntries() const;
     QVector<LibraryEntry> musicEntries() const;
     QVector<LibraryEntry> playlistEntries() const;
+    /* Network > Live TV: iptv-org's public channel lists */
+    QVector<LibraryEntry> liveTvEntries() const;
+    void watchLiveTv();
+    bool liveTvWatched = false;
     void showPlaylistMenu( const QString &file, const QPoint &, QWidget *parent );
     void addToPlaylistMenu( QMenu *, const QStringList &uris, QWidget *parent );
     static QString shelfTitle( const QString &key );

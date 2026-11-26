@@ -25,6 +25,10 @@
 
 #include "external.hpp"
 #include "errors.hpp"
+#include "styles/vlc_theme.hpp"
+#include "util/bookmarks.hpp"      /* Bookmarks::osd */
+
+#include <vlc_playlist.h>
 
 #include <assert.h>
 
@@ -176,8 +180,35 @@ void DialogHandler::updateProgress(vlc_dialog_id *p_id, float f_value,
         p_wrapper->updateProgress(f_value, text);
 }
 
+/* items in the queue, stopping at two */
+static int queuedItems( playlist_item_t *node, int found = 0 )
+{
+    for( int i = 0; i < node->i_children && found < 2; i++ )
+        found = node->pp_children[i]->i_children >= 0
+              ? queuedItems( node->pp_children[i], found ) : found + 1;
+    return found;
+}
+
 void DialogHandler::displayError(const QString &title, const QString &text)
 {
+    /* A dead stream in a channel list (IPTV) is routine: VLC moves on to
+     * the next one, so say so over the player instead of stacking up the
+     * Errors window. Files, and a stream played on its own, still get it.
+     * The details stay in the log either way. */
+    if( Theme::redesign() && title == qtr( "Your input can't be opened" )
+     && text.contains( "://" ) && !text.contains( "file://" ) )
+    {
+        playlist_t *pl = THEPL;
+        playlist_Lock( pl );
+        const int n = queuedItems( pl->p_playing );
+        playlist_Unlock( pl );
+        if( n > 1 )
+        {
+            msg_Warn( p_intf, "%s: %s", qtu( title ), qtu( text ) );
+            Bookmarks::osd( p_intf, qtr( "Stream unavailable, trying the next one" ) );
+            return;
+        }
+    }
     ErrorsDialog::getInstance (p_intf)->addError(title, text);
 }
 

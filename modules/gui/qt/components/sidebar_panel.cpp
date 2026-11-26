@@ -388,7 +388,8 @@ void SidebarPanel::showSection( const QString &key )
         const bool ordered = key == "home" || key == "recents";
         sortBtn->setEnabled( browse && !ordered );
         viewBtn->setEnabled( browse && key != "home" );
-        searchBtn->setEnabled( browse );
+        /* Network: for Live TV's long lists (countries) */
+        searchBtn->setEnabled( browse || key == "network" );
         browser->openSection( key == "recents" ? QString( "recent" ) : key );
         return;
     }

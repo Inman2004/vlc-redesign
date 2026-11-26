@@ -172,6 +172,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/key_map.cpp gui/qt/util/key_map.hpp \
 	gui/qt/util/qt_compat.cpp gui/qt/util/qt_compat.hpp \
 	gui/qt/util/frame_animation.cpp gui/qt/util/frame_animation.hpp \
+	gui/qt/util/iptv_catalog.cpp gui/qt/util/iptv_catalog.hpp \
 	gui/qt/util/subtitle_timeline.cpp gui/qt/util/subtitle_timeline.hpp \
 	gui/qt/util/bookmarks.cpp gui/qt/util/bookmarks.hpp \
 	gui/qt/components/settings_controls.cpp gui/qt/components/settings_controls.hpp \
@@ -209,6 +210,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/adjust_panel.moc.cpp \
 	gui/qt/util/redesign_widgets.moc.cpp \
 	gui/qt/util/frame_animation.moc.cpp \
+	gui/qt/util/iptv_catalog.moc.cpp \
 	gui/qt/util/seek_preview.moc.cpp \
 	gui/qt/util/frame_grabber.moc.cpp \
 	gui/qt/util/audio_scanner.moc.cpp \
@@ -552,6 +554,9 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/remove.svg \
 	gui/qt/pixmaps/redesign/album.svg \
 	gui/qt/pixmaps/redesign/genre.svg \
+	gui/qt/pixmaps/redesign/tv.svg \
+	gui/qt/pixmaps/redesign/globe.svg \
+	gui/qt/pixmaps/redesign/language.svg \
 	gui/qt/pixmaps/redesign/back-15.svg \
 	gui/qt/pixmaps/redesign/forward-15.svg \
 	gui/qt/pixmaps/redesign/home-active.svg \

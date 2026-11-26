@@ -21,6 +21,7 @@
 #endif
 
 #include "library/library_view.hpp"
+#include "util/iptv_catalog.hpp"
 #include "util/qt_compat.hpp"
 #include "library/library_browser.hpp"
 #include "library/media_library.hpp"
@@ -368,6 +369,8 @@ int LibraryGrid::entryAt( const QPoint &pos ) const
 /* the item's thumbnail scaled to cover the size, cached per size */
 QPixmap LibraryGrid::thumbnail( const LibraryEntry &e, const QSize &size )
 {
+    if( !e.image.isEmpty() )        /* a Live TV channel's logo */
+        return IptvCatalog::instance( p_intf )->logo( e.image, size, devicePixelRatioF() );
     const int i = lib->indexOf( e.thumbFrom );
     if( i < 0 )
         return QPixmap();
@@ -655,12 +658,23 @@ void LibraryGrid::paintShelfEntry( QPainter &p, int i, const QRect &rr, const QF
     p.setClipPath( clip );
     const bool glyphTile = e.tile == LibraryEntry::TILE_GLYPH;
     p.fillRect( thumbRect, glyphTile ? SHELF_GLYPH_BG : SHELF_TILE );
-    const QPixmap pm = glyphTile ? QPixmap() : thumbnail( e, thumbRect.size() );
+    const QPixmap pm = glyphTile && e.image.isEmpty() ? QPixmap() : thumbnail( e, thumbRect.size() );
     if( !pm.isNull() )
         p.drawPixmap( thumbRect, pm );
+    else if( glyphTile && !e.glyphText.isEmpty() )
+    {
+        /* a country's code, until its flag has downloaded */
+        p.save();
+        QFont ff = p.font();
+        ff.setPixelSize( thumbRect.height() / 4 );
+        p.setFont( ff );
+        p.setPen( Theme::colors().icon );
+        p.drawText( thumbRect, Qt::AlignCenter, e.glyphText );
+        p.restore();
+    }
     else
     {
-        const QString glyph = glyphTile ? e.icon
+        const QString glyph = glyphTile || ( e.type == LibraryEntry::ACTION && !e.icon.isEmpty() ) ? e.icon
                             : e.type == LibraryEntry::GROUP ? "album" : ( audio ? "music" : "video" );
         const QColor gc = glyphTile ? Theme::colors().icon : QColor( 0x3A, 0x3A, 0x3A );
         p.drawPixmap( QRect( thumbRect.center() - QPoint( SHELF_GLYPH / 2 - 1, SHELF_GLYPH / 2 - 1 ),
@@ -826,6 +840,7 @@ LibraryView::LibraryView( intf_thread_t *_p_intf, QWidget *parent )
     connect( lib, &MediaLibrary::thumbnailReady, grid, &LibraryGrid::refreshThumbnail );
     connect( browser, &LibraryBrowser::locationChanged, this, &LibraryView::locationChanged );
     connect( browser, &LibraryBrowser::entriesChanged, this, &LibraryView::entriesChanged );
+    connect( browser, &LibraryBrowser::artChanged, grid->viewport(), QOverload<>::of( &QWidget::update ) );
     connect( browser, &LibraryBrowser::played, this, [this]( const QString &first ) {
         grid->setPlayingPath( first );
         /* the playlist chip names where playback came from */
@@ -1088,6 +1103,18 @@ void LibraryView::placeMini()
     mini->move( x, height() - mini->height() - 6 );
     mini->show();
     mini->raise();
+}
+
+/* Ctrl+F is also VLC's Open Folder: inside the library it is the search */
+bool LibraryView::event( QEvent *e )
+{
+    if( e->type() == QEvent::ShortcutOverride
+     && static_cast<QKeyEvent *>( e )->matches( QKeySequence::Find ) )
+    {
+        e->accept();
+        return true;
+    }
+    return QWidget::event( e );
 }
 
 void LibraryView::keyPressEvent( QKeyEvent *e )

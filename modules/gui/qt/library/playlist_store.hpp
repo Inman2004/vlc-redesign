@@ -37,6 +37,12 @@ struct SavedPlaylist
     QString title;
     QString image;          /* picture URI, may be empty */
     QStringList uris;
+    /* per track, parallel to uris (empty when unknown): a name, a picture
+     * (a channel logo) and VLC input options (#EXTVLCOPT, like an IPTV
+     * channel's http-referrer), so channel lists survive a save */
+    QStringList titles;
+    QStringList images;
+    QList<QStringList> options;
     int plays = 0;
     qint64 lastPlayed = 0;
 };
@@ -55,6 +61,10 @@ public:
 
     /* returns the new file, empty on failure */
     QString create( const QString &title, const QStringList &uris );
+    /* the same, keeping each track's name, picture and options */
+    QString create( const SavedPlaylist &tracks );
+    /* the play queue as a playlist (names, pictures and options kept) */
+    static SavedPlaylist fromQueue( intf_thread_t * );
     bool append( const QString &file, const QStringList &uris );
     bool removeTrack( const QString &file, int track );
     bool rename( const QString &file, const QString &title );

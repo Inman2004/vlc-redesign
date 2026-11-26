@@ -30,6 +30,8 @@
 #include <QWidget>
 
 class QButtonGroup;
+class QLineEdit;
+class QTimer;
 class QLabel;
 class QListView;
 class QListWidget;
@@ -53,8 +55,9 @@ public:
     PLModel *plModel() const { return model; }
     void removeSelected();
     void showSortMenu( const QPoint &globalPos );
-    /* "4 items - 2h 3m" */
-    static QString summary( intf_thread_t * );
+    /* "4 items - 2h 3m" ("11,512 items" when most have no length, like
+     * live channels); with a search, "12 of 11,512" */
+    static QString summary( intf_thread_t *, int shown = -1 );
 
 signals:
     void changed();
@@ -89,6 +92,7 @@ signals:
     void closeRequested();
 
 protected:
+    bool event( QEvent * ) override;
     void keyPressEvent( QKeyEvent * ) override;
     bool eventFilter( QObject *, QEvent * ) override;
 
@@ -104,6 +108,11 @@ private:
     void refreshBookmarks();
     void refreshChapters();
     void showSortMenu();
+    /* the search row under the header: filters the queue as you type */
+    void setSearchVisible( bool );
+    void applySearch();
+    /* the queue as a named playlist (names, logos, options kept) */
+    void saveQueue();
 
     intf_thread_t *p_intf;
     QWidget *tabBar;
@@ -115,7 +124,10 @@ private:
     PLModel *model;
     QueueList *queueView;
     QLabel *queueCount, *bookmarkCount, *chapterCount;
-    QToolButton *sortBtn, *repeatBtn, *shuffleBtn;
+    QToolButton *sortBtn, *repeatBtn, *shuffleBtn, *searchBtn = NULL;
+    QWidget *searchRow = NULL;
+    QLineEdit *searchEdit = NULL;
+    QTimer *searchTimer = NULL;
     QListWidget *bookmarkList, *chapterList;
     SeekPoints *chapters;
 };

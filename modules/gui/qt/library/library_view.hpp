@@ -134,6 +134,7 @@ signals:
     void played();
 
 protected:
+    bool event( QEvent * ) override;
     void keyPressEvent( QKeyEvent * ) override;
     void resizeEvent( QResizeEvent * ) override;
 

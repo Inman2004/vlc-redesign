@@ -540,6 +540,8 @@ static QString buildStyleSheet()
     " { color: @muted; }\n"
     "#VLCQueue QWidget#QueueTabLine { background: @accent; }\n"
     "#VLCQueue QLabel#QueueCount { color: #6B6B6B; font-size: 14px; background: transparent; }\n"
+    "#VLCQueue QLineEdit#QueueSearch { background: @track; border: none; border-radius: 6px;"
+    "  color: @text; font-size: 14px; padding: 0 6px; selection-background-color: @accentSoft; }\n"
     "#VLCQueue QListView, #VLCQueue QListWidget { background: transparent; border: none; outline: 0; }\n"
     "#VLCAdjust { background: @adjBg; border-radius: 8px; }\n"
     "#VLCAdjust QScrollArea#AdjustScroll, #VLCAdjust QWidget#AdjustPage { background: transparent; border: none; }\n"

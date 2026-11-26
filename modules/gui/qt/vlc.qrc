@@ -109,6 +109,9 @@
         <file alias="remove.svg">pixmaps/redesign/remove.svg</file>
         <file alias="album.svg">pixmaps/redesign/album.svg</file>
         <file alias="genre.svg">pixmaps/redesign/genre.svg</file>
+        <file alias="tv.svg">pixmaps/redesign/tv.svg</file>
+        <file alias="globe.svg">pixmaps/redesign/globe.svg</file>
+        <file alias="language.svg">pixmaps/redesign/language.svg</file>
         <file alias="back-15.svg">pixmaps/redesign/back-15.svg</file>
         <file alias="forward-15.svg">pixmaps/redesign/forward-15.svg</file>
         <file alias="home-active.svg">pixmaps/redesign/home-active.svg</file>

@@ -29,6 +29,7 @@
 #include "input_manager.hpp"
 #include "styles/vlc_theme.hpp"
 #include "util/bookmarks.hpp"
+#include "library/playlist_store.hpp"
 
 #include <vlc_playlist.h>
 #include <vlc_input.h>
@@ -39,6 +40,10 @@
 #include <QUrl>
 #include <QEvent>
 #include <QHBoxLayout>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QLocale>
+#include <QTimer>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListView>
@@ -120,6 +125,16 @@ public:
         QString d = dur.data( Qt::DisplayRole ).toString();
         if( d == "--:--" )
             d.clear();
+        if( d.isEmpty() )
+        {
+            /* no length (a live channel): its group from the playlist,
+             * like "News", in that column instead */
+            const QModelIndex grp = index.sibling( index.row(), VLCModel::columnFromMeta( COLUMN_ALBUM ) );
+            QString g = grp.data( Qt::DisplayRole ).toString();
+            if( g.compare( "Undefined", Qt::CaseInsensitive ) == 0 )
+                g.clear();          /* iptv-org's "no category" */
+            d = fm.elidedText( g.replace( ';', ", " ), Qt::ElideRight, r.width() / 3 );
+        }
         const int dw = d.isEmpty() ? 0 : QtCompat::textWidth( fm, d );
         p->setPen( current ? Theme::accent() : QColor( 0x6B, 0x6B, 0x6B ) );
         p->drawText( QRect( r.right() - rightInset - dw, r.top(), dw + 1, r.height() ),
@@ -350,6 +365,9 @@ QWidget *QueuePanel::buildQueuePage()
 
     QWidget *header = headerRow( &queueCount );
     QHBoxLayout *h = static_cast<QHBoxLayout *>( header->layout() );
+    searchBtn = headerButton( header, "search", qtr( "Search the queue (Ctrl+F)" ) );
+    searchBtn->setCheckable( true );
+    QToolButton *saveBtn = headerButton( header, "save", qtr( "Save the queue as a playlist" ) );
     sortBtn = headerButton( header, "sort", qtr( "Sort" ) );
     repeatBtn = headerButton( header, "repeat", qtr( "Repeat" ) );
     shuffleBtn = headerButton( header, "shuffle", qtr( "Shuffle" ) );
@@ -357,9 +375,32 @@ QWidget *QueuePanel::buildQueuePage()
     QToolButton *addBtn = headerButton( header, "add", qtr( "Add to the queue" ) );
     repeatBtn->setCheckable( true );
     shuffleBtn->setCheckable( true );
-    foreach( QToolButton *b, QList<QToolButton *>() << sortBtn << repeatBtn << shuffleBtn << removeBtn << addBtn )
+    foreach( QToolButton *b, QList<QToolButton *>() << searchBtn << saveBtn << sortBtn << repeatBtn
+                                                     << shuffleBtn << removeBtn << addBtn )
         h->addWidget( b );
     v->addWidget( header );
+
+    searchRow = new QWidget( page );
+    QHBoxLayout *sr = new QHBoxLayout( searchRow );
+    sr->setContentsMargins( INSET - 9, 0, RIGHT_INSET - 9, 8 );
+    searchEdit = new QLineEdit( searchRow );
+    searchEdit->setObjectName( "QueueSearch" );
+    searchEdit->setPlaceholderText( qtr( "Search the queue" ) );
+    searchEdit->setClearButtonEnabled( true );
+    searchEdit->setFixedHeight( 32 );
+    searchEdit->addAction( QIcon( Theme::pixmap( "search", 16, Theme::colors().icon ) ),
+                           QLineEdit::LeadingPosition );
+    searchEdit->installEventFilter( this );
+    sr->addWidget( searchEdit );
+    searchRow->hide();
+    v->addWidget( searchRow );
+    searchTimer = new QTimer( this );
+    searchTimer->setSingleShot( true );
+    searchTimer->setInterval( 250 );    /* thousands of channels: not on every key */
+    connect( searchTimer, &QTimer::timeout, this, &QueuePanel::applySearch );
+    connect( searchEdit, &QLineEdit::textChanged, searchTimer, QOverload<>::of( &QTimer::start ) );
+    connect( searchBtn, &QToolButton::clicked, this, [this]( bool on ) { setSearchVisible( on ); } );
+    connect( saveBtn, &QToolButton::clicked, this, &QueuePanel::saveQueue );
 
     queueView = new QueueList( p_intf, page, INSET, NAME_X, RIGHT_INSET );
     model = queueView->plModel();
@@ -377,39 +418,93 @@ QWidget *QueuePanel::buildQueuePage()
 }
 
 /* the queue's count and length: every item under VLC's playing node */
-static void sumItems( playlist_item_t *node, int &count, qint64 &length )
+static void sumItems( playlist_item_t *node, int &count, int &timed, qint64 &length )
 {
     for( int i = 0; i < node->i_children; i++ )
     {
         playlist_item_t *c = node->pp_children[i];
         if( c->i_children >= 0 )
-            sumItems( c, count, length );
+            sumItems( c, count, timed, length );
         else
         {
             count++;
             const qint64 d = input_item_GetDuration( c->p_input );
             if( d > 0 )
+            {
                 length += d;
+                timed++;
+            }
         }
     }
 }
 
-QString QueueList::summary( intf_thread_t *p_intf )
+QString QueueList::summary( intf_thread_t *p_intf, int shown )
 {
-    int count = 0;
+    int count = 0, timed = 0;
     qint64 length = 0;
     playlist_Lock( THEPL );
-    sumItems( THEPL->p_playing, count, length );
+    sumItems( THEPL->p_playing, count, timed, length );
     playlist_Unlock( THEPL );
-    QString text = count == 1 ? qtr( "1 item" ) : qtr( "%1 items" ).arg( count );
-    if( length > 0 )
+    const QLocale loc;
+    if( shown >= 0 )
+        return qtr( "%1 of %2" ).arg( loc.toString( shown ), loc.toString( count ) );
+    QString text = count == 1 ? qtr( "1 item" ) : qtr( "%1 items" ).arg( loc.toString( count ) );
+    /* a total only means something when (nearly) every item has a length:
+     * live channels have none, and a channel's few seconds of buffered
+     * stream are not its length */
+    if( length > 0 && timed * 10 >= count * 9 )
         text += " - " + span( length );
     return text;
 }
 
 void QueuePanel::updateQueueHeader()
 {
-    queueCount->setText( QueueList::summary( p_intf ) );
+    const bool searching = searchEdit && !searchEdit->text().trimmed().isEmpty();
+    queueCount->setText( QueueList::summary( p_intf, searching ? model->rowCount() : -1 ) );
+}
+
+void QueuePanel::setSearchVisible( bool b )
+{
+    searchBtn->setChecked( b );
+    searchRow->setVisible( b );
+    if( b )
+    {
+        searchEdit->setFocus( Qt::ShortcutFocusReason );
+        searchEdit->selectAll();
+    }
+    else if( !searchEdit->text().isEmpty() )
+    {
+        /* hiding the row ends the search: the whole queue comes back */
+        searchEdit->clear();
+        searchTimer->stop();
+        applySearch();
+    }
+}
+
+void QueuePanel::applySearch()
+{
+    /* VLC's own live search: matches title, artist and album (an IPTV
+     * channel's group), and hides the rest of the queue */
+    model->filter( searchEdit->text().trimmed(), QModelIndex(), true );
+    updateQueueHeader();
+    const QModelIndex cur = model->currentIndex();
+    if( cur.isValid() )
+        queueView->scrollTo( cur.sibling( cur.row(), queueView->modelColumn() ) );
+}
+
+void QueuePanel::saveQueue()
+{
+    SavedPlaylist p = PlaylistStore::fromQueue( p_intf );
+    if( p.uris.isEmpty() )
+        return;
+    bool ok = false;
+    const QString name = QInputDialog::getText( this, qtr( "Save as Playlist" ), qtr( "Name" ),
+                                                QLineEdit::Normal, QString(), &ok ).trimmed();
+    if( !ok || name.isEmpty() )
+        return;
+    p.title = name;
+    if( PlaylistStore::instance( p_intf )->create( p ).isEmpty() )
+        msg_Warn( p_intf, "could not save the queue as playlist %s", qtu( name ) );
 }
 
 void QueuePanel::updateModes()
@@ -661,7 +756,54 @@ bool QueuePanel::eventFilter( QObject *o, QEvent *e )
 {
     if( o == tabBar && ( e->type() == QEvent::Resize || e->type() == QEvent::Show ) )
         placeUnderline( false );
+    if( o == searchEdit && e->type() == QEvent::KeyPress )
+    {
+        QKeyEvent *k = static_cast<QKeyEvent *>( e );
+        switch( k->key() )
+        {
+        case Qt::Key_Escape:            /* clears, then closes the search */
+            if( !searchEdit->text().isEmpty() )
+                searchEdit->clear();
+            else
+            {
+                setSearchVisible( false );
+                queueView->setFocus();
+            }
+            return true;
+        case Qt::Key_Return:
+        case Qt::Key_Enter:             /* plays the first match */
+            searchTimer->stop();
+            applySearch();
+            if( model->rowCount() > 0 )
+            {
+                const QModelIndex first = static_cast<QAbstractItemModel *>( model )->index( 0, queueView->modelColumn() );
+                model->activateItem( first );
+            }
+            return true;
+        case Qt::Key_Down:              /* into the results */
+            if( model->rowCount() > 0 )
+            {
+                queueView->setFocus();
+                queueView->setCurrentIndex( static_cast<QAbstractItemModel *>( model )->index( 0, queueView->modelColumn() ) );
+            }
+            return true;
+        default:
+            break;
+        }
+    }
     return QWidget::eventFilter( o, e );
+}
+
+/* Ctrl+F is also VLC's Open Folder: inside the panel it is the search */
+bool QueuePanel::event( QEvent *e )
+{
+    if( e->type() == QEvent::ShortcutOverride
+     && static_cast<QKeyEvent *>( e )->matches( QKeySequence::Find ) )
+    {
+        e->accept();
+        return true;
+    }
+    return QWidget::event( e );
 }
 
 void QueuePanel::keyPressEvent( QKeyEvent *e )
@@ -674,6 +816,12 @@ void QueuePanel::keyPressEvent( QKeyEvent *e )
     if( e->key() == Qt::Key_Tab && ( e->modifiers() & Qt::ControlModifier ) )
     {
         setCurrentTab( ( stack->currentIndex() + 1 ) % TAB_COUNT );
+        return;
+    }
+    if( e->matches( QKeySequence::Find ) )
+    {
+        setCurrentTab( QUEUE_TAB );
+        setSearchVisible( true );
         return;
     }
     QWidget::keyPressEvent( e );

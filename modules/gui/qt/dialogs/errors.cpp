@@ -26,6 +26,7 @@
 #endif
 
 #include "dialogs/errors.hpp"
+#include "styles/vlc_theme.hpp"
 
 #include <QTextCursor>
 #include <QTextEdit>
@@ -76,9 +77,13 @@ void ErrorsDialog::addError( const QString& title, const QString& text )
 void ErrorsDialog::add( bool error, const QString& title, const QString& text )
 {
     messages->textCursor().movePosition( QTextCursor::End );
-    messages->setTextColor( error ? "red" : "yellow" );
+    /* the details in the theme's text colour: black was unreadable on the
+     * dark theme */
+    const bool themed = Theme::redesign();
+    messages->setTextColor( error ? ( themed ? QColor( 0xE5, 0x5B, 0x4D ) : QColor( "red" ) )
+                                  : QColor( "yellow" ) );
     messages->insertPlainText( title + QString( ":\n" ) );
-    messages->setTextColor( "black" );
+    messages->setTextColor( themed ? Theme::colors().text : QColor( "black" ) );
     messages->insertPlainText( text + QString( "\n" ) );
     messages->ensureCursorVisible();
     if ( var_InheritBool( p_intf, "qt-error-dialogs" ) )
