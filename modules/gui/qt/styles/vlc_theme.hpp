@@ -78,7 +78,7 @@ enum
     SEEK_HANDLE_H     = 24,
     PLAY_BUTTON_W     = 60,   /* bigger than Figma's 54x28: an easier target */
     PLAY_BUTTON_H     = 36,
-    PLAY_GLYPH        = 20,
+    PLAY_GLYPH        = 32,   /* the play/pause art fills a third of its box */
     BAR_BUTTON        = 32,   /* hit target of a control-bar icon button */
     BAR_GLYPH         = 24,   /* stroke icons are drawn on a 24px grid */
     SMALL_GLYPH       = 14,
