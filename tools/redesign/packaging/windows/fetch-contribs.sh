@@ -31,11 +31,12 @@ if ! zstd -q -t "$ARCHIVE" 2>/dev/null; then
         want=$(( end - start + 1 ))
         part=$CACHE/part.$i
         (
-            for try in 1 2 3 4 5 6 7 8; do
+            # a connection the server stops feeding is dropped after 30s and resumed
+            for try in 1 2 3 4 5 6 7 8 9 10 11 12; do
                 have=$(stat -c %s "$part" 2>/dev/null || echo 0)
                 [ "$have" -eq "$want" ] && exit 0
                 [ "$have" -gt "$want" ] && { rm -f "$part"; have=0; }
-                curl -s --http1.1 --retry 3 -r $(( start + have ))-$end "$URL" >> "$part" || true
+                curl -s --http1.1 --retry 3 --speed-limit 1024 --speed-time 30 -r $(( start + have ))-$end "$URL" >> "$part" || true
             done
             echo "part $i incomplete" >&2; exit 1
         ) &
