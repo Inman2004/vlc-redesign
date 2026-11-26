@@ -75,6 +75,7 @@ struct IptvChannel
 {
     QString title;
     QString url;
+    QString id;             /* tvg-id ("MakkalTV.in@SD"), may be empty */
     QString logo;           /* tvg-logo, may be empty */
     QString group;          /* group-title ("News;Public") */
     QStringList options;    /* #EXTVLCOPT lines (untrusted) */
@@ -99,8 +100,9 @@ public:
     QVector<IptvList> countries() const { return ctrs; }
 
     /* curated lists of Tamil and Indian channels, kept by their authors
-     * on GitHub (path: "featured/<id>") */
-    QVector<IptvList> featured() const;
+     * on GitHub (path: "featured/<id>"); with a home, the ones shown in
+     * that iptv-org list ("languages/tam", "countries/in") */
+    QVector<IptvList> featured( const QString &home = QString() ) const;
 
     /* Radio Browser (radio-browser.info): station counts by language and
      * country, fetched once a day */
@@ -117,8 +119,15 @@ public:
      * (channelsReady follows), or after a failure (*failed set) */
     QVector<IptvChannel> channels( const QString &path, bool *loading = NULL,
                                    bool *failed = NULL );
-    /* replaces the queue with the list, playing from channel `from` */
+    /* plays channel `from` of the list, with the list as the queue: a
+     * jump when the queue already is that list, else the queue is
+     * replaced without stopping the player first */
     void play( const QString &path, int from );
+    /* the queue is a channel list from here and one of its channels is
+     * playing: it stays on that channel (no moving on to the next one
+     * when it fails or drops) and the window keeps its size from channel
+     * to channel */
+    static bool liveQueue();
 
     /* a channel logo, fitted into size; null until it has downloaded
      * (logoReady follows). Only http(s) URLs are fetched. */
@@ -139,6 +148,11 @@ private:
     QVector<IptvList> parseRadioLists( const QByteArray &, bool countries ) const;
     void fetch( const QString &url, int maxBytes, std::function<void( const QByteArray & )> done );
     void pumpLogos();
+    QVector<IptvChannel> visible( const QString &path ) const;
+    void loadMainLanguages();
+    void parseFeeds( const QByteArray & );
+    void inputChanged();
+    void stopAfterItem( bool );
 
     intf_thread_t *p_intf;
     QString cacheDir;
@@ -152,6 +166,18 @@ private:
     QStringList logoQueue;
     int logoJobs = 0;
     QList<IptvFetch *> jobs;
+
+    /* a multilingual feed's main language ("MoviesNow.in@HD" -> "eng"),
+     * from iptv-org's feeds: its language lists also hold every channel
+     * with a second audio language, which are left out */
+    QHash<QString, QString> mainLang;
+    bool mainLangLoaded = false, mainLangFetching = false;
+
+    /* the queue played from a list */
+    QSet<QString> queuedUrls;
+    QString queuedPath;
+    bool live = false;
+    int leftover = -1;              /* the old queue's playing item, until replaced */
 };
 
 #endif

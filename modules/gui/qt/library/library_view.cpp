@@ -455,9 +455,35 @@ void LibraryGrid::paintEvent( QPaintEvent * )
         if( glyphRow || ( e.type == LibraryEntry::ACTION && compact ) )
         {
             const QColor fg = i == hovered ? Theme::colors().text : Theme::colors().icon;
-            p.drawPixmap( QRect( rr.left() + SIDE_ICON_X, rr.center().y() - SIDE_ICON / 2 + 1,
-                                 SIDE_ICON, SIDE_ICON ),
-                          Theme::pixmap( e.icon.isEmpty() ? QString( "folder" ) : e.icon, SIDE_ICON, fg ) );
+            /* a Live TV channel's logo or a country's flag, a little
+             * larger than the glyph it replaces, centred on it */
+            const int logo = SIDE_ICON + 8;
+            const QRect logoRect( rr.left() + SIDE_ICON_X - 4, rr.center().y() - logo / 2 + 1, logo, logo );
+            const QPixmap pm = e.image.isEmpty() ? QPixmap() : thumbnail( e, logoRect.size() );
+            if( !pm.isNull() )
+            {
+                QPainterPath clip;
+                clip.addRoundedRect( QRectF( logoRect ), 4, 4 );
+                p.save();
+                p.setClipPath( clip );
+                p.drawPixmap( logoRect, pm );
+                p.restore();
+            }
+            else if( !e.image.isEmpty() && !e.glyphText.isEmpty() )
+            {
+                /* a country's code, until its flag has downloaded */
+                p.save();
+                QFont ff = p.font();
+                ff.setPixelSize( 11 );
+                p.setFont( ff );
+                p.setPen( fg );
+                p.drawText( logoRect, Qt::AlignCenter, e.glyphText );
+                p.restore();
+            }
+            else
+                p.drawPixmap( QRect( rr.left() + SIDE_ICON_X, rr.center().y() - SIDE_ICON / 2 + 1,
+                                     SIDE_ICON, SIDE_ICON ),
+                              Theme::pixmap( e.icon.isEmpty() ? QString( "folder" ) : e.icon, SIDE_ICON, fg ) );
             p.setPen( i == hovered ? Theme::colors().text : LABEL );
             const QRect tr = rr.adjusted( SIDE_TEXT_X, 0, -8, 0 );
             p.drawText( tr, Qt::AlignLeft | Qt::AlignVCenter,

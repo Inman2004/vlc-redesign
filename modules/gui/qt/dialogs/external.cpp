@@ -27,6 +27,7 @@
 #include "errors.hpp"
 #include "styles/vlc_theme.hpp"
 #include "util/bookmarks.hpp"      /* Bookmarks::osd */
+#include "util/iptv_catalog.hpp"
 
 #include <vlc_playlist.h>
 
@@ -198,6 +199,13 @@ void DialogHandler::displayError(const QString &title, const QString &text)
     if( Theme::redesign() && title == qtr( "Your input can't be opened" )
      && text.contains( "://" ) && !text.contains( "file://" ) )
     {
+        /* a Live TV channel stays where it is: the one you picked */
+        if( IptvCatalog::liveQueue() )
+        {
+            msg_Warn( p_intf, "%s: %s", qtu( title ), qtu( text ) );
+            Bookmarks::osd( p_intf, qtr( "This channel isn't available right now" ) );
+            return;
+        }
         playlist_t *pl = THEPL;
         playlist_Lock( pl );
         const int n = queuedItems( pl->p_playing );

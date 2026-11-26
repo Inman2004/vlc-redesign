@@ -45,6 +45,7 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSettings>
+#include <QTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -62,24 +63,29 @@ static const char RADIO_STATIONS[] = "?hidebroken=true&order=votes&reverse=true&
  * iptv-org's own lists leave out: Sun TV, KTV, Star Vijay, Zee Tamil,
  * Colors Tamil, Jaya TV, History TV18 Tamil, Hungama, Nick, Cartoon
  * Network, and the local Tamil Nadu channels. First the Tamil ones. */
-static const struct { const char *id, *title, *url; } featuredLists[] = {
+/* Each shows inside the iptv-org list it belongs with (home): the
+ * Tamil ones in By Language > Tamil, the Indian ones in By Country > India. */
+static const struct { const char *id, *title, *url, *home; } featuredLists[] = {
     { "pocket-tv", "Pocket TV",
-      "https://raw.githubusercontent.com/jgog/My-IPTV/main/playlist.m3u" },
+      "https://raw.githubusercontent.com/jgog/My-IPTV/main/playlist.m3u", "languages/tam" },
     { "tamil-local", "Tamil Local Cable",
-      "https://raw.githubusercontent.com/amazeyourself/tamil-local-iptv/main/channels.m3u" },
+      "https://raw.githubusercontent.com/amazeyourself/tamil-local-iptv/main/channels.m3u", "languages/tam" },
     { "tamil-news", "Tamil News",
-      "https://raw.githubusercontent.com/naveenland4/News_Channels/main/news_channels.m3u" },
+      "https://raw.githubusercontent.com/naveenland4/News_Channels/main/news_channels.m3u", "languages/tam" },
     { "tamil-world", "Tamil World",
-      "https://raw.githubusercontent.com/snwebdev211-jpg/Tamil-World-IPTV/main/playlists/all-sources.m3u" },
+      "https://raw.githubusercontent.com/snwebdev211-jpg/Tamil-World-IPTV/main/playlists/all-sources.m3u", "languages/tam" },
     { "pavish", "Pavish Family TV",
-      "https://raw.githubusercontent.com/Vishvakumar/pavish-family-tv/main/playlist-full.m3u" },
+      "https://raw.githubusercontent.com/Vishvakumar/pavish-family-tv/main/playlist-full.m3u", "languages/tam" },
     { "india-live", "India Live TV",
-      "https://raw.githubusercontent.com/Diljan707/new/main/playlist.m3u" },
+      "https://raw.githubusercontent.com/Diljan707/new/main/playlist.m3u", "countries/in" },
     { "indian-tv", "Indian TV",
-      "https://raw.githubusercontent.com/krshnaprsad/tv-playlist/main/tv-playlist.m3u" },
+      "https://raw.githubusercontent.com/krshnaprsad/tv-playlist/main/tv-playlist.m3u", "countries/in" },
     { "india-vip", "India VIP",
-      "https://raw.githubusercontent.com/Mrbotrx/BD-OTT-PLAYLIST/main/india/India_vip.m3u" },
+      "https://raw.githubusercontent.com/Mrbotrx/BD-OTT-PLAYLIST/main/india/India_vip.m3u", "countries/in" },
 };
+
+/* every feed of every channel, with its languages (~8 MB) */
+static const char IPTV_FEEDS[] = "https://iptv-org.github.io/api/feeds.json";
 
 enum
 {
@@ -162,9 +168,10 @@ void IptvFetch::run()
 /*********************************************************************
  * IptvCatalog
  *********************************************************************/
+static QPointer<IptvCatalog> catalog;
+
 IptvCatalog *IptvCatalog::instance( intf_thread_t *p_intf )
 {
-    static QPointer<IptvCatalog> catalog;
     if( !catalog )
         catalog = new IptvCatalog( p_intf, THEMIM );
     return catalog;
@@ -204,6 +211,9 @@ IptvCatalog::IptvCatalog( intf_thread_t *_p_intf, QObject *parent )
     if( f.open( QIODevice::ReadOnly ) )
         parseLists( f.readAll() );
     refreshLists();
+    /* the playlist's own copy of the option, to turn on for channels */
+    var_Create( THEPL, "play-and-stop", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
+    connect( THEMIM, &MainInputManager::inputChanged, this, &IptvCatalog::inputChanged );
 }
 
 IptvCatalog::~IptvCatalog()
@@ -278,11 +288,13 @@ QString IptvCatalog::flagUrl( const QString &code )
 }
 
 /* the curated Tamil and Indian lists, as paths the catalog fetches */
-QVector<IptvList> IptvCatalog::featured() const
+QVector<IptvList> IptvCatalog::featured( const QString &home ) const
 {
     QVector<IptvList> out;
     for( const auto &f : featuredLists )
     {
+        if( !home.isEmpty() && home != QLatin1String( f.home ) )
+            continue;
         IptvList l;
         l.path = QString( "featured/" ) + f.id;
         l.title = QString::fromUtf8( f.title );
@@ -422,6 +434,8 @@ static QVector<IptvChannel> parseM3u( const QByteArray &data )
                     cur.logo = m.captured( 2 );
                 else if( k == "group-title" )
                     cur.group = m.captured( 2 );
+                else if( k == "tvg-id" )
+                    cur.id = m.captured( 2 );
                 else if( k == "tvg-name" )
                     tvgName = m.captured( 2 );
             }
@@ -477,7 +491,7 @@ QVector<IptvChannel> IptvCatalog::channels( const QString &path, bool *loading, 
     if( failed )
         *failed = false;
     if( lists.contains( path ) )
-        return lists.value( path );
+        return visible( path );
     if( listsFailed.contains( path ) )
     {
         if( failed )
@@ -490,6 +504,8 @@ QVector<IptvChannel> IptvCatalog::channels( const QString &path, bool *loading, 
     if( listsLoading.contains( path ) )
         return QVector<IptvChannel>();
     listsLoading.insert( path );
+    if( path.startsWith( "languages/" ) )
+        loadMainLanguages();
     fetch( listUrl( path ), LIST_MAX, [this, path]( const QByteArray &data ) {
         listsLoading.remove( path );
         const QVector<IptvChannel> ch = path.startsWith( "radio/" ) ? parseStations( data )
@@ -507,13 +523,135 @@ QVector<IptvChannel> IptvCatalog::channels( const QString &path, bool *loading, 
     return QVector<IptvChannel>();
 }
 
+/* a language list without the channels that only carry the language as
+ * a second audio track (Movies Now, NDTV Good Times, MTA6 Asia in Tamil):
+ * their main language, by iptv-org's feeds, is another one */
+QVector<IptvChannel> IptvCatalog::visible( const QString &path ) const
+{
+    const QVector<IptvChannel> all = lists.value( path );
+    if( !path.startsWith( "languages/" ) || mainLang.isEmpty() )
+        return all;
+    const QString code = path.mid( 10 );
+    QVector<IptvChannel> out;
+    foreach( const IptvChannel &c, all )
+    {
+        const QString main = mainLang.value( c.id );
+        if( main.isEmpty() || main == code )
+            out << c;
+    }
+    return out.isEmpty() ? all : out;
+}
+
+/* the main languages, from the cached table (a day old at most), else
+ * from iptv-org's feeds; the open language lists follow */
+void IptvCatalog::loadMainLanguages()
+{
+    if( mainLangFetching )
+        return;
+    const QString file = cacheDir + "/main-languages.tsv";
+    const QFileInfo fi( file );
+    if( !mainLangLoaded && fi.exists() )
+    {
+        QFile f( file );
+        if( f.open( QIODevice::ReadOnly ) )
+            foreach( const QByteArray &line, f.readAll().split( '\n' ) )
+            {
+                const int tab = line.indexOf( '\t' );
+                if( tab > 0 )
+                    mainLang.insert( QString::fromUtf8( line.left( tab ) ),
+                                     QString::fromLatin1( line.mid( tab + 1 ) ) );
+            }
+        mainLangLoaded = true;
+    }
+    if( fi.exists() && fi.lastModified().secsTo( QDateTime::currentDateTime() ) < 24 * 3600 )
+        return;
+    mainLangFetching = true;
+    fetch( IPTV_FEEDS, LIST_MAX, [this]( const QByteArray &data ) {
+        parseFeeds( data );
+    } );
+}
+
+void IptvCatalog::parseFeeds( const QByteArray &data )
+{
+    const QJsonArray feeds = QJsonDocument::fromJson( data ).array();
+    if( feeds.isEmpty() )
+    {
+        msg_Dbg( p_intf, "Live TV: could not read iptv-org's feeds" );
+        return;     /* mainLangFetching stays: no retry until next launch */
+    }
+    mainLangFetching = false;
+    QHash<QString, QString> m;
+    QByteArray table;
+    foreach( const QJsonValue &v, feeds )
+    {
+        const QJsonObject o = v.toObject();
+        const QJsonArray langs = o.value( "languages" ).toArray();
+        if( langs.size() < 2 )
+            continue;           /* one language: its lists are right */
+        const QString channel = o.value( "channel" ).toString();
+        const QString main = langs.first().toString();
+        QStringList keys( channel + "@" + o.value( "id" ).toString() );
+        if( o.value( "is_main" ).toBool() )
+            keys << channel;    /* a tvg-id without a feed is the main one */
+        foreach( const QString &k, keys )
+        {
+            m.insert( k, main );
+            table += k.toUtf8() + '\t' + main.toLatin1() + '\n';
+        }
+    }
+    mainLang = m;
+    mainLangLoaded = true;
+    QSaveFile f( cacheDir + "/main-languages.tsv" );
+    if( f.open( QIODevice::WriteOnly ) )
+    {
+        f.write( table );
+        f.commit();
+    }
+    foreach( const QString &path, lists.keys() )
+        if( path.startsWith( "languages/" ) )
+            emit channelsReady( path );
+}
+
+/* an item's MRL, locked */
+static QString itemUri( playlist_item_t *it )
+{
+    char *uri = input_item_GetURI( it->p_input );
+    const QString s = qfu( uri );
+    free( uri );
+    return s;
+}
+
 void IptvCatalog::play( const QString &path, int from )
 {
-    const QVector<IptvChannel> ch = lists.value( path );
+    const QVector<IptvChannel> ch = visible( path );
     if( ch.isEmpty() )
         return;
     from = qBound( 0, from, ch.size() - 1 );
-    playlist_Clear( THEPL, pl_Unlocked );
+    playlist_t *pl = THEPL;
+    playlist_Lock( pl );
+    playlist_item_t *root = pl->p_playing;
+
+    /* the queue already is this list: zap, nothing else changes */
+    if( path == queuedPath && root->i_children == ch.size() )
+    {
+        playlist_item_t *it = root->pp_children[from];
+        if( it->i_children < 0 && itemUri( it ) == ch[from].url )
+        {
+            playlist_ViewPlay( pl, NULL, it );
+            playlist_Unlock( pl );
+            return;
+        }
+    }
+
+    /* a new queue: the channels after the old items, then the old ones
+     * go while the chosen channel takes over. Clearing first would stop
+     * the player, drop the video window (and full screen) and start it
+     * all again. */
+    QVector<int> old;
+    for( int i = 0; i < root->i_children; i++ )
+        old << root->pp_children[i]->i_id;
+    playlist_item_t *start = NULL;
+    queuedUrls.clear();
     for( int i = 0; i < ch.size(); i++ )
     {
         const IptvChannel &c = ch[i];
@@ -533,9 +671,77 @@ void IptvCatalog::play( const QString &path, int from )
             input_item_SetArtURL( in, qtu( c.logo ) );
         if( !c.group.isEmpty() )
             input_item_SetAlbum( in, qtu( c.group ) );
-        playlist_AddInput( THEPL, in, i == from, true );
+        playlist_item_t *it = playlist_NodeAddInput( pl, in, root, PLAYLIST_END );
+        if( it && i == from )
+            start = it;
         input_item_Release( in );
+        queuedUrls.insert( c.url );
     }
+    queuedPath = path;
+    /* marked live before it plays: the window must not jump to its size */
+    live = start != NULL;
+    if( start )
+    {
+        stopAfterItem( true );
+        playlist_ViewPlay( pl, NULL, start );
+    }
+
+    /* the old items, except the one still playing: it goes once the
+     * chosen channel has taken over (inputChanged) */
+    playlist_item_t *playing = playlist_CurrentPlayingItem( pl );
+    foreach( int id, old )
+    {
+        playlist_item_t *it = playlist_ItemGetById( pl, id );
+        if( it && it != playing )
+            playlist_NodeDelete( pl, it );
+        else if( it )
+            leftover = id;
+    }
+    playlist_Unlock( pl );
+}
+
+bool IptvCatalog::liveQueue()
+{
+    return catalog && catalog->live;
+}
+
+/* while a channel of the list plays: no moving on to the next one by
+ * itself (a channel that fails or drops stops there: it is the one you
+ * picked, Next zaps), and the window keeps its size */
+void IptvCatalog::inputChanged()
+{
+    playlist_t *pl = THEPL;
+    playlist_Lock( pl );
+    playlist_item_t *cur = playlist_CurrentPlayingItem( pl );
+    const QString uri = cur ? itemUri( cur ) : QString();
+    const int curId = cur ? cur->i_id : -1;
+    if( leftover >= 0 && leftover != curId )
+    {
+        /* the item that played before the list: the list has taken over */
+        playlist_item_t *it = playlist_ItemGetById( pl, leftover );
+        if( it )
+            playlist_NodeDelete( pl, it );
+        leftover = -1;
+    }
+    playlist_Unlock( pl );
+
+    if( !cur )
+        return;         /* stopped: the queue may still be the list */
+    const bool wasLive = live;
+    live = !queuedUrls.isEmpty() && queuedUrls.contains( uri );
+    if( !live )
+    {
+        queuedUrls.clear();
+        queuedPath.clear();
+    }
+    if( live || wasLive )
+        stopAfterItem( live );
+}
+
+/* VLC's "play and stop" while a channel plays, your setting otherwise */
+void IptvCatalog::stopAfterItem( bool b )
+{
+    var_SetBool( THEPL, "play-and-stop", b || var_InheritBool( p_intf, "play-and-stop" ) );
 }
 
 /*********************************************************************

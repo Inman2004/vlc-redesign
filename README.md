@@ -86,11 +86,14 @@ untouched.
 - **Live TV:** free channels from [iptv-org](https://github.com/iptv-org/iptv)
   by category, language or country, shown as cards with each channel's
   logo. Pick one and the whole list becomes your queue, so Next and
-  Previous flip channels.
-  **Tamil & Indian** holds curated lists from other GitHub projects,
-  Tamil first: Sun TV, KTV, Star Vijay, Zee Tamil, Colors Tamil, Jaya
-  TV, History TV18 Tamil, Hungama, Nick and Cartoon Network, plus local
-  Tamil Nadu cable channels and Indian news.
+  Previous flip channels, and a channel that fails stays put instead of
+  jumping to another. Language lists hold that language's own channels,
+  not every channel with a second audio track in it.
+  **Tamil** (By Language) also opens curated lists from other GitHub
+  projects: Sun TV, KTV, Star Vijay, Zee Tamil, Colors Tamil, Jaya TV,
+  History TV18 Tamil, Hungama, Nick and Cartoon Network, plus local
+  Tamil Nadu cable channels and Tamil news. **India** (By Country) has
+  three more Indian lists.
   Got your own channel list? Add any M3U link or file and it sits right
   next to them.
 - **Radio:** tens of thousands of stations from

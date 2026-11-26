@@ -29,6 +29,7 @@
 
 #include "qt.hpp"
 #include "util/qt_compat.hpp"
+#include "util/iptv_catalog.hpp"
 
 #include "main_interface.hpp"
 #include "input_manager.hpp"                    // Creation
@@ -434,7 +435,8 @@ private:
         {
             if( !videoGone.isValid() )
                 videoGone.start();
-            if( videoGone.elapsed() < VIDEO_GRACE_MS )
+            /* a live channel takes seconds to tune in */
+            if( videoGone.elapsed() < ( IptvCatalog::liveQueue() ? LIVE_GRACE_MS : VIDEO_GRACE_MS ) )
             {
                 QTimer::singleShot( 100, this, [this]() { apply(); } );
                 return;
@@ -482,7 +484,7 @@ private:
     FrameAnimation *slide;
     QTimer pending;
     QElapsedTimer videoGone;
-    enum { VIDEO_GRACE_MS = 800 };
+    enum { VIDEO_GRACE_MS = 800, LIVE_GRACE_MS = 10000 };
     bool on = false;
     qreal shown = 1.;   /* 1: in view, 0: slid off the edges */
 };
@@ -493,8 +495,14 @@ void MainInterface::setChromeVisible( bool b )
         return;
     if( chromeOverlay && chromeOverlay->isOn() )
     {
-        /* floating over the video: slide away, nothing resizes */
+        /* floating over the video: the bars slide away; the rail and the
+         * library go too, so the video has the whole window (the queue
+         * stays: it is the player's own) */
         chromeOverlay->slideTo( b );
+        rail->setVisible( b );
+        sidebar->setVisible( b && playlistVisible );
+        if( adjustDock )
+            adjustDock->setVisible( b && adjustDock->isOpen() );
         return;
     }
     header->setVisible( b );
@@ -723,7 +731,10 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     if( Theme::redesign() )
     {
         lastSection = settings->value( "MainWindow/sidebar-section", "playlists" ).toString();
-        if( settings->value( "MainWindow/sidebar-visible", true ).toBool() )
+        /* opened to play a file (from the file manager): the player
+         * alone, the library stays closed until asked for */
+        if( settings->value( "MainWindow/sidebar-visible", true ).toBool()
+         && !var_InheritBool( p_intf, "started-from-file" ) )
             activateSection( lastSection );
         else
             setSidebarVisible( false );
@@ -1429,7 +1440,7 @@ void MainInterface::getVideoSlot( struct vout_window_t *p_wnd,
 
         /* Ask videoWidget to resize correctly, if we are in normal mode
          * (in the library the video sits in the fixed-size mini player) */
-        if( b_autoresize && !b_libraryMode ) {
+        if( b_autoresize && !b_libraryMode && !IptvCatalog::liveQueue() ) {
 #if HAS_QT56
             qreal factor = videoWidget->devicePixelRatioF();
 
@@ -1485,7 +1496,8 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
          * to the screen size. Not in the library: the video is in the
          * fixed-size mini player and the window must not follow it.
          */
-        if (b_autoresize && !b_libraryMode)
+        /* not from channel to channel: each has its own size */
+        if (b_autoresize && !b_libraryMode && !IptvCatalog::liveQueue())
         {
             QRect screen = QGuiApplication::primaryScreen()->availableGeometry();
 #if HAS_QT56

@@ -143,7 +143,8 @@ static QString toolbarLine( QSettings *settings, int which )
     {
         if( which == TOOLBAR_MAIN2 && line == REDESIGN_TB2_DEFAULT_V1 )
             line = REDESIGN_TB2_DEFAULT;
-        else if( which == TOOLBAR_FSC && line == REDESIGN_FSC_TB_DEFAULT_V1 )
+        else if( which == TOOLBAR_FSC && ( line == REDESIGN_FSC_TB_DEFAULT_V1
+                                        || line == REDESIGN_FSC_TB_DEFAULT_V2 ) )
             line = REDESIGN_FSC_TB_DEFAULT;
     }
     return line;

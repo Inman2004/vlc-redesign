@@ -181,11 +181,7 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
         if( l.count > 0 )           /* iptv-org's index names them */
             out << l;
         out << k;
-        /* curated Tamil and Indian lists from GitHub projects */
-        LibraryEntry f = group( "featured", sectionTitle( "featured" ), "playlist" );
-        f.subtitle = qtr( "Curated lists" );
-        f.count = cat->featured().size();
-        out << f;
+        /* the curated Tamil and Indian lists are inside Tamil and India */
         /* your own lists, then a card to add one */
         const QVector<IptvList> mine = cat->myLists();
         for( int i = 0; i < mine.size(); i++ )
@@ -242,6 +238,15 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
         all.subtitle = counted( ch.size() );
         if( needle.isEmpty() )
             out << all;
+        /* more lists of the same channels, kept on GitHub (in Tamil:
+         * Sun TV, Vijay, Zee Tamil...), before the list's own channels */
+        if( loc.size() == 4 )
+            foreach( const IptvList &il, cat->featured( path ) )
+            {
+                LibraryEntry f = group( il.path.mid( 9 ), il.title, "playlist" );
+                f.subtitle = qtr( "Curated list" );
+                out << f;
+            }
         for( int i = 0; i < ch.size(); i++ )
         {
             LibraryEntry e;
@@ -317,6 +322,9 @@ QString LibraryBrowser::liveListPath() const
         const int i = what.section( QChar( 0x1F ), 1 ).toInt();
         return i >= 0 && i < mine.size() ? mine[i].path : QString();
     }
+    /* a curated list inside Tamil or India */
+    if( loc.size() >= 5 )
+        return "featured/" + loc.value( 4 );
     return what + "/" + loc.value( 3 );
 }
 
@@ -357,6 +365,13 @@ QString LibraryBrowser::segmentTitle( int i ) const
         }
         if( i == 2 && s == "top" )
             return qtr( "Top Stations" );
+        if( i == 4 )
+        {
+            foreach( const IptvList &l, cat->featured() )
+                if( l.path == "featured/" + s )
+                    return l.title;
+            return s;
+        }
         if( i == 3 )
         {
             const QString path = radio ? QString( QString( "radio/" ) + ( loc.value( 2 ) == "languages" ? "language/" : "country/" ) + s )

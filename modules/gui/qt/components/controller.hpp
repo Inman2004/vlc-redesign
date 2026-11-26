@@ -54,8 +54,10 @@
  * seek, total, volume, audio tracks, queue; used while the bar is the
  * default one */
 #define REDESIGN_MUSIC_TB2 "22;16;0;17;23;64;43;33-4;44;64;35-4;64;26;10"
-#define REDESIGN_FSC_TB_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;20;28;26;27;8"
+/* full screen: the docked bar's buttons, leave full screen, the queue */
+#define REDESIGN_FSC_TB_DEFAULT "22;0;23;64;43;33-4;44;64;35-4;64;20;28;26;27;8;64;10"
 #define REDESIGN_FSC_TB_DEFAULT_V1 "22;0;23;64;43;33-4;44;64;35-4;64;26;27;8"
+#define REDESIGN_FSC_TB_DEFAULT_V2 "22;0;23;64;43;33-4;44;64;35-4;64;20;28;26;27;8"
 
 /* Settings key / default for each toolbar, depending on the active UI */
 const char *toolbarKey( int which );

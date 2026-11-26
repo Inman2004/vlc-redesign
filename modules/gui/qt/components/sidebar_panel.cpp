@@ -249,6 +249,8 @@ SidebarPanel::SidebarPanel( intf_thread_t *_p_intf, QWidget *parent )
     connect( browser, &LibraryBrowser::locationChanged, this, &SidebarPanel::libraryLocationChanged );
     connect( browser, &LibraryBrowser::entriesChanged, this, &SidebarPanel::libraryEntriesChanged );
     connect( browser, &LibraryBrowser::actionRequested, this, &SidebarPanel::libraryAction );
+    /* channel logos and flags, as they download */
+    connect( browser, &LibraryBrowser::artChanged, libGrid->viewport(), QOverload<>::of( &QWidget::update ) );
     connect( libSearch, &QLineEdit::textChanged, browser, &LibraryBrowser::setSearch );
 
     connect( backBtn, &QToolButton::clicked, this, &SidebarPanel::goBack );
