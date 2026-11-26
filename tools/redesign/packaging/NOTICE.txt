@@ -11,6 +11,8 @@ Modified in 2026 by Immanuvel B (https://github.com/Inman2004):
 
 - modules/gui/qt/: a redesigned Qt interface (new and changed files
   throughout the module);
+- modules/demux/playlist/m3u.c: reads IPTV channel logos and groups
+  (tvg-logo, group-title) and keeps channel names whole;
 - configure.ac: the Qt Network module made optional;
 - extras/package/win32/: Windows packaging without browser plugins, and
   the NSIS files missing from the 3.0.24 source release;

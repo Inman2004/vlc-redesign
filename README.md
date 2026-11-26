@@ -83,6 +83,13 @@ untouched.
   changes work immediately.
 - **Subtitles:** an optional timeline on the seek bar showing each subtitle,
   and `Ctrl+B` to drop a quick bookmark (saved per file).
+- **Live TV:** free channels from [iptv-org](https://github.com/iptv-org/iptv)
+  by category, language or country, shown as cards with each channel's
+  logo. Pick one and the whole list becomes your queue, so Next and
+  Previous flip channels.
+- **A smarter queue:** search it with `Ctrl+F` (thousands of channels are
+  fine), see each channel's group, and save it as a playlist that keeps
+  channel names and logos.
 - **Themes:** dark, light or follow your system, with nine accent colours.
 
 <table>
@@ -116,7 +123,9 @@ Everything's in Settings, but these work from the command line too:
 
 ## Building it yourself
 
-All my changes live in `modules/gui/qt/`; the rest is stock VLC 3.0.24.
+Almost all my changes live in `modules/gui/qt/`. The one other is VLC's M3U
+reader (`modules/demux/playlist/m3u.c`), which now picks up IPTV channel
+logos and groups. The rest is stock VLC 3.0.24.
 
 On Linux:
 
@@ -159,6 +168,10 @@ libraries ship an older Qt (5.6) and an older C runtime, so
 - On Windows there's no SRT streaming, and the interface is English only.
 - Customize Player (drag and drop your own control layout) is still in the
   works.
+- Live TV channels come from public lists, so some are offline, geo-blocked
+  or only on at certain times. A dead one shows a short message and the
+  next channel starts. Channel logos and flags (from flagcdn.com) download
+  the first time you see them.
 
 ## Who made this
 
