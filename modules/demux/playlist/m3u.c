@@ -41,7 +41,8 @@
  * Local prototypes
  *****************************************************************************/
 static int ReadDir( stream_t *, input_item_node_t * );
-static void parseEXTINF( char *psz_string, char **ppsz_artist, char **ppsz_name, int *pi_duration );
+static void parseEXTINF( char *psz_string, char **ppsz_artist, char **ppsz_name, int *pi_duration,
+                         char **ppsz_logo, char **ppsz_group );
 static bool ContainsURL(const uint8_t *, size_t);
 
 static char *GuessEncoding (const char *str)
@@ -217,6 +218,7 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
     char       *psz_name = NULL;
     char       *psz_artist = NULL;
     char       *psz_album_art = NULL;
+    char       *psz_group = NULL;
     int        i_parsed_duration = 0;
     vlc_tick_t i_duration = -1;
     const char**ppsz_options = NULL;
@@ -251,15 +253,25 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
             {
                 /* Extended info */
                 psz_parse += sizeof("EXTINF:") - 1;
+                char *psz_logo = NULL, *psz_grp = NULL;
                 FREENULL( psz_name );
                 FREENULL( psz_artist );
-                parseEXTINF( psz_parse, &psz_artist, &psz_name, &i_parsed_duration );
+                FREENULL( psz_group );
+                parseEXTINF( psz_parse, &psz_artist, &psz_name, &i_parsed_duration,
+                             &psz_logo, &psz_grp );
                 if( i_parsed_duration >= 0 )
                     i_duration = i_parsed_duration * INT64_C(1000000);
                 if( psz_name )
                     psz_name = pf_dup( psz_name );
                 if( psz_artist )
                     psz_artist = pf_dup( psz_artist );
+                if( !EMPTY_STR( psz_logo ) )
+                {
+                    free( psz_album_art );
+                    psz_album_art = pf_dup( psz_logo );
+                }
+                if( !EMPTY_STR( psz_grp ) )
+                    psz_group = pf_dup( psz_grp );
             }
             else if( !strncasecmp( psz_parse, "EXTVLCOPT:",
                                    sizeof("EXTVLCOPT:") -1 ) )
@@ -326,6 +338,9 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
             if( psz_name ) input_item_SetTitle( p_input, psz_name );
             if( !EMPTY_STR(psz_album_art) )
                 input_item_SetArtURL( p_input, psz_album_art );
+            /* IPTV lists: the channel's group ("News", "Movies"...) */
+            if( !EMPTY_STR(psz_group) )
+                input_item_SetAlbum( p_input, psz_group );
 
             input_item_node_AppendItem( p_subitems, p_input );
             input_item_Release( p_input );
@@ -347,6 +362,7 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
             FREENULL( psz_name );
             FREENULL( psz_artist );
             FREENULL( psz_album_art );
+            FREENULL( psz_group );
             i_parsed_duration = 0;
             i_duration = -1;
 
@@ -356,8 +372,49 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
     return VLC_SUCCESS; /* Needed for correct operation of go back */
 }
 
+/* IPTV lists put attributes between the duration and the title:
+ *   #EXTINF:-1 tvg-id="x" tvg-logo="https://..." group-title="News",Channel
+ * Reads them in place; returns whether there were any. */
+static bool parseEXTINFAttributes( char *s, char **ppsz_logo, char **ppsz_group,
+                                   char **ppsz_tvgname )
+{
+    bool b_found = false;
+    while( *s )
+    {
+        while( *s == ' ' || *s == '\t' )
+            s++;
+        char *psz_key = s;
+        while( *s && *s != '=' && *s != ' ' && *s != '\t' )
+            s++;
+        if( *s != '=' )
+            continue;              /* a bare token, like the duration */
+        *s++ = '\0';
+        char *psz_val = s;
+        if( *s == '"' )
+        {
+            psz_val = ++s;
+            while( *s && *s != '"' )
+                s++;
+        }
+        else
+            while( *s && *s != ' ' && *s != '\t' )
+                s++;
+        if( *s )
+            *s++ = '\0';
+        b_found = true;
+        if( !strcasecmp( psz_key, "tvg-logo" ) )
+            *ppsz_logo = psz_val;
+        else if( !strcasecmp( psz_key, "group-title" ) )
+            *ppsz_group = psz_val;
+        else if( !strcasecmp( psz_key, "tvg-name" ) )
+            *ppsz_tvgname = psz_val;
+    }
+    return b_found;
+}
+
 static void parseEXTINF(char *psz_string, char **ppsz_artist,
-                        char **ppsz_name, int *pi_duration)
+                        char **ppsz_name, int *pi_duration,
+                        char **ppsz_logo, char **ppsz_group)
 {
     char *end = NULL;
     char *psz_item = NULL;
@@ -368,10 +425,18 @@ static void parseEXTINF(char *psz_string, char **ppsz_artist,
     for (; psz_string < end && ( *psz_string == '\t' || *psz_string == ' ' );
          psz_string++ );
 
-    /* duration: read to next comma */
+    /* duration (and IPTV attributes): read to the next comma that is not
+     * inside a quoted attribute value */
     psz_item = psz_string;
-    psz_string = strchr( psz_string, ',' );
-    if ( psz_string )
+    bool b_quoted = false;
+    for( ; *psz_string; psz_string++ )
+    {
+        if( *psz_string == '"' )
+            b_quoted = !b_quoted;
+        else if( *psz_string == ',' && !b_quoted )
+            break;
+    }
+    if ( *psz_string == ',' )
     {
         *psz_string = '\0';
         *pi_duration = atoi( psz_item );
@@ -383,6 +448,16 @@ static void parseEXTINF(char *psz_string, char **ppsz_artist,
 
     if ( psz_string < end )               /* continue parsing if possible */
         psz_string++;
+
+    char *psz_tvgname = NULL;
+    if( parseEXTINFAttributes( psz_item, ppsz_logo, ppsz_group, &psz_tvgname ) )
+    {
+        /* an IPTV channel: the rest is its name, " - " included */
+        while( *psz_string == ' ' || *psz_string == '\t' )
+            psz_string++;
+        *ppsz_name = *psz_string ? psz_string : psz_tvgname;
+        return;
+    }
 
     /* analyse the remaining string */
     psz_item = strstr( psz_string, " - " );
