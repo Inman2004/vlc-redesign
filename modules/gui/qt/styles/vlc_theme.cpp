@@ -775,6 +775,16 @@ static QString buildStyleSheet()
     " { background: none; width: 0; height: 0; }\n"
     );
 
+#if QT_VERSION < QT_VERSION_CHECK( 5, 13, 0 )
+    /* Before 5.13, a styled menu item draws its text at the left of the
+     * item's content box, right on top of the icon or checkmark (later Qt
+     * shifts it by the icon column). Reserve that column in the padding:
+     * icon padding + glyph + 4, the same place newer Qt puts the text. */
+    ss += QLatin1String(
+    "QMenu::item { padding-left: 38px; }\n"
+    "QMenu#VLCMainMenu::item { padding-left: 44px; }\n" );
+#endif
+
     /* Longest keys first so "accentHov" is not eaten by "accent". */
     QStringList keys = t.keys();
     std::sort( keys.begin(), keys.end(), []( const QString &a, const QString &b ) {
