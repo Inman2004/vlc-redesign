@@ -58,6 +58,29 @@ static const char RADIO_API[] = "https://all.api.radio-browser.info/json/";
 /* hidebroken: only stations that passed the last check */
 static const char RADIO_STATIONS[] = "?hidebroken=true&order=votes&reverse=true&limit=500";
 
+/* Tamil and Indian lists kept by their authors on GitHub, what
+ * iptv-org's own lists leave out: Sun TV, KTV, Star Vijay, Zee Tamil,
+ * Colors Tamil, Jaya TV, History TV18 Tamil, Hungama, Nick, Cartoon
+ * Network, and the local Tamil Nadu channels. First the Tamil ones. */
+static const struct { const char *id, *title, *url; } featuredLists[] = {
+    { "pocket-tv", "Pocket TV",
+      "https://raw.githubusercontent.com/jgog/My-IPTV/main/playlist.m3u" },
+    { "tamil-local", "Tamil Local Cable",
+      "https://raw.githubusercontent.com/amazeyourself/tamil-local-iptv/main/channels.m3u" },
+    { "tamil-news", "Tamil News",
+      "https://raw.githubusercontent.com/naveenland4/News_Channels/main/news_channels.m3u" },
+    { "tamil-world", "Tamil World",
+      "https://raw.githubusercontent.com/snwebdev211-jpg/Tamil-World-IPTV/main/playlists/all-sources.m3u" },
+    { "pavish", "Pavish Family TV",
+      "https://raw.githubusercontent.com/Vishvakumar/pavish-family-tv/main/playlist-full.m3u" },
+    { "india-live", "India Live TV",
+      "https://raw.githubusercontent.com/Diljan707/new/main/playlist.m3u" },
+    { "indian-tv", "Indian TV",
+      "https://raw.githubusercontent.com/krshnaprsad/tv-playlist/main/tv-playlist.m3u" },
+    { "india-vip", "India VIP",
+      "https://raw.githubusercontent.com/Mrbotrx/BD-OTT-PLAYLIST/main/india/India_vip.m3u" },
+};
+
 enum
 {
     LIST_MAX   = 32 << 20,      /* the whole index is ~3 MB */
@@ -158,6 +181,14 @@ QString IptvCatalog::listUrl( const QString &path )
              + QString::fromLatin1( QUrl::toPercentEncoding( path.mid( 15 ) ) ) + RADIO_STATIONS;
     if( path.startsWith( "radio/country/" ) )
         return QString( RADIO_API ) + "stations/bycountrycodeexact/" + path.mid( 14 ) + RADIO_STATIONS;
+    if( path.startsWith( "featured/" ) )
+    {
+        const QString id = path.mid( 9 );
+        for( const auto &f : featuredLists )
+            if( id == f.id )
+                return f.url;
+        return QString();
+    }
     return QString( IPTV_BASE ) + path + ".m3u";
 }
 
@@ -244,6 +275,20 @@ static const struct { const char *id, *title; } builtInCategories[] = {
 QString IptvCatalog::flagUrl( const QString &code )
 {
     return code.size() == 2 ? QString( "https://flagcdn.com/w160/%1.png" ).arg( code ) : QString();
+}
+
+/* the curated Tamil and Indian lists, as paths the catalog fetches */
+QVector<IptvList> IptvCatalog::featured() const
+{
+    QVector<IptvList> out;
+    for( const auto &f : featuredLists )
+    {
+        IptvList l;
+        l.path = QString( "featured/" ) + f.id;
+        l.title = QString::fromUtf8( f.title );
+        out << l;
+    }
+    return out;
 }
 
 /* offline: the categories, and the countries Qt knows (no languages:

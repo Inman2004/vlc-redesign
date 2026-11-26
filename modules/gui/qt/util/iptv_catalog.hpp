@@ -98,6 +98,10 @@ public:
     QVector<IptvList> languages() const { return langs; }
     QVector<IptvList> countries() const { return ctrs; }
 
+    /* curated lists of Tamil and Indian channels, kept by their authors
+     * on GitHub (path: "featured/<id>") */
+    QVector<IptvList> featured() const;
+
     /* Radio Browser (radio-browser.info): station counts by language and
      * country, fetched once a day */
     QVector<IptvList> radioLanguages();

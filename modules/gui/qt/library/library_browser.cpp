@@ -90,6 +90,7 @@ QString LibraryBrowser::sectionTitle( const QString &key )
     if( key == "categories" ) return qtr( "By Category" );
     if( key == "countries" ) return qtr( "By Country" );
     if( key == "languages" ) return qtr( "By Language" );
+    if( key == "featured" ) return qtr( "Tamil & Indian" );
     if( key == "all" )     return qtr( "All Channels" );
     return key;
 }
@@ -180,6 +181,11 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
         if( l.count > 0 )           /* iptv-org's index names them */
             out << l;
         out << k;
+        /* curated Tamil and Indian lists from GitHub projects */
+        LibraryEntry f = group( "featured", sectionTitle( "featured" ), "playlist" );
+        f.subtitle = qtr( "Curated lists" );
+        f.count = cat->featured().size();
+        out << f;
         /* your own lists, then a card to add one */
         const QVector<IptvList> mine = cat->myLists();
         for( int i = 0; i < mine.size(); i++ )
@@ -199,6 +205,7 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
               radio ? ( what == "languages" ? cat->radioLanguages() : cat->radioCountries() )
             : what == "categories" ? cat->categories()
             : what == "languages" ? cat->languages()
+            : what == "featured" ? cat->featured()
             : cat->countries();
         foreach( const IptvList &il, lists )
         {
@@ -207,14 +214,15 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
             const QString seg = il.path.mid( il.path.lastIndexOf( '/' ) + 1 );
             LibraryEntry e = group( seg, il.title,
                                     what == "categories" ? "tv"
-                                    : what == "languages" ? "language" : "globe" );
+                                    : what == "languages" ? "language"
+                                    : what == "featured" ? "playlist" : "globe" );
             if( !il.code.isEmpty() )
             {
                 /* the flag, and its code until the picture is in */
                 e.image = IptvCatalog::flagUrl( il.code );
                 e.glyphText = il.code.toUpper();
             }
-            e.subtitle = counted( il.count );
+            e.subtitle = what == "featured" ? qtr( "Curated list" ) : counted( il.count );
             out << e;
         }
     }
@@ -357,7 +365,8 @@ QString LibraryBrowser::segmentTitle( int i ) const
             if( radio )
                 all << cat->radioLanguages() << cat->radioCountries();
             else
-                all << cat->categories() << cat->languages() << cat->countries();
+                all << cat->categories() << cat->languages() << cat->countries()
+                    << cat->featured();
             foreach( const QVector<IptvList> &v, all )
                 foreach( const IptvList &l, v )
                     if( l.path == path )
