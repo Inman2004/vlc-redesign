@@ -1199,6 +1199,15 @@ void SoundSlider::paintEvent( QPaintEvent *e )
         Theme::paintVolumeWedge( &p, QRectF( rect() ).adjusted( 0.5, 0.5, -0.5, -0.5 ),
                                  maximum() > 0 ? qreal( value() ) / maximum() : 0.0,
                                  b_isMuted, underMouse() );
+        /* the level, in the wide end of the cone */
+        QFont f( "Google Sans" );
+        f.setPixelSize( 11 );
+        f.setWeight( QFont::Medium );
+        p.setFont( f );
+        p.setPen( b_isMuted ? QColor( 255, 255, 255, 110 ) : QColor( 255, 255, 255, 220 ) );
+        p.drawText( QRectF( rect() ).adjusted( 0, 0, -8, 0 ),
+                    Qt::AlignRight | Qt::AlignVCenter | Qt::TextDontClip,
+                    QString::number( value() ) + '%' );
         e->accept();
         return;
     }

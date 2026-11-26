@@ -479,8 +479,10 @@ STickSlider::STickSlider( double min, double max, QWidget *parent )
 void STickSlider::setLabels( const QVector<QPair<double, QString> > &l )
 {
     labels = l;
-    /* the labels hang 6px under the track */
-    setFixedHeight( l.isEmpty() ? CONTROL_H : 40 );
+    /* the labels hang 6px under the track; leave room for the font's real
+     * line height (taller on Windows and with display scaling) */
+    const int lh = QFontMetrics( SettingsUI::font( 11 ) ).height();
+    setFixedHeight( l.isEmpty() ? CONTROL_H : qMax( 40, int( std::ceil( HANDLE_H ) ) + 6 + lh + 2 ) );
     update();
 }
 
@@ -575,8 +577,8 @@ void STickSlider::paintEvent( QPaintEvent * )
             qreal left = x - w / 2.0;
             if( i == 0 && lf <= 0.0 ) left = 0;
             if( i == labels.count() - 1 && lf >= 1.0 ) left = width() - w;
-            p.drawText( QRectF( left, y, w + 1, 14 ), Qt::AlignLeft | Qt::AlignTop,
-                        labels[i].second );
+            p.drawText( QRectF( left, y, w + 1, p.fontMetrics().height() ),
+                        Qt::AlignLeft | Qt::AlignTop | Qt::TextDontClip, labels[i].second );
         }
     }
 }
