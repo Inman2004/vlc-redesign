@@ -57,8 +57,11 @@ private:
     QThread *thread = NULL;
 };
 
-/* One of iptv-org's public lists: "categories/news", "languages/eng",
- * "countries/fr", or "index" for every channel */
+/* A list of channels or stations, by path:
+ *   iptv-org:      "categories/news", "languages/tam", "countries/fr",
+ *                  "index" (every channel)
+ *   Radio Browser: "radio/top", "radio/language/tamil", "radio/country/IN"
+ *   your own:      "url:<the M3U's address>" */
 struct IptvList
 {
     QString path;
@@ -95,6 +98,17 @@ public:
     QVector<IptvList> languages() const { return langs; }
     QVector<IptvList> countries() const { return ctrs; }
 
+    /* Radio Browser (radio-browser.info): station counts by language and
+     * country, fetched once a day */
+    QVector<IptvList> radioLanguages();
+    QVector<IptvList> radioCountries();
+
+    /* channel lists you added (any M3U address or file) */
+    QVector<IptvList> myLists() const;
+    void addMyList( const QString &title, const QString &url );
+    void renameMyList( const QString &path, const QString &title );
+    void removeMyList( const QString &path );
+
     /* the channels of a list; empty and *loading set while it downloads
      * (channelsReady follows), or after a failure (*failed set) */
     QVector<IptvChannel> channels( const QString &path, bool *loading = NULL,
@@ -117,12 +131,15 @@ private:
     void refreshLists();
     void parseLists( const QByteArray & );
     void builtInLists();
+    void fetchRadioLists();
+    QVector<IptvList> parseRadioLists( const QByteArray &, bool countries ) const;
     void fetch( const QString &url, int maxBytes, std::function<void( const QByteArray & )> done );
     void pumpLogos();
 
     intf_thread_t *p_intf;
     QString cacheDir;
-    QVector<IptvList> cats, langs, ctrs;
+    QVector<IptvList> cats, langs, ctrs, radioLangs, radioCtrs;
+    bool radioFetching = false;
     QHash<QString, QVector<IptvChannel> > lists;
     QSet<QString> listsLoading, listsFailed;
     QHash<QString, QImage> logos;           /* decoded, by URL */

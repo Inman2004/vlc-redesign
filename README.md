@@ -87,6 +87,11 @@ untouched.
   by category, language or country, shown as cards with each channel's
   logo. Pick one and the whole list becomes your queue, so Next and
   Previous flip channels.
+  Got your own channel list? Add any M3U link or file and it sits right
+  next to them.
+- **Radio:** tens of thousands of stations from
+  [Radio Browser](https://www.radio-browser.info), by language or country,
+  with their logos (196 in Tamil alone).
 - **A smarter queue:** search it with `Ctrl+F` (thousands of channels are
   fine), see each channel's group, and save it as a playlist that keeps
   channel names and logos.

@@ -86,6 +86,7 @@ QString LibraryBrowser::sectionTitle( const QString &key )
     if( key == "genres" )  return qtr( "Genres" );
     if( key == "playlists" ) return qtr( "Playlists" );
     if( key == "livetv" )  return qtr( "Live TV" );
+    if( key == "liveradio" ) return qtr( "Radio" );
     if( key == "categories" ) return qtr( "By Category" );
     if( key == "countries" ) return qtr( "By Country" );
     if( key == "languages" ) return qtr( "By Language" );
@@ -105,7 +106,9 @@ void LibraryBrowser::watchLiveTv()
         return;
     liveTvWatched = true;
     IptvCatalog *cat = IptvCatalog::instance( p_intf );
-    auto inLiveTv = [this]() { return section() == "network" && loc.value( 1 ) == "livetv"; };
+    auto inLiveTv = [this]() {
+        return section() == "network" && ( loc.value( 1 ) == "livetv" || loc.value( 1 ) == "liveradio" );
+    };
     connect( cat, &IptvCatalog::changed, this, [this, inLiveTv]() {
         if( inLiveTv() )
             rebuild();
@@ -126,6 +129,7 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
     const_cast<LibraryBrowser *>( this )->watchLiveTv();
     IptvCatalog *cat = IptvCatalog::instance( p_intf );
     const QLocale locale;
+    const bool radio = loc.value( 1 ) == "liveradio";
     const QString what = loc.value( 2 );
     auto group = []( const QString &seg, const QString &title, const QString &icon ) {
         LibraryEntry e;
@@ -136,17 +140,34 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
         e.tile = LibraryEntry::TILE_GLYPH;
         return e;
     };
-    auto note = []( const QString &title, const QString &key ) {
+    auto note = []( const QString &title, const QString &key, const QString &icon ) {
         LibraryEntry e;
         e.type = LibraryEntry::ACTION;
         e.segment = key;
         e.title = title;
-        e.icon = "tv";
+        e.icon = icon;
         e.tile = LibraryEntry::TILE_GLYPH;
         return e;
     };
+    auto counted = [&locale, radio]( int n ) {
+        if( n < 0 )
+            return QString();
+        if( radio )
+            return n == 1 ? qtr( "1 station" ) : qtr( "%1 stations" ).arg( locale.toString( n ) );
+        return n == 1 ? qtr( "1 channel" ) : qtr( "%1 channels" ).arg( locale.toString( n ) );
+    };
 
-    if( what.isEmpty() )
+    if( what.isEmpty() && radio )
+    {
+        /* Network > Radio: Radio Browser's stations */
+        out << group( "top", qtr( "Top Stations" ), "audio" );
+        LibraryEntry l = group( "languages", sectionTitle( "languages" ), "language" );
+        l.count = cat->radioLanguages().size();
+        LibraryEntry k = group( "countries", sectionTitle( "countries" ), "globe" );
+        k.count = cat->radioCountries().size();
+        out << l << k;
+    }
+    else if( what.isEmpty() )
     {
         out << group( "all", qtr( "All Channels" ), "tv" );
         LibraryEntry c = group( "categories", sectionTitle( "categories" ), "grid" );
@@ -159,15 +180,32 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
         if( l.count > 0 )           /* iptv-org's index names them */
             out << l;
         out << k;
+        /* your own lists, then a card to add one */
+        const QVector<IptvList> mine = cat->myLists();
+        for( int i = 0; i < mine.size(); i++ )
+        {
+            LibraryEntry m = group( "mine" + QString( QChar( 0x1F ) ) + QString::number( i ),
+                                    mine[i].title, "playlist" );
+            m.subtitle = qtr( "Your list" );
+            out << m;
+        }
+        LibraryEntry add = note( qtr( "Add Channel List" ), "iptvaddlist", "add" );
+        add.subtitle = qtr( "Any M3U link or file" );
+        out << add;
     }
-    else if( loc.size() == 3 && what != "all" )
+    else if( loc.size() == 3 && what != "all" && what != "top" && !what.startsWith( "mine" ) )
     {
-        const QVector<IptvList> lists = what == "categories" ? cat->categories()
-                                      : what == "languages" ? cat->languages()
-                                      : cat->countries();
+        const QVector<IptvList> lists =
+              radio ? ( what == "languages" ? cat->radioLanguages() : cat->radioCountries() )
+            : what == "categories" ? cat->categories()
+            : what == "languages" ? cat->languages()
+            : cat->countries();
         foreach( const IptvList &il, lists )
         {
-            LibraryEntry e = group( il.path.mid( il.path.indexOf( '/' ) + 1 ), il.title,
+            /* the list's own segment: the part after its kind
+             * ("news", "tam", "tamil", "IN") */
+            const QString seg = il.path.mid( il.path.lastIndexOf( '/' ) + 1 );
+            LibraryEntry e = group( seg, il.title,
                                     what == "categories" ? "tv"
                                     : what == "languages" ? "language" : "globe" );
             if( !il.code.isEmpty() )
@@ -176,40 +214,40 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
                 e.image = IptvCatalog::flagUrl( il.code );
                 e.glyphText = il.code.toUpper();
             }
-            if( il.count >= 0 )
-                e.subtitle = il.count == 1 ? qtr( "1 channel" )
-                                           : qtr( "%1 channels" ).arg( locale.toString( il.count ) );
+            e.subtitle = counted( il.count );
             out << e;
         }
     }
     else
     {
-        /* a list's channels */
-        const QString path = what == "all" ? QString( "index" ) : what + "/" + loc.value( 3 );
+        /* a list's channels, or stations */
+        const QString path = liveListPath();
         bool loading = false, failed = false;
         const QVector<IptvChannel> ch = cat->channels( path, &loading, &failed );
+        const QString icon = radio ? "audio" : "tv";
         if( loading )
-            return QVector<LibraryEntry>() << note( qtr( "Loading channels..." ), QString() );
+            return QVector<LibraryEntry>() << note( radio ? qtr( "Loading stations..." )
+                                                          : qtr( "Loading channels..." ), QString(), icon );
         if( failed )
-            return QVector<LibraryEntry>() << note( qtr( "Could not load this list. Try again" ), "iptvretry" );
-        LibraryEntry all = note( qtr( "Play All" ), "iptvplay:" + path + ":0" );
-        all.subtitle = ch.size() == 1 ? qtr( "1 channel" )
-                                      : qtr( "%1 channels" ).arg( locale.toString( ch.size() ) );
-        all.icon = "play";
+            return QVector<LibraryEntry>() << note( qtr( "Could not load this list. Try again" ), "iptvretry", icon );
+        LibraryEntry all = note( qtr( "Play All" ), "iptvplay:" + path + QChar( 0x1F ) + "0", "play" );
+        all.subtitle = counted( ch.size() );
         if( needle.isEmpty() )
             out << all;
         for( int i = 0; i < ch.size(); i++ )
         {
             LibraryEntry e;
             e.type = LibraryEntry::ACTION;
-            e.segment = "iptvplay:" + path + ":" + QString::number( i );
+            e.segment = "iptvplay:" + path + QChar( 0x1F ) + QString::number( i );
             e.title = ch[i].title;
             QString g = ch[i].group;
             if( g.compare( "Undefined", Qt::CaseInsensitive ) == 0 )
                 g.clear();
             e.subtitle = g.replace( ';', ", " );
             e.image = ch[i].logo;
-            e.icon = "tv";
+            e.icon = icon;
+            /* station logos are small squares, channel logos wide */
+            e.tile = radio ? LibraryEntry::TILE_SQUARE : LibraryEntry::TILE_AUTO;
             out << e;
         }
     }
@@ -223,6 +261,55 @@ QVector<LibraryEntry> LibraryBrowser::liveTvEntries() const
         return hits;
     }
     return out;
+}
+
+void LibraryBrowser::addChannelList()
+{
+    QWidget *parent = p_intf->p_sys->p_mi;
+    bool ok = false;
+    QString url = QInputDialog::getText( parent, qtr( "Add Channel List" ),
+                                         qtr( "Link to an M3U channel list, or a file on this computer" ),
+                                         QLineEdit::Normal, QString(), &ok ).trimmed();
+    if( !ok || url.isEmpty() )
+        return;
+    if( QFileInfo::exists( url ) )
+        url = QUrl::fromLocalFile( QFileInfo( url ).absoluteFilePath() ).toString( QUrl::FullyEncoded );
+    const QUrl u( url );
+    if( !u.isValid() || ( u.scheme() != "http" && u.scheme() != "https" && u.scheme() != "file" ) )
+    {
+        QMessageBox::warning( parent, qtr( "Add Channel List" ),
+                              qtr( "That doesn't look like a link or a file. A link starts with http:// or https://." ) );
+        return;
+    }
+    QString guess = QFileInfo( u.path() ).completeBaseName();
+    if( guess.isEmpty() || guess == "index" || guess == "playlist" )
+        guess = u.host();
+    const QString name = QInputDialog::getText( parent, qtr( "Add Channel List" ), qtr( "Name" ),
+                                                QLineEdit::Normal, guess, &ok ).trimmed();
+    if( !ok )
+        return;
+    IptvCatalog::instance( p_intf )->addMyList( name.isEmpty() ? guess : name, url );
+}
+
+/* the catalog path of the list shown at this location */
+QString LibraryBrowser::liveListPath() const
+{
+    const QString what = loc.value( 2 );
+    if( loc.value( 1 ) == "liveradio" )
+    {
+        if( what == "top" )
+            return "radio/top";
+        return QString( "radio/" ) + ( what == "languages" ? "language/" : "country/" ) + loc.value( 3 );
+    }
+    if( what == "all" )
+        return "index";
+    if( what.startsWith( "mine" ) )
+    {
+        const QVector<IptvList> mine = IptvCatalog::instance( p_intf )->myLists();
+        const int i = what.section( QChar( 0x1F ), 1 ).toInt();
+        return i >= 0 && i < mine.size() ? mine[i].path : QString();
+    }
+    return what + "/" + loc.value( 3 );
 }
 
 QString LibraryBrowser::shelfTitle( const QString &key )
@@ -249,17 +336,34 @@ QString LibraryBrowser::segmentTitle( int i ) const
         const int k = store->indexOf( s );
         return k >= 0 ? store->playlists()[k].title : QFileInfo( s ).completeBaseName();
     }
-    if( section() == "network" && i == 3 && loc.value( 1 ) == "livetv" )
+    if( section() == "network" && ( loc.value( 1 ) == "livetv" || loc.value( 1 ) == "liveradio" ) )
     {
-        /* a Live TV list: its name ("France", "News") */
+        /* a list's name ("France", "News", "Tamil", one of yours) */
         IptvCatalog *cat = IptvCatalog::instance( p_intf );
-        const QString path = loc.value( 2 ) + "/" + s;
-        foreach( const QVector<IptvList> &v, QList<QVector<IptvList> >() << cat->categories()
-                                                 << cat->languages() << cat->countries() )
-            foreach( const IptvList &l, v )
-                if( l.path == path )
-                    return l.title;
-        return s;
+        const bool radio = loc.value( 1 ) == "liveradio";
+        if( i == 2 && s.startsWith( "mine" ) )
+        {
+            const QVector<IptvList> mine = cat->myLists();
+            const int k = s.section( QChar( 0x1F ), 1 ).toInt();
+            return k >= 0 && k < mine.size() ? mine[k].title : qtr( "Your list" );
+        }
+        if( i == 2 && s == "top" )
+            return qtr( "Top Stations" );
+        if( i == 3 )
+        {
+            const QString path = radio ? QString( QString( "radio/" ) + ( loc.value( 2 ) == "languages" ? "language/" : "country/" ) + s )
+                                       : QString( loc.value( 2 ) + "/" + s );
+            QList<QVector<IptvList> > all;
+            if( radio )
+                all << cat->radioLanguages() << cat->radioCountries();
+            else
+                all << cat->categories() << cat->languages() << cat->countries();
+            foreach( const QVector<IptvList> &v, all )
+                foreach( const IptvList &l, v )
+                    if( l.path == path )
+                        return l.title;
+            return s;
+        }
     }
     if( section() == "network" )
         return sectionTitle( s );
@@ -394,7 +498,7 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
     /* Components "Network" panel: the sources of VLC 3's discovery */
     if( sec == "network" )
     {
-        if( loc.value( 1 ) == "livetv" )
+        if( loc.value( 1 ) == "livetv" || loc.value( 1 ) == "liveradio" )
             return liveTvEntries();
         LibraryEntry tv;
         tv.type = LibraryEntry::GROUP;
@@ -402,10 +506,13 @@ QVector<LibraryEntry> LibraryBrowser::collect() const
         tv.title = sectionTitle( "livetv" );
         tv.icon = "tv";
         tv.tile = LibraryEntry::TILE_GLYPH;
+        LibraryEntry radio = tv;
+        radio.segment = "liveradio";
+        radio.title = sectionTitle( "liveradio" );
+        radio.icon = "audio";
         out << action( "netstream", qtr( "Add Network Stream" ), "add" )
-            << tv
-            << action( "podcast", qtr( "Podcasts" ), "network" )
-            << action( "radio", qtr( "Radio" ), "network" );
+            << tv << radio
+            << action( "podcast", qtr( "Podcasts" ), "network" );
         return out;
     }
 
@@ -1115,13 +1222,16 @@ void LibraryBrowser::activate( int i )
             Open::openMRL( p_intf, e.segment.mid( 4 ), true, true );
         else if( e.segment == "iptvretry" )
             rebuild();
+        else if( e.segment == "iptvaddlist" )
+            addChannelList();
         else if( e.segment.startsWith( "iptvplay:" ) )
         {
             /* the channel, with its list as the queue (zap with Next and
              * Previous, search and save it there) */
+            /* "<path><US><index>": paths hold colons ("url:https://...") */
             const QString arg = e.segment.mid( 9 );
-            const int colon = arg.lastIndexOf( ':' );
-            IptvCatalog::instance( p_intf )->play( arg.left( colon ), arg.mid( colon + 1 ).toInt() );
+            const int sep = arg.lastIndexOf( QChar( 0x1F ) );
+            IptvCatalog::instance( p_intf )->play( arg.left( sep ), arg.mid( sep + 1 ).toInt() );
             /* straight to the player, the channels beside it */
             if( MainInterface *mi = p_intf->p_sys->p_mi )
             {
@@ -1180,6 +1290,35 @@ void LibraryBrowser::showEntryMenu( int i, const QPoint &pos, QWidget *parent )
     if( i < 0 || i >= current.size() || current[i].type == LibraryEntry::HEADER )
         return;
     const LibraryEntry e = current[i];
+    if( section() == "network" && loc.value( 1 ) == "livetv" && loc.size() == 2
+     && e.type == LibraryEntry::GROUP && e.segment.startsWith( "mine" ) )
+    {
+        /* one of your channel lists: Open, Rename, Remove */
+        IptvCatalog *cat = IptvCatalog::instance( p_intf );
+        const QVector<IptvList> mine = cat->myLists();
+        const int k = e.segment.section( QChar( 0x1F ), 1 ).toInt();
+        if( k < 0 || k >= mine.size() )
+            return;
+        const IptvList l = mine[k];
+        QMenu menu( parent );
+        menu.addAction( RedesignMenus::menuIcon( "folder", 20 ), qtr( "Open" ), this, [this, i]() { activate( i ); } );
+        menu.addSeparator();
+        menu.addAction( RedesignMenus::menuIcon( "edit", 20 ), qtr( "Rename…" ), this, [cat, l, parent]() {
+            bool ok = false;
+            const QString name = QInputDialog::getText( parent, qtr( "Rename Channel List" ), qtr( "Name" ),
+                                                        QLineEdit::Normal, l.title, &ok ).trimmed();
+            if( ok && !name.isEmpty() )
+                cat->renameMyList( l.path, name );
+        } );
+        menu.addAction( RedesignMenus::menuIcon( "win-close", 20 ), qtr( "Remove" ), this, [cat, l, parent]() {
+            if( QMessageBox::question( parent, qtr( "Remove Channel List" ),
+                    qtr( "Remove \"%1\" from Live TV? The list itself isn't touched." ).arg( l.title ) )
+                == QMessageBox::Yes )
+                cat->removeMyList( l.path );
+        } );
+        menu.exec( pos );
+        return;
+    }
     const bool inPlaylist = section() == "playlists" && loc.size() == 2 && e.track >= 0;
     if( section() == "playlists" && loc.size() == 1 && e.type == LibraryEntry::GROUP )
     {

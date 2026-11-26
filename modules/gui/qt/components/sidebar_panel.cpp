@@ -604,7 +604,7 @@ void SidebarPanel::showMoreMenu()
                 const QString name = qfu( names[i] );
                 const QString longname = qfu( longnames[i] );
                 if( ( categories[i] == SD_CAT_LAN || categories[i] == SD_CAT_INTERNET )
-                    && !name.startsWith( "podcast" ) && !name.contains( "icecast" ) )
+                    && !name.startsWith( "podcast" ) )
                     menu.addAction( RedesignMenus::menuIcon( "network", 20 ), longname, this,
                                     [this, name, longname]() { openSource( name, longname ); } );
                 free( names[i] );

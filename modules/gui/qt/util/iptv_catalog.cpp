@@ -44,10 +44,19 @@
 #include <QPointer>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QSettings>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QUrl>
 
 static const char IPTV_BASE[] = "https://iptv-org.github.io/iptv/";
 static const char IPTV_INDEX[] =
     "https://raw.githubusercontent.com/iptv-org/iptv/master/PLAYLISTS.md";
+/* any of its servers (round-robin DNS), as Radio Browser asks */
+static const char RADIO_API[] = "https://all.api.radio-browser.info/json/";
+/* hidebroken: only stations that passed the last check */
+static const char RADIO_STATIONS[] = "?hidebroken=true&order=votes&reverse=true&limit=500";
 
 enum
 {
@@ -140,6 +149,15 @@ IptvCatalog *IptvCatalog::instance( intf_thread_t *p_intf )
 
 QString IptvCatalog::listUrl( const QString &path )
 {
+    if( path.startsWith( "url:" ) )
+        return path.mid( 4 );
+    if( path == "radio/top" )
+        return QString( RADIO_API ) + "stations/topvote/200";
+    if( path.startsWith( "radio/language/" ) )
+        return QString( RADIO_API ) + "stations/bylanguageexact/"
+             + QString::fromLatin1( QUrl::toPercentEncoding( path.mid( 15 ) ) ) + RADIO_STATIONS;
+    if( path.startsWith( "radio/country/" ) )
+        return QString( RADIO_API ) + "stations/bycountrycodeexact/" + path.mid( 14 ) + RADIO_STATIONS;
     return QString( IPTV_BASE ) + path + ".m3u";
 }
 
@@ -379,6 +397,34 @@ static QVector<IptvChannel> parseM3u( const QByteArray &data )
     return out;
 }
 
+/* Radio Browser's station JSON: name, stream, logo, genre tags */
+static QVector<IptvChannel> parseStations( const QByteArray &data )
+{
+    QVector<IptvChannel> out;
+    const QJsonArray a = QJsonDocument::fromJson( data ).array();
+    QSet<QString> seen;
+    foreach( const QJsonValue &v, a )
+    {
+        const QJsonObject o = v.toObject();
+        IptvChannel c;
+        c.title = o.value( "name" ).toString().trimmed();
+        c.url = o.value( "url_resolved" ).toString();
+        if( c.url.isEmpty() )
+            c.url = o.value( "url" ).toString();
+        if( c.title.isEmpty() || c.url.isEmpty() || seen.contains( c.url ) )
+            continue;
+        seen.insert( c.url );
+        c.logo = o.value( "favicon" ).toString();
+        /* the first genres it lists, like "news, talk" */
+        QStringList tags = o.value( "tags" ).toString().split( ',', QString::SkipEmptyParts );
+        for( QString &t : tags )
+            t = t.trimmed();
+        c.group = QStringList( tags.mid( 0, 2 ) ).join( ";" );
+        out << c;
+    }
+    return out;
+}
+
 QVector<IptvChannel> IptvCatalog::channels( const QString &path, bool *loading, bool *failed )
 {
     if( loading )
@@ -401,7 +447,8 @@ QVector<IptvChannel> IptvCatalog::channels( const QString &path, bool *loading, 
     listsLoading.insert( path );
     fetch( listUrl( path ), LIST_MAX, [this, path]( const QByteArray &data ) {
         listsLoading.remove( path );
-        const QVector<IptvChannel> ch = parseM3u( data );
+        const QVector<IptvChannel> ch = path.startsWith( "radio/" ) ? parseStations( data )
+                                                                   : parseM3u( data );
         if( ch.isEmpty() )
             listsFailed.insert( path );
         else
@@ -444,6 +491,161 @@ void IptvCatalog::play( const QString &path, int from )
         playlist_AddInput( THEPL, in, i == from, true );
         input_item_Release( in );
     }
+}
+
+/*********************************************************************
+ * Radio Browser's languages and countries
+ *********************************************************************/
+QVector<IptvList> IptvCatalog::parseRadioLists( const QByteArray &data, bool countries ) const
+{
+    QVector<IptvList> out;
+    const QJsonArray a = QJsonDocument::fromJson( data ).array();
+    foreach( const QJsonValue &v, a )
+    {
+        const QJsonObject o = v.toObject();
+        const QString name = o.value( "name" ).toString().trimmed();
+        const int n = o.value( "stationcount" ).toInt();
+        if( name.isEmpty() || n < 2 )
+            continue;               /* hundreds of one-station spellings */
+        IptvList l;
+        l.count = n;
+        if( countries )
+        {
+            const QString cc = o.value( "iso_3166_1" ).toString();
+            if( cc.size() != 2 )
+                continue;
+            l.path = "radio/country/" + cc;
+            l.code = cc.toLower();
+            /* "The United States Of America": the Live TV name reads better */
+            l.title = name;
+            foreach( const IptvList &c, ctrs )
+                if( c.code == l.code || ( l.code == "gb" && c.code == "gb" ) )
+                    l.title = c.title;
+        }
+        else
+        {
+            /* real languages carry an ISO 639 code; the rest are tags
+             * people typed ("80s", "#japan") */
+            if( o.value( "iso_639" ).toString().isEmpty() )
+                continue;
+            l.path = "radio/language/" + name;
+            l.title = name;
+            l.title[0] = l.title[0].toUpper();
+        }
+        out << l;
+    }
+    return out;
+}
+
+void IptvCatalog::fetchRadioLists()
+{
+    static const char *files[] = { "radio-languages.json", "radio-countries.json" };
+    static const char *apis[] = { "languages", "countries" };
+    for( int k = 0; k < 2; k++ )
+    {
+        QFile f( cacheDir + "/" + files[k] );
+        if( ( k ? radioCtrs : radioLangs ).isEmpty() && f.open( QIODevice::ReadOnly ) )
+            ( k ? radioCtrs : radioLangs ) = parseRadioLists( f.readAll(), k );
+    }
+    const QFileInfo fi( cacheDir + "/" + files[1] );
+    if( radioFetching
+     || ( fi.exists() && fi.lastModified().secsTo( QDateTime::currentDateTime() ) < 24 * 3600 ) )
+        return;
+    radioFetching = true;
+    for( int k = 0; k < 2; k++ )
+    {
+        const QString file = cacheDir + "/" + files[k];
+        fetch( QString( RADIO_API ) + apis[k] + "?hidebroken=true", INDEX_MAX,
+               [this, k, file]( const QByteArray &data ) {
+            const QVector<IptvList> l = parseRadioLists( data, k );
+            if( k == 1 )
+                radioFetching = false;
+            if( l.isEmpty() )
+                return;
+            QSaveFile f( file );
+            if( f.open( QIODevice::WriteOnly ) )
+            {
+                f.write( data );
+                f.commit();
+            }
+            ( k ? radioCtrs : radioLangs ) = l;
+            emit changed();
+        } );
+    }
+}
+
+QVector<IptvList> IptvCatalog::radioLanguages()
+{
+    fetchRadioLists();
+    return radioLangs;
+}
+
+QVector<IptvList> IptvCatalog::radioCountries()
+{
+    fetchRadioLists();
+    return radioCtrs;
+}
+
+/*********************************************************************
+ * Your own lists: "title<US>url" entries in the Qt settings
+ *********************************************************************/
+QVector<IptvList> IptvCatalog::myLists() const
+{
+    QVector<IptvList> out;
+    foreach( const QString &e, getSettings()->value( "LiveTV/myLists" ).toStringList() )
+    {
+        const int sep = e.indexOf( QChar( 0x1F ) );
+        if( sep < 0 )
+            continue;
+        IptvList l;
+        l.title = e.left( sep );
+        l.path = "url:" + e.mid( sep + 1 );
+        out << l;
+    }
+    return out;
+}
+
+static void saveMyLists( QSettings *settings, const QVector<IptvList> &lists )
+{
+    QStringList out;
+    foreach( const IptvList &l, lists )
+        out << l.title + QChar( 0x1F ) + l.path.mid( 4 );
+    settings->setValue( "LiveTV/myLists", out );
+}
+
+void IptvCatalog::addMyList( const QString &title, const QString &url )
+{
+    QVector<IptvList> l = myLists();
+    foreach( const IptvList &e, l )
+        if( e.path == "url:" + url )
+            return;
+    IptvList n;
+    n.title = title;
+    n.path = "url:" + url;
+    l << n;
+    saveMyLists( getSettings(), l );
+    emit changed();
+}
+
+void IptvCatalog::renameMyList( const QString &path, const QString &title )
+{
+    QVector<IptvList> l = myLists();
+    for( IptvList &e : l )
+        if( e.path == path )
+            e.title = title;
+    saveMyLists( getSettings(), l );
+    emit changed();
+}
+
+void IptvCatalog::removeMyList( const QString &path )
+{
+    QVector<IptvList> l = myLists();
+    for( int i = l.size() - 1; i >= 0; i-- )
+        if( l[i].path == path )
+            l.remove( i );
+    saveMyLists( getSettings(), l );
+    lists.remove( path );
+    emit changed();
 }
 
 /*********************************************************************

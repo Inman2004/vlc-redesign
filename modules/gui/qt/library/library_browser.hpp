@@ -128,6 +128,9 @@ private:
     /* Network > Live TV: iptv-org's public channel lists */
     QVector<LibraryEntry> liveTvEntries() const;
     void watchLiveTv();
+    QString liveListPath() const;
+    /* asks for an M3U link (or file) and its name: a list of your own */
+    void addChannelList();
     bool liveTvWatched = false;
     void showPlaylistMenu( const QString &file, const QPoint &, QWidget *parent );
     void addToPlaylistMenu( QMenu *, const QStringList &uris, QWidget *parent );
